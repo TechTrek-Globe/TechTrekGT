@@ -10,7 +10,8 @@ import {
   generateEbayCopy,
   generateWhatnotCopy,
   generateMercariCopy,
-  generateSocialCopy
+  generateSocialCopy,
+  stripInternalTrackingNotes
 } from '../utils/listingCopyGenerator';
 import { getApiUrl } from '../utils/api';
 import { parseAmazonProductContent } from '../utils/amazonParser';
@@ -81,7 +82,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
     setFeatures('');
     setSpecs('');
     setCompatibility('');
-    setDescription(item.notes || '');
+    setDescription(stripInternalTrackingNotes(item.notes || ''));
     setIncludedInSale('');
     setAmazonMsg(null);
     setConditionMsg(null);
@@ -253,6 +254,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
     setGeneratingAiDetails(true);
     setAiDetailsMsg(null);
     try {
+      const cleanNotes = stripInternalTrackingNotes(description || item.notes || '');
       const res = await generateAiEbayDetails({
         title: title || item.item_name || '',
         brand: brand || '',
@@ -260,7 +262,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
         condition: condition || '',
         conditionHeader: conditionHeader || '',
         conditionSubheader: conditionSubheader || '',
-        notes: description || item.notes || '',
+        notes: cleanNotes,
         specs: specs || '',
         features: features || ''
       });
@@ -269,7 +271,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
         throw new Error(res?.error || 'Failed to generate AI listing details.');
       }
 
-      setAiGeneratedMiddleSection(res.html);
+      setAiGeneratedMiddleSection(stripInternalTrackingNotes(res.html));
       setAiDetailsMsg({
         type: 'success',
         text: 'AI Condition and Key Details cards generated successfully. Preview updated.'

@@ -1,7 +1,7 @@
 import { getCertVerificationUrl } from './certLookup.js';
-import { generateEbayListingHtml } from './ebayTemplate.js';
+import { generateEbayListingHtml, stripInternalTrackingNotes } from './ebayTemplate.js';
 
-export { generateEbayListingHtml };
+export { generateEbayListingHtml, stripInternalTrackingNotes };
 
 /**
  * Generate multi-channel formatted listing copy for sports cards, memorabilia, and general/Amazon inventory.
@@ -98,8 +98,11 @@ export function generateEbayCopy(item, options = {}) {
     textLines.push('');
   }
 
-  if (options.description) {
-    textLines.push('ITEM DESCRIPTION:', options.description, '');
+  const rawDescription = (options.description || '').trim();
+  const cleanDescription = stripInternalTrackingNotes(rawDescription);
+
+  if (cleanDescription) {
+    textLines.push('ITEM DESCRIPTION:', cleanDescription, '');
   } else if (isAutographed) {
     textLines.push(
       'ABOUT THIS PIECE:',
@@ -131,7 +134,7 @@ export function generateEbayCopy(item, options = {}) {
 
   const inscription = options.inscription || item.inscription || '';
   const authType = options.authType || item.auth_type || authenticator;
-  const additionalDescription = options.description || item.additional_description || '';
+  const additionalDescription = cleanDescription || stripInternalTrackingNotes(item.additional_description || '');
 
   // Build Item Details Table Rows
   const itemDetailsRows = [];
@@ -180,7 +183,7 @@ export function generateEbayCopy(item, options = {}) {
   // Generate modular dark-theme card layout (between delimiters)
   const insertHtml = generateEbayListingHtml({
     title: titleInput,
-    description: options.description || additionalDescription,
+    description: cleanDescription || additionalDescription,
     conditionDetails: options.conditionHeader && options.conditionSubheader
       ? `${options.conditionHeader}: ${options.conditionSubheader}`
       : (condition ? `${condition}. Please review all photos carefully for the exact condition, quality, and details.` : undefined),
@@ -282,12 +285,14 @@ export function generateWhatnotCopy(item, options = {}) {
   const brand = (options.brand || '').trim();
 
   const title = `${titleInput}${authenticator ? ` ${authenticator}` : ''}`.trim();
+  const customNotes = stripInternalTrackingNotes(options.notes || options.description || '');
   const notes = [
     `🔥 ${titleInput}`,
     brand ? `🏷️ Brand: ${brand}` : null,
     athlete ? `⭐ Athlete: ${athlete}` : null,
     item.category ? `📦 Category: ${item.category}` : null,
     (authenticator || cert) ? `🛡️ Auth: ${authenticator || 'Certified'} ${cert}`.trim() : null,
+    customNotes || null,
     `📦 Ships next-day securely packed!`
   ].filter(Boolean).join('\n');
 
@@ -302,6 +307,7 @@ export function generateMercariCopy(item, options = {}) {
   const authenticator = isCertified ? rawAuth : '';
   const certNumber = (options.certNumber || item.cert_number) ? `#${options.certNumber || item.cert_number}` : '';
   const brand = (options.brand || '').trim();
+  const cleanDesc = stripInternalTrackingNotes(options.description || '');
 
   let title = `${titleInput}${authenticator ? ` ${authenticator}` : ''}${certNumber ? ` ${certNumber}` : ''}`.trim();
   if (title.length > 80) title = title.substring(0, 80).trim();
@@ -321,6 +327,7 @@ export function generateMercariCopy(item, options = {}) {
     titleInput,
     ''
   ];
+  if (cleanDesc) descriptionLines.push(cleanDesc, '');
   if (brand) descriptionLines.push(`Brand: ${brand}`);
   if (athlete) descriptionLines.push(`Athlete / Subject: ${athlete}`);
   if (item.category) descriptionLines.push(`Category: ${item.category}`);
@@ -344,6 +351,7 @@ export function generateSocialCopy(item, options = {}) {
   const authenticator = isCertified ? rawAuth : '';
   const certNumber = (options.certNumber || item.cert_number) ? `#${options.certNumber || item.cert_number}` : '';
   const brand = (options.brand || '').trim();
+  const cleanDesc = stripInternalTrackingNotes(options.description || '');
 
   const tags = [
     'TechTrekOutpost',
@@ -359,6 +367,7 @@ export function generateSocialCopy(item, options = {}) {
     `🚨 AVAILABLE NOW: ${titleInput}`,
     ''
   ];
+  if (cleanDesc) captionLines.push(cleanDesc, '');
   if (brand) captionLines.push(`🏷️ Brand: ${brand}`);
   if (athlete) captionLines.push(`⭐ Subject: ${athlete}`);
   if (item.category) captionLines.push(`📦 Category: ${item.category}`);

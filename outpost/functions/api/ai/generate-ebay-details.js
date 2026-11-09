@@ -2,6 +2,52 @@ import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { fetchWithTimeout } from '../ebay/tokenHelper.js';
 
 /**
+ * Strips internal warehouse, auction lot, invoice, and tracking metadata
+ * (e.g., 'Inventory tracked: Lot #12862710, Item #8183938', 'Lot #12862710 · Item #8183938',
+ * Amazon order IDs, ASINs, etc.) from public-facing listing copy.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function stripInternalTrackingNotes(text) {
+  if (!text || typeof text !== 'string') return '';
+
+  let cleaned = text;
+
+  // 1. Remove explicit 'Inventory tracked: ...' blocks (up to period, pipe, or newline)
+  cleaned = cleaned.replace(/Inventory\s+tracked\s*:[^.\n\r|]*(?:\.|$)/gi, '');
+  cleaned = cleaned.replace(/Inventory\s+tracked\s*:?[^\n\r|]*/gi, '');
+
+  // 2. Remove 'Lot #... · Item #...' or 'Lot #..., Item #...' or standalone 'Lot #...'
+  cleaned = cleaned.replace(/Lot\s*#?\s*\d+\s*[·•,;&|/-]?\s*(?:Item\s*#?\s*\d+)?/gi, '');
+
+  // 3. Remove standalone 'Item #...' (when followed by numbers, e.g. Item #8183938)
+  cleaned = cleaned.replace(/Item\s*#\s*\d+/gi, '');
+
+  // 4. Remove internal Amazon/Vine order IDs and ASIN markers
+  cleaned = cleaned.replace(/Order\s*ID\s*:\s*[\d-]+/gi, '');
+  cleaned = cleaned.replace(/\bASIN\s*:\s*B0[A-Z0-9]{8}\b/gi, '');
+  cleaned = cleaned.replace(/Imported\s+via\s+VineScout/gi, '');
+  cleaned = cleaned.replace(/Sold\s+on\s+eBay[^\n\r|]*/gi, '');
+
+  // 5. Clean up dangling delimiters like ' · ', ' | ', ' - ', leading/trailing commas, multiple spaces
+  cleaned = cleaned
+    .split('\n')
+    .map(line => {
+      let l = line.trim();
+      l = l.replace(/^[\s|·•,;:/-]+|[\s|·•,;:/-]+$/g, '').trim();
+      l = l.replace(/[\s|·•,;:/-]*[|·•][\s|·•,;:/-]*/g, ' · ').trim();
+      l = l.replace(/^[\s|·•,;:/-]+|[\s|·•,;:/-]+$/g, '').trim();
+      return l;
+    })
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+
+  return cleaned;
+}
+
+/**
  * Extracts plain text from Gemini API response structures.
  * Supports both the modern Interactions API format and the generateContent format.
  *
@@ -130,8 +176,11 @@ export async function onRequestPost(context) {
       '2. In the Condition card, provide an accurate, reassuring description based on the provided condition, headline, and notes. Highlight that photos depict the exact item.',
       '3. In the Key Details card, provide 4 to 6 strong, bulleted specifications or features relevant to buyers based on the provided title, brand, specs, and features.',
       '4. Strict Punctuation Rule: NEVER use em dashes anywhere. Use standard hyphens (-), colons (:), or parentheses exclusively.',
-      '5. Output ONLY the raw HTML code for the two card <div> elements. Do NOT output markdown code fences (no ```html), do not output outer page wrappers or commentary.'
+      '5. Output ONLY the raw HTML code for the two card <div> elements. Do NOT output markdown code fences (no ```html), do not output outer page wrappers or commentary.',
+      '6. Strict Privacy Rule: NEVER include internal warehouse, auction, or inventory tracking references (such as "Inventory tracked:", "Lot #", "Item #", "Order ID", "ASIN", invoice numbers, or internal stock identifiers) anywhere in the output.'
     ].join('\n');
+
+    const cleanNotes = stripInternalTrackingNotes(trimmedNotes);
 
     const promptLines = [
       `Item Title: ${trimmedTitle || 'Authentic Item'}`,
@@ -143,7 +192,7 @@ export async function onRequestPost(context) {
         : null,
       specsText ? `Technical Specifications:\n${specsText}` : null,
       featuresText ? `Features / Highlights:\n${featuresText}` : null,
-      trimmedNotes ? `Seller Notes / Raw Description:\n${trimmedNotes}` : null
+      cleanNotes ? `Seller Notes / Raw Description:\n${cleanNotes}` : null
     ].filter(Boolean);
 
     const userPrompt = promptLines.join('\n\n');
@@ -226,6 +275,9 @@ export async function onRequestPost(context) {
 
     // Enforce strict zero em-dash invariant
     sanitizedHtml = sanitizedHtml.replace(/[\u2014\u2013]/g, '-');
+
+    // Strip any leaked internal tracking or warehouse lot metadata
+    sanitizedHtml = stripInternalTrackingNotes(sanitizedHtml);
 
     return ok({
       success: true,

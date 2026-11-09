@@ -541,14 +541,16 @@ Integrated Google Gemini API (`gemini-3.5-flash-lite` primary with `gemini-3.5-f
    - Ingests item metadata payload (`title`, `brand`, `productType`, `condition`, `conditionHeader`, `conditionSubheader`, `notes`, `specs`, `features`).
    - Queries Google Gemini API using `fetchWithTimeout` targeting the high-performance `gemini-3.5-flash-lite` model via `generateContent` (delivering sub-2-second generation latency) with resilient automatic fallback to `gemini-3.5-flash`.
    - Dual Model Resilience: Calls `gemini-3.5-flash-lite` with a 10-second timeout, falling back gracefully to `gemini-3.5-flash` with a 15-second timeout if the primary request encounters an issue.
-   - Strict Output Sanitization: Strips markdown code fences (` ```html `) and strictly enforces the platform zero em-dash rule (replacing any Unicode em or en dashes with standard hyphens).
+   - Strict Output Sanitization & Privacy Protection: Strips markdown code fences (` ```html `), enforces the platform zero em-dash rule, and filters out internal tracking notes (e.g., `Inventory tracked: Lot #...`, `Lot #... · Item #...`, order IDs, ASINs) so warehouse and invoice metadata is never leaked to buyers.
 2. **Dynamic Template Injection & Fallback Architecture (`src/utils/ebayTemplate.js`)**:
    - `generateEbayListingHtml(item)` accepts optional `aiGeneratedMiddleSection`.
    - When provided, seamlessly injects the AI-generated HTML cards directly between the Header Banner and the What's Included / Authentication cards.
    - When absent, empty, or on generation failure, falls back cleanly to the static Condition and Key Details card layout with zero visual regressions.
-   - Integrated with `generateEbayCopy` in `src/utils/listingCopyGenerator.js` to ensure both `insertHtml` and full `htmlBody` preview render the dynamic middle section.
+   - Internal Tracking Privacy Filter: `stripInternalTrackingNotes(text)` scrubs internal auction lot numbers (`Lot #...`), item tracking (`Item #...`), and invoice metadata from the Header Banner, Condition description, and middle section.
+   - Integrated with `generateEbayCopy` in `src/utils/listingCopyGenerator.js` to ensure both `insertHtml` and full `htmlBody` preview render the dynamic middle section without internal tracking metadata.
 3. **Frontend UI State & Dual-Trigger Ergonomics (`src/components/ListingCopyModal.jsx`)**:
    - Added an amber **"Auto-Generate AI Description"** button with `Sparkles` icon and animated `Loader2` spinner to the eBay tab toolbar and the Collapsible Details Form.
+   - Sanitizes item notes on modal load and before submitting to AI so internal lot tracking (`Lot #12862710 · Item #8183938`) is never populated into public description fields or prompts.
    - Follows AUDIT-004 resilience guidelines: gates loading flags in `finally {}` blocks to guarantee button recovery, catches `{ success: false }` payloads, and presents non-blocking accessible error alerts without browser `alert()` dialogs.
    - Displays real-time status pill badges: "AI Active" (emerald) when AI cards are rendered versus "Standard Template" (slate).
    - Provides an on-demand **"Reset to Static"** button allowing sellers to revert instantly to the static template at any time.

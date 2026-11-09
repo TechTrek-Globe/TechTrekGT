@@ -1,12 +1,47 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateEbayListingHtml } from '../src/utils/ebayTemplate.js';
+import { generateEbayListingHtml, stripInternalTrackingNotes } from '../src/utils/ebayTemplate.js';
 import { generateEbayCopy } from '../src/utils/listingCopyGenerator.js';
 import { COMPILED_ROUTES, matchRoute } from '../src/worker.js';
 import { onRequestPost as generateEbayDetailsHandler } from '../functions/api/ai/generate-ebay-details.js';
 import { createToken } from '../functions/utils/auth.js';
 
 test('[AI-001] eBay Listing HTML Generator with AI Middle Section', async (t) => {
+  await t.test('stripInternalTrackingNotes strips inventory tracking and warehouse numbers', () => {
+    assert.equal(stripInternalTrackingNotes('Inventory tracked: Lot #12862710, Item #8183938'), '');
+    assert.equal(stripInternalTrackingNotes('Lot #12862710 · Item #8183938'), '');
+    assert.equal(stripInternalTrackingNotes('Lot #11120149 · Item #6973424'), '');
+    assert.equal(stripInternalTrackingNotes('Authentic hand signed puck with Fanatics hologram. Lot #12862710 · Item #8183938'), 'Authentic hand signed puck with Fanatics hologram.');
+    assert.equal(stripInternalTrackingNotes('Order ID: 111-2212343-5265805 | ASIN: B0GRFNV381 | Imported via VineScout'), '');
+    assert.equal(stripInternalTrackingNotes('ASIN: B0FNWQPFPC | Brand New in Box'), 'Brand New in Box');
+  });
+
+  await t.test('Never includes internal inventory tracking notes in generateEbayListingHtml', () => {
+    const item = {
+      title: 'Thatcher Demko Signed Canucks Logo Hockey Puck',
+      notes: 'Inventory tracked: Lot #12862710, Item #8183938'
+    };
+    const html = generateEbayListingHtml(item);
+    assert.ok(!html.includes('12862710'), 'Must not include Lot number');
+    assert.ok(!html.includes('8183938'), 'Must not include Item number');
+    assert.ok(!html.includes('Inventory tracked'), 'Must not include Inventory tracked label');
+  });
+
+  await t.test('Never includes internal lot or item numbers in generateEbayCopy textBody or htmlBody', () => {
+    const item = {
+      item_name: 'Thatcher Demko Signed Canucks Logo Hockey Puck',
+      notes: 'Lot #12862710 · Item #8183938'
+    };
+    const copy = generateEbayCopy(item, {
+      description: 'Inventory tracked: Lot #12862710, Item #8183938'
+    });
+    assert.ok(!copy.textBody.includes('12862710'), 'Plain text must not contain Lot number');
+    assert.ok(!copy.textBody.includes('8183938'), 'Plain text must not contain Item number');
+    assert.ok(!copy.textBody.includes('Inventory tracked'), 'Plain text must not contain Inventory tracked');
+    assert.ok(!copy.htmlBody.includes('12862710'), 'HTML body must not contain Lot number');
+    assert.ok(!copy.htmlBody.includes('8183938'), 'HTML body must not contain Item number');
+    assert.ok(!copy.htmlBody.includes('Inventory tracked'), 'HTML body must not contain Inventory tracked');
+  });
   await t.test('Falls back to static Condition and Key Details cards when aiGeneratedMiddleSection is absent', () => {
     const item = {
       title: 'Kemimoto UTV Windshield',

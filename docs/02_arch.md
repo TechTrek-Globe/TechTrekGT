@@ -138,6 +138,7 @@ Production credentials are provisioned directly to Cloudflare Workers using the 
 - JWT_SECRET: Shared SSO signing secret provisioned across all Worker environments.
 - TOKEN_ENCRYPTION_KEY: Dedicated AES-256-GCM encryption key for stored OAuth tokens.
 - EBAY_CLIENT_ID / EBAY_CLIENT_SECRET / EBAY_RUNAME: Developer credentials for eBay Sell API access.
+- GEMINI_API_KEY: Google Gemini API key powering AI listing template generation in Outpost and document extractions in Wayfinder.
 - SCRAPER_API_KEY: Optional proxy key for external scraping cascades.
 - GUACAMOLE_INTERNAL_URL / GUAC_USERNAME / GUAC_PASSWORD: Internal connection secrets for BigWorm.
 - SYNC_UNLOCK_CODE: Dedicated authorization code for cloud vault backup operations.

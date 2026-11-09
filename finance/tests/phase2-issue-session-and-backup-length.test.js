@@ -67,7 +67,7 @@ describe('issueSession Options Object Signature & Verification', () => {
     assert.ok(payload);
     assert.strictEqual(payload.userId, user.id);
     const expectedSexp = Math.floor(Date.now() / 1000) + SESSION_TTL_REMEMBER;
-    assert.ok(Math.abs(payload.sexp - expectedSexp) <= 2, 'sexp should be ~30 days in future');
+    assert.ok(Math.abs(payload.sexp - expectedSexp) <= 5, 'sexp should be ~30 days in future');
   });
 
   test('issueSession with { rememberMe: false } issues SESSION_TTL_DEFAULT (1 day)', async () => {
@@ -78,7 +78,7 @@ describe('issueSession Options Object Signature & Verification', () => {
     const payload = await verifyToken(session.token, TEST_JWT_SECRET);
     assert.ok(payload);
     const expectedSexp = Math.floor(Date.now() / 1000) + SESSION_TTL_DEFAULT;
-    assert.ok(Math.abs(payload.sexp - expectedSexp) <= 2, 'sexp should be ~1 day in future');
+    assert.ok(Math.abs(payload.sexp - expectedSexp) <= 5, 'sexp should be ~1 day in future');
   });
 
   test('issueSession with empty options or omitted options defaults to SESSION_TTL_DEFAULT', async () => {

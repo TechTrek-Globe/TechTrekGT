@@ -171,3 +171,10 @@ To keep Cloudflare D1 write volume well below the 100k daily row-write free-tier
 - Outpost eBay Analytics (`listing_traffic`) and active inventory sync (`auction_items`) use deterministic primary keys, in-memory diffing, and conditional `ON CONFLICT DO UPDATE ... WHERE` clauses so unchanged rows and secondary indexes are never rewritten.
 - VineScout batch extension sync (`POST /api/vinescout/sync`) enforces `ON CONFLICT DO UPDATE ... WHERE` change-detection guards on both `vine_items` and `vine_asin_cache`.
 - Background client auto-polling gates execution on `document.visibilityState !== 'hidden'` and coordinates across tabs via a server-side cooldown window.
+
+## 10. Deep Relational Normalization & Structured Storage Governance
+
+Across both Finance OS and Outpost Tracker, monolithic JSON document blobs have been dismantled and migrated to normalized relational tables:
+- **Finance OS (`finance-os-db`)**: Decomposed bank statement comparison rows (`importedLedgerRows`) into `finance_account_statement_rows`, bill splits into `finance_bill_splits`, earner allocations into `finance_person_allocations`, account splits into `finance_account_splits`, dashboard widgets into `finance_dashboard_widgets`, and custom categories into `finance_categories`. Promoted scalar columns directly onto `finance_accounts`, `finance_bills`, `finance_transactions`, and `finance_funding_goals`, reducing `finance_accounts.extra_json` storage by up to 99.6%.
+- **Outpost Tracker (`outpost-db`)**: Decomposed product image galleries into `auction_item_images`, specifications and bullet features into `auction_item_specs`, multi-platform listing records into `auction_item_platform_listings`, and fee breakdowns into `ebay_reconciliation_fee_lines`. Normalized active eBay listings into `ebay_active_listings`.
+- **Positional Parameterization Enforcement (`FIN-AUDIT-001`)**: All decomposition and reconstruction services (`structuredBudgetStore.js`, `normalizedItemStore.js`) enforce strictly parameterized `?` bindings across all queries.

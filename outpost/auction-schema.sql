@@ -687,3 +687,69 @@ CREATE INDEX IF NOT EXISTS idx_auction_items_asin ON auction_items(asin) WHERE a
 CREATE INDEX IF NOT EXISTS idx_auction_items_order_id ON auction_items(order_id) WHERE order_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_auction_items_vinescout ON auction_items(user_id, is_vinescout) WHERE is_vinescout = 1;
 
+-- ============================================================
+-- RELATIONAL NORMALIZATION (MIGRATION 0011)
+-- 1. Normalizes attributes.image_urls into auction_item_images
+-- 2. Normalizes attributes.specs/features into auction_item_specs
+-- 3. Normalizes other_platform_listing_ids into auction_item_platform_listings
+-- 4. Normalizes finances_api_raw into ebay_reconciliation_fee_lines
+-- ============================================================
+CREATE TABLE IF NOT EXISTS auction_item_images (
+  item_id      TEXT NOT NULL,
+  user_id      TEXT NOT NULL,
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  image_url    TEXT NOT NULL,
+  is_primary   INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (item_id, sort_order),
+  FOREIGN KEY (item_id) REFERENCES auction_items(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_item_images_user ON auction_item_images(user_id, item_id);
+
+CREATE TABLE IF NOT EXISTS auction_item_specs (
+  item_id      TEXT NOT NULL,
+  user_id      TEXT NOT NULL,
+  spec_type    TEXT NOT NULL DEFAULT 'aspect' CHECK(spec_type IN ('aspect', 'feature', 'included')),
+  spec_key     TEXT NOT NULL,
+  spec_value   TEXT NOT NULL,
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (item_id, spec_type, spec_key),
+  FOREIGN KEY (item_id) REFERENCES auction_items(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_item_specs_item ON auction_item_specs(item_id, spec_type, sort_order);
+
+CREATE TABLE IF NOT EXISTS auction_item_platform_listings (
+  item_id              TEXT NOT NULL,
+  user_id              TEXT NOT NULL,
+  platform_name        TEXT NOT NULL,
+  external_listing_id  TEXT NOT NULL,
+  listing_url          TEXT,
+  status               TEXT NOT NULL DEFAULT 'Listed',
+  synced_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (item_id, platform_name),
+  FOREIGN KEY (item_id) REFERENCES auction_items(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_item_plat_listings_ext
+  ON auction_item_platform_listings(platform_name, external_listing_id);
+
+CREATE TABLE IF NOT EXISTS ebay_reconciliation_fee_lines (
+  id                 TEXT PRIMARY KEY,
+  reconciliation_id  TEXT NOT NULL,
+  sale_id            TEXT NOT NULL,
+  user_id            TEXT NOT NULL,
+  ebay_order_id      TEXT NOT NULL,
+  transaction_type   TEXT NOT NULL,
+  fee_type           TEXT NOT NULL,
+  amount             REAL NOT NULL DEFAULT 0.0,
+  description        TEXT,
+  occurred_at        TEXT,
+  FOREIGN KEY (reconciliation_id) REFERENCES ebay_fee_reconciliations(id) ON DELETE CASCADE,
+  FOREIGN KEY (sale_id) REFERENCES auction_sales(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_recon_fee_lines_recon ON ebay_reconciliation_fee_lines(reconciliation_id);
+CREATE INDEX IF NOT EXISTS idx_recon_fee_lines_order ON ebay_reconciliation_fee_lines(ebay_order_id);
+

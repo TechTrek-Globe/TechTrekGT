@@ -610,6 +610,31 @@ Normalized legacy monolithic JSON document blobs across active eBay listings and
    - Executed migration `migrations/0010_relational_normalization.sql` across local and remote `outpost-db` instances.
    - Backfilled 33 discrete active eBay listings from existing cache blobs using SQLite `json_each()`, and backfilled 53 inventory records with extracted ASINs, order IDs, image URLs, and VineScout markers.
 
+## Deep Relational Normalization & Normalized Item Store [ACTION ID: DB-004]
+
+Eliminated remaining high-volume JSON text blobs across Outpost inventory items and fee reconciliations by decomposing images, specifications, bullet-point features, platform listing links, and fee breakdowns into discrete relational SQLite tables in `outpost-db`.
+
+### Deep Normalization Capabilities
+
+1. **Normalized Image Gallery (`auction_item_images`)**:
+   - Stores multiple product images relationally with columns: `id`, `item_id`, `image_url`, `display_order`, `is_primary`, `caption`, `created_at`.
+   - Primary and gallery images are queryable by `(item_id, display_order)` via `idx_item_images_order` and by `(item_id, is_primary)` via `idx_item_images_primary`.
+   - Eliminates serialized `images` JSON arrays in item attributes and invoice attachments.
+2. **Normalized Specifications & Bullet Features (`auction_item_specs`)**:
+   - Stores key-value specifications and product bullet points relationally with columns: `id`, `item_id`, `spec_key`, `spec_value`, `spec_type` (`'spec'` or `'feature'`), `display_order`, `created_at`.
+   - Eliminates opaque `specs` and `features` JSON blobs in `auction_items.attributes`.
+3. **Normalized Platform Listing Cross-References (`auction_item_platform_listings`)**:
+   - Maps multi-platform listing IDs and status relationally with columns: `id`, `item_id`, `platform_id`, `external_listing_id`, `external_url`, `status`, `price`, `synced_at`, `created_at`.
+   - Replaces embedded `platform_listings` JSON arrays with compound uniqueness on `(item_id, platform_id)` via `idx_item_platform_listings_unique`.
+4. **Normalized Fee Reconciliations (`ebay_reconciliation_fee_lines`)**:
+   - Decomposes line-item fee breakdowns into discrete relational records with columns: `id`, `reconciliation_id`, `fee_type`, `amount`, `currency`, `created_at`.
+   - Foreign-keyed to `ebay_fee_reconciliations(id)` with cascade deletion and indexed via `idx_fee_lines_recon`.
+5. **Normalized Item Store Service (`functions/utils/normalizedItemStore.js`)**:
+   - Centralizes relational decomposition on item write paths (`saveNormalizedItemImages`, `saveNormalizedItemSpecs`, `saveNormalizedPlatformListings`) and reconstruction on item read paths (`attachNormalizedItemRelations`).
+   - Uses strictly positional `?` parameter bindings (`FIN-AUDIT-001`) with all-or-nothing cascading transactions.
+6. **Zero-Downtime Migration (Migration 0011)**:
+   - Executed `outpost/migrations/0011_deep_normalization.sql` across both local and remote `outpost-db` instances, expanding the schema to 24 fully normalized relational tables.
+
 
 
 

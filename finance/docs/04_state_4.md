@@ -203,8 +203,19 @@ For every existing user, their personal ledger ID is identical to their user ID 
 ## 11. Cross-App Account Isolation & Administration State
 
 ### 11.1 Dynamic App Filtering (`GET /api/admin/stats`) & Dedicated D1 Database (`finance-os-db`)
-- Finance OS operates on its dedicated Cloudflare D1 database `finance-os-db` (ID: `1746a2c8-2653-4136-8301-d217748621fa`) with 17 structured tables defined in `finance/finance-schema.sql`.
-- Accounts in the D1 database (`finance-os-db`) are strictly filtered so Finance OS has zero awareness of other platforms:
+- Finance OS operates on its dedicated Cloudflare D1 database `finance-os-db` (ID: `1746a2c8-2653-4136-8301-d217748621fa`), initialized via `finance/finance-schema.sql` and `finance/migrations/0012_deep_relational_normalization.sql` across 23 structured relational tables:
+  - Identity & Auth: `users`, `password_resets`, `email_verifications`
+  - Collaboration: `finance_ledgers`, `ledger_invites`, `ledger_shares`
+  - Domain Tables: `finance_ledger_settings`, `finance_accounts`, `finance_people`, `finance_bills`, `finance_transactions`, `finance_line_items`, `finance_funding_goals`, `finance_loans`, `finance_daily_matrix`
+  - Normalized Tables (Migration 0012): `finance_account_statement_rows`, `finance_bill_splits`, `finance_person_allocations`, `finance_account_splits`, `finance_dashboard_widgets`, `finance_categories`
+  - Snapshots & Version History: `user_backups`, `user_backup_versions`
+- **Deep Relational Normalization (Phase 2):**
+  - Statement row comparison maps (`importedLedgerRows`) are fully normalized into `finance_account_statement_rows` (`PRIMARY KEY (ledger_id, account_id, date_key)`), shrinking `finance_accounts.extra_json` from 69 KB down to < 300 bytes (99.6% reduction).
+  - Explicit scalar columns (`starting_balance`, `extra_starting_balance`, `balance_as_of_date`, `start_date`, `ledger_mode`, `is_archived`) are promoted directly to SQL columns on `finance_accounts`.
+  - Splits and allocations (`splits_json`, `account_allocations`, `saveExtraSplits`, `overflowSplits`) are decomposed into discrete junction tables (`finance_bill_splits`, `finance_person_allocations`, `finance_account_splits`).
+  - Settings arrays (`dashboard_widgets_json`, `custom_categories_json`) are normalized into `finance_dashboard_widgets` and `finance_categories`.
+  - Delta-only storage with `_p` (present keys set) in `structuredBudgetStore.js` ensures 100% key-for-key idempotency and zero full-item duplication in `extra_json`.
+- Accounts in `finance-os-db` are strictly filtered so Finance OS has zero awareness of other platforms:
   - A user is recognized as a Finance user only if they have active rows in `user_backups`, `user_backup_versions`, `finance_ledgers`, or `ledger_shares`, or if their `users.created_app` is `'finance'` or role is `'admin'`.
   - Accounts belonging exclusively to other platforms (such as Wayfinder or Outpost) are completely omitted from API responses and never rendered in the UI.
 - `totalUsers` and `users` reflect strictly Finance-scoped accounts.

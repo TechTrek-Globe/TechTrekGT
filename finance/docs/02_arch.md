@@ -89,7 +89,14 @@ API routes are registered in a centralized dispatch table (ROUTES) mapping HTTP 
 Finance OS connects to its dedicated Cloudflare D1 SQLite database (`finance-os-db`):
 
 - D1 Binding: DB bound to dedicated database `finance-os-db` (ID: `1746a2c8-2653-4136-8301-d217748621fa`), decoupled from `personal-budget-db` to isolate single-writer SQLite lock contention and quota metrics.
-- Structured Relational Schema (`finance/finance-schema.sql`): Persists Finance OS domain entities in discrete indexed SQLite tables (`finance_ledger_settings`, `finance_accounts`, `finance_people`, `finance_bills`, `finance_transactions`, `finance_line_items`, `finance_funding_goals`, `finance_loans`, `finance_daily_matrix`) alongside auth and collaboration tables (`users`, `email_verifications`, `password_resets`, `finance_ledgers`, `ledger_invites`, `ledger_shares`, `user_backups`, `user_backup_versions`).
+- Structured Relational Schema (`finance/finance-schema.sql` & Migration 0012): Persists Finance OS domain entities across 23 discrete indexed SQLite tables:
+  - Identity & Auth: `users`, `email_verifications`, `password_resets`
+  - Collaboration & Tenant Isolation: `finance_ledgers`, `ledger_invites`, `ledger_shares`
+  - Domain Core: `finance_ledger_settings`, `finance_accounts`, `finance_people`, `finance_bills`, `finance_transactions`, `finance_line_items`, `finance_funding_goals`, `finance_loans`, `finance_daily_matrix`
+  - Deep Relational Normalization (Migration 0012): `finance_account_statement_rows` (normalized `importedLedgerRows` compound-keyed by `ledger_id, account_id, date_key`), `finance_bill_splits`, `finance_person_allocations`, `finance_account_splits`, `finance_dashboard_widgets`, and `finance_categories`
+  - Snapshot & Version History: `user_backups`, `user_backup_versions`
+  - Scalar Column Promotions: Direct typed columns on `finance_accounts` (`starting_balance`, `extra_starting_balance`, `balance_as_of_date`, `start_date`, `ledger_mode`, `is_archived`), `finance_bills` (`bank_match_names`), `finance_transactions` (`person_id`, `is_other`), `finance_line_items` (`updated_at`), and `finance_funding_goals` (`contributor_id`, `frequency`, `amount_per_pay`), reducing `extra_json` payload sizes by up to 99.6%.
+  - Decomposition & Reconstruction Service: `functions/utils/structuredBudgetStore.js` decomposes budget snapshots into normalized relational rows with delta-only `_p` (present keys) tracking, and reconstructs client payloads losslessly with strict positional parameter bindings (`FIN-AUDIT-001`).
 - Durable Object Rate Limiting: Bound to RATE_LIMITER (class RateLimiter) with SQLite storage migration tag v1 for coordinated brute-force defense.
 - Client Persistence: Local-first IndexedDB storage keying full budget snapshots per user ID, enabling immediate offline interaction and network reconnection syncing.
 

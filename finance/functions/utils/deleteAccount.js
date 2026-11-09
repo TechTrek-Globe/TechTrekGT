@@ -42,6 +42,12 @@ export async function deleteUserAccount(db, targetUserId, actorUserId) {
 
   // --- Core Finance Tables ---
   addIfTable('finance_daily_matrix', 'DELETE FROM finance_daily_matrix WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_account_statement_rows', 'DELETE FROM finance_account_statement_rows WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_bill_splits', 'DELETE FROM finance_bill_splits WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_person_allocations', 'DELETE FROM finance_person_allocations WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_account_splits', 'DELETE FROM finance_account_splits WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_dashboard_widgets', 'DELETE FROM finance_dashboard_widgets WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_categories', 'DELETE FROM finance_categories WHERE ledger_id = ?', targetUserId);
   addIfTable('finance_transactions', 'DELETE FROM finance_transactions WHERE ledger_id = ?', targetUserId);
   addIfTable('finance_line_items', 'DELETE FROM finance_line_items WHERE ledger_id = ?', targetUserId);
   addIfTable('finance_funding_goals', 'DELETE FROM finance_funding_goals WHERE ledger_id = ?', targetUserId);

@@ -80,7 +80,8 @@ Applications requiring relational persistence bind Cloudflare D1 SQLite database
 Cloudflare D1 is built on a single-primary SQLite engine. While reads can scale across edge replicas, all write transactions serialize on a single primary coordinator. Concurrent writes across different applications contend for the same global database lock.
 
 To maintain performance and prevent lock starvation, the platform enforces strict mitigations:
-- Client-Side Primary Storage (Finance OS): Finance OS persists ledger transactions primarily in browser IndexedDB, using D1 strictly for authentication and debounced (5,000ms) cloud vault backups.
+- Structured Relational Storage (Finance OS): Finance OS persists client state in IndexedDB and synchronizes debounced (5,000ms) cloud vault backups to dedicated `finance-os-db` across 23 normalized SQLite tables (`finance/finance-schema.sql`), eliminating monolithic JSON text blobs.
+- Normalized Resale Catalog (Outpost Tracker): Outpost operates on dedicated `outpost-db` across 24 structured tables (`outpost/auction-schema.sql`), decomposing images, specifications, features, platform listings, and fee reconciliations into relational tables via `functions/utils/normalizedItemStore.js`.
 - Bounded Batch Concurrency (Outpost): Multi-item synchronization routines bound concurrency to three simultaneous tasks (CONCURRENCY_LIMIT = 3) with brief inter-batch delays (DELAY_MS = 100).
 - Static Travel Catalog (Wayfinder): Core travel itineraries and POI data are bundled as static datasets ([wayfinder/src/data/poland-2026.js](file:///e:/TechTrekGT/wayfinder/src/data/poland-2026.js)), eliminating D1 read and write pressure during travel browsing.
 - Authentication-Only Access (BigWorm): BigWorm limits D1 queries exclusively to user authentication and session validation.

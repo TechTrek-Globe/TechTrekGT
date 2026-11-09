@@ -94,7 +94,7 @@ describe('CRIT-001 / SEC-001: Secure D1 Database Parameterization Protocol', () 
   });
 
   test('Static Audit: Zero template literal variable interpolations exist inside db.prepare()', () => {
-    const rootDir = path.resolve(__dirname, '../../');
+    const rootDir = path.resolve(__dirname, '../');
     const ignoreDirs = new Set(['node_modules', '.wrangler', 'dist', '.git', 'coverage', 'build']);
 
     function scanDir(dir) {

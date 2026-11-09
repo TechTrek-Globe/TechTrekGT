@@ -150,10 +150,18 @@ Outpost manages over 50 serverless endpoints organized into modular handler file
 
 Outpost Tracker operates on its own dedicated Cloudflare D1 SQLite database (`outpost-db`) to isolate database usage and track quota metrics independently:
 
-- D1 Database Binding: DB mapped to outpost-db (ID: c41ad6c7-26f1-4ca8-9af8-82990ccb4566).
-- Durable Object: Bound to RATE_LIMIT_DO (class RateLimitCounter) with migration tag v1-rate-limit-do for distributed rate limiting.
-- Cloudflare KV: Bound to RATE_LIMIT_KV (ID: 12a9495ec88b45cdb492f1a63786066c).
-- Schema Migrations: Database structure defined in auction-schema.sql, executed via wrangler d1 execute outpost-db --file=./auction-schema.sql.
+- D1 Database Binding: DB mapped to `outpost-db` (ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`).
+- Durable Object: Bound to `RATE_LIMIT_DO` (class `RateLimitCounter`) with migration tag `v1-rate-limit-do` for distributed rate limiting.
+- Cloudflare KV: Bound to `RATE_LIMIT_KV` (ID: `12a9495ec88b45cdb492f1a63786066c`).
+- Structured Schema & Deep Relational Normalization (`outpost/auction-schema.sql` & Migration 0011): Manages 24 structured tables:
+  - Identity & Auth: `users`, `email_verifications`, `password_resets`
+  - Inventory & Invoicing: `auction_invoices`, `auction_items`, `auction_sales`, `auction_comps`, `auction_platforms`, `auction_supplies`, `market_comps`, `auction_market_alerts`
+  - Normalized Item Attributes (Migration 0011): `auction_item_images` (replaces `images` JSON array), `auction_item_specs` (replaces `specs` / `features` JSON blobs), `auction_item_platform_listings` (replaces `platform_listings` JSON blob)
+  - Normalized Fee Reconciliations (Migration 0011): `ebay_reconciliation_fee_lines` (replaces `fees_json` array in `ebay_fee_reconciliations`)
+  - Normalized eBay Listings: `ebay_active_listings` (replaces `ebay_listings_cache.listings_json`)
+  - Integration, Telemetry & OAuth: `ebay_oauth_tokens`, `ebay_webhook_events`, `ebay_fee_reconciliations`, `auction_item_analytics`, `listing_traffic`, `outpost_sync_settings`, `outpost_sync_history`, `api_integrations`, `ebay_listings_cache`
+  - Normalized Item Store Service: `functions/utils/normalizedItemStore.js` coordinates relational decomposition and reconstruction of items, images, specs, and platform listings using strict positional parameter bindings (`FIN-AUDIT-001`).
+- Schema Migrations: Database structure defined in `auction-schema.sql`, executed via `wrangler d1 execute outpost-db --file=./auction-schema.sql`.
 
 ## 6. Build & Deployment Lifecycle
 

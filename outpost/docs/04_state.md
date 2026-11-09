@@ -246,6 +246,10 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - `outpost/wrangler.jsonc`: Binds `env.DB` (`"binding": "DB"`) to dedicated Cloudflare D1 database `outpost-db` (`database_id`: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`), decoupling Outpost from `personal-budget-db`.
     - `outpost/auction-schema.sql`: Defines the complete 20-table Outpost schema (`users`, `email_verifications`, `password_resets`, `auction_invoices`, `auction_items`, `auction_sales`, `auction_comps`, `auction_platforms`, `auction_supplies`, `auction_market_alerts`, `ebay_oauth_tokens`, `ebay_webhook_events`, `ebay_fee_reconciliations`, `auction_item_analytics`, `market_comps`, `listing_traffic`, `outpost_sync_settings`, `outpost_sync_history`, `api_integrations`, `ebay_listings_cache`).
     - All existing Outpost production records (2,141 statements / 12,456 row writes across 20 tables) were exported from `personal-budget-db` and imported into both remote and local `outpost-db` instances.
+  - **Relational Normalization & Fast-Path Column State [ACTION ID: DB-003]**:
+    - `ebay_active_listings`: Discrete 1-to-many active listing table with primary key `ebay_listing_id`, foreign user scoping, and indexes `idx_ebay_active_user_sku` and `idx_ebay_active_user_synced`. Replaces monolithic `ebay_listings_cache` JSON blob reads while maintaining dual-write backward compatibility.
+    - `auction_items`: Fast-path columns (`asin`, `order_id`, `image_url`, `is_vinescout`, `etv`, `tax_cost`, `cert_verified`, `cert_verified_at`) with indexes `idx_auction_items_asin`, `idx_auction_items_order_id`, and `idx_auction_items_vinescout`.
+    - Handlers: `enriched.js` and `image-preview.js` prioritize native column values before JSON fallback. `amazon.js`, `[id].js`, and `sync/vinescout-catalog.js` synchronize native columns on insert and update.
 
 
 

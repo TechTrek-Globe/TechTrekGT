@@ -648,3 +648,42 @@ CREATE INDEX IF NOT EXISTS idx_auction_items_user_order_id
   ON auction_items(user_id, json_extract(attributes, '$.order_id'))
   WHERE attributes IS NOT NULL AND json_valid(attributes);
 
+-- ============================================================
+-- RELATIONAL NORMALIZATION (MIGRATION 0010)
+-- 1. Normalizes ebay_listings_cache JSON blob into 1-to-many ebay_active_listings table.
+-- 2. Promotes recurring attributes JSON keys (asin, image_url, order_id, is_vinescout, etv, tax_cost, cert_verified, cert_verified_at) to explicit columns on auction_items.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ebay_active_listings (
+  ebay_listing_id     TEXT PRIMARY KEY,
+  user_id             TEXT NOT NULL,
+  sku                 TEXT,
+  title               TEXT NOT NULL,
+  price               REAL NOT NULL DEFAULT 0.0,
+  quantity            INTEGER NOT NULL DEFAULT 1,
+  quantity_sold       INTEGER NOT NULL DEFAULT 0,
+  buyer_shipping_cost REAL NOT NULL DEFAULT 0.0,
+  is_free_shipping    INTEGER NOT NULL DEFAULT 0,
+  condition           TEXT,
+  status              TEXT NOT NULL DEFAULT 'Active',
+  image_url           TEXT,
+  listing_url         TEXT,
+  synced_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ebay_active_user_sku ON ebay_active_listings(user_id, sku);
+CREATE INDEX IF NOT EXISTS idx_ebay_active_user_synced ON ebay_active_listings(user_id, synced_at);
+
+ALTER TABLE auction_items ADD COLUMN asin TEXT;
+ALTER TABLE auction_items ADD COLUMN image_url TEXT;
+ALTER TABLE auction_items ADD COLUMN order_id TEXT;
+ALTER TABLE auction_items ADD COLUMN is_vinescout INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE auction_items ADD COLUMN etv REAL;
+ALTER TABLE auction_items ADD COLUMN tax_cost REAL;
+ALTER TABLE auction_items ADD COLUMN cert_verified INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE auction_items ADD COLUMN cert_verified_at TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_auction_items_asin ON auction_items(asin) WHERE asin IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_auction_items_order_id ON auction_items(order_id) WHERE order_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_auction_items_vinescout ON auction_items(user_id, is_vinescout) WHERE is_vinescout = 1;
+

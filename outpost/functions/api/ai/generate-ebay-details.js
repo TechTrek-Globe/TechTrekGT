@@ -119,8 +119,9 @@ export async function onRequestPost(context) {
     // Authenticate user via JWT session cookie / token_version check
     await requireAuth(request, env);
 
-    const apiKey = env.GEMINI_API_KEY;
-    if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
+    const rawApiKey = env.GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : '');
+    const apiKey = (rawApiKey || '').trim().replace(/^['"]+|['"]+$/g, '');
+    if (!apiKey) {
       return err('AI generation service is not configured (missing GEMINI_API_KEY).', 503);
     }
 

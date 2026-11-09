@@ -397,6 +397,7 @@ export async function onRequestPut(context) {
           sku = ?, listing_format = ?, listing_status = ?,
           quantity = ?, purchase_date = ?, floor_price = ?, buy_it_now_price = ?,
           buyer_shipping_cost = ?, attributes = ?,
+          asin = ?, order_id = ?, image_url = ?, is_vinescout = ?, etv = ?, tax_cost = ?,
           updated_at = datetime('now')
         WHERE id = ? AND user_id = ?
       `).bind(
@@ -414,6 +415,12 @@ export async function onRequestPut(context) {
         updated.sku, updated.listing_format, updated.listing_status,
         updated.quantity, updated.purchase_date, updated.floor_price, updated.buy_it_now_price,
         updated.buyer_shipping_cost, attributesJson,
+        nextAttrs.asin || null,
+        nextAttrs.order_id || null,
+        nextAttrs.image_url || nextAttrs.ebay_image_url || null,
+        (nextAttrs.is_vinescout || nextAttrs.source === 'amazon_vinescout' || nextAttrs.asin) ? 1 : 0,
+        nextAttrs.etv != null ? Number(nextAttrs.etv) : null,
+        nextAttrs.tax_cost != null ? Number(nextAttrs.tax_cost) : null,
         id, payload.userId
       ).run();
     } catch (updateErr) {

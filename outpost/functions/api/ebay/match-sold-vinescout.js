@@ -67,12 +67,19 @@ export async function onRequestGet(context) {
         i.ebay_listing_id,
         i.notes,
         i.attributes,
+        i.asin,
+        i.order_id,
+        i.image_url,
+        i.etv,
+        i.tax_cost,
         inv.invoice_ref
       FROM auction_items i
       LEFT JOIN auction_invoices inv ON i.invoice_id = inv.id
       WHERE i.user_id = ?
         AND (
-          inv.invoice_ref LIKE 'AMAZON-%'
+          i.is_vinescout = 1
+          OR i.asin IS NOT NULL
+          OR inv.invoice_ref LIKE 'AMAZON-%'
           OR i.notes LIKE '%ASIN:%'
           OR i.notes LIKE '%B0%'
           OR i.attributes LIKE '%asin%'
@@ -100,11 +107,11 @@ export async function onRequestGet(context) {
 
     // 3. Format Vine Scout items
     const parsedVScoutItems = vscoutRows.map(row => {
-      let asin = null;
-      let orderId = null;
-      let etv = null;
-      let taxCost = null;
-      let imageUrl = null;
+      let asin = row.asin ? String(row.asin).trim().toUpperCase() : null;
+      let orderId = row.order_id ? String(row.order_id).trim() : null;
+      let etv = row.etv != null ? Number(row.etv) : null;
+      let taxCost = row.tax_cost != null ? Number(row.tax_cost) : null;
+      let imageUrl = row.image_url || null;
       let liquidated = false;
       let linkedEbayOrderId = null;
 
@@ -112,13 +119,15 @@ export async function onRequestGet(context) {
         try {
           const attrs = typeof row.attributes === 'string' ? JSON.parse(row.attributes) : row.attributes;
           if (attrs && typeof attrs === 'object') {
-            if (attrs.asin) asin = String(attrs.asin).trim().toUpperCase();
-            if (attrs.order_id) orderId = String(attrs.order_id).trim();
-            if (attrs.etv != null) etv = Number(attrs.etv);
-            if (attrs.tax_cost != null) taxCost = Number(attrs.tax_cost);
-            if (attrs.image_url) imageUrl = attrs.image_url;
-            else if (Array.isArray(attrs.image_urls) && attrs.image_urls[0]) imageUrl = attrs.image_urls[0];
-            else if (attrs.ebay_image_url) imageUrl = attrs.ebay_image_url;
+            if (!asin && attrs.asin) asin = String(attrs.asin).trim().toUpperCase();
+            if (!orderId && attrs.order_id) orderId = String(attrs.order_id).trim();
+            if (etv == null && attrs.etv != null) etv = Number(attrs.etv);
+            if (taxCost == null && attrs.tax_cost != null) taxCost = Number(attrs.tax_cost);
+            if (!imageUrl) {
+              if (attrs.image_url) imageUrl = attrs.image_url;
+              else if (Array.isArray(attrs.image_urls) && attrs.image_urls[0]) imageUrl = attrs.image_urls[0];
+              else if (attrs.ebay_image_url) imageUrl = attrs.ebay_image_url;
+            }
 
             if (attrs.outpost_liquidated) liquidated = true;
             if (attrs.ebay_order_id) linkedEbayOrderId = String(attrs.ebay_order_id);

@@ -198,6 +198,12 @@ export async function onRequestPost(context) {
         min_sell_price = ?,
         suggested_list_price = ?,
         attributes = ?,
+        asin = ?,
+        order_id = ?,
+        image_url = ?,
+        is_vinescout = 1,
+        etv = ?,
+        tax_cost = ?,
         notes = ?,
         sku = COALESCE(sku, ?)
       WHERE id = ? AND user_id = ?
@@ -205,7 +211,13 @@ export async function onRequestPost(context) {
       title.trim(),
       unitPrice, unitPrice, proration.true_total_cost,
       pricing.min_sell_price, pricing.suggested_list_price,
-      attributes, itemNotes,
+      attributes,
+      cleanAsin,
+      normalizedOrderId || null,
+      resolvedImageUrls[0] || null,
+      etvAmt,
+      taxAmt,
+      itemNotes,
       existingSku,
       existingItem.id, userId
     ).run();
@@ -244,7 +256,8 @@ export async function onRequestPost(context) {
         proration_weight, prorated_discount, prorated_shipping, prorated_tax, true_total_cost,
         status, platform, platform_fee_pct, platform_flat_fee,
         est_shipping_cost, boost_pct, min_sell_price, suggested_list_price,
-        current_list_price, target_margin_pct, date_acquired, notes, attributes, sku
+        current_list_price, target_margin_pct, date_acquired, notes, attributes, sku,
+        asin, order_id, image_url, is_vinescout, etv, tax_cost
       ) VALUES (
         ?,?,?,?,?,?,
         ?,?,?,?,
@@ -252,6 +265,7 @@ export async function onRequestPost(context) {
         ?,?,?,?,
         ?,?,?,?,
         ?,?,?,?,?,?
+        ,?,?,?,?,?,?
       )
     `).bind(
       itemId, userId, invoiceId,
@@ -263,7 +277,8 @@ export async function onRequestPost(context) {
       'Available', plat.name, plat.fee_pct, plat.flat_fee,
       0, 0,
       pricing.min_sell_price, pricing.suggested_list_price,
-      null, DEFAULT_TARGET_MARGIN_PCT, today, itemNotes, attributes, itemSku
+      null, DEFAULT_TARGET_MARGIN_PCT, today, itemNotes, attributes, itemSku,
+      cleanAsin, normalizedOrderId || null, resolvedImageUrls[0] || null, 1, etvAmt, taxAmt
     ).run();
   } catch (itemErr) {
     console.error('[amazon-import] Failed to insert item, cleaning up invoice:', itemErr);

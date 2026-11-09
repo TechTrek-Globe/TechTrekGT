@@ -27,12 +27,23 @@ export async function onRequestGet(context) {
     // 1. Check local DB if itemId is provided
     if (itemId) {
       item = await env.DB.prepare(
-        `SELECT id, item_name, ebay_listing_id, notes, attributes FROM auction_items WHERE id = ? AND user_id = ?`
+        `SELECT id, item_name, ebay_listing_id, notes, attributes, image_url, asin FROM auction_items WHERE id = ? AND user_id = ?`
       ).bind(itemId, payload.userId).first();
 
       if (item) {
         if (!listingId && item.ebay_listing_id) {
           listingId = item.ebay_listing_id;
+        }
+
+        if (item.asin && !asin) {
+          asin = item.asin;
+        }
+
+        // Fast path 0: explicit normalized image_url column
+        if (item.image_url) {
+          const normDirect = normalizeHttps(item.image_url);
+          const isEbay = normDirect.includes('ebayimg');
+          if (normDirect) return ok({ success: true, imageUrl: normDirect, source: isEbay ? 'eBay' : 'Amazon' });
         }
 
         if (item.attributes) {

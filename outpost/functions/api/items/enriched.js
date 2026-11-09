@@ -205,39 +205,38 @@ export async function onRequestGet(context) {
 
     const enrichedItems = (rows.results || []).map(row => {
       const isAmazon = typeof row.invoice_ref === 'string' && row.invoice_ref.startsWith('AMAZON-');
-      // Parse image from notes first (Amazon pipe-delimited: "Image: https://...")
-      let imageUrl = parseImageFromNotes(row.notes);
       const userNote = parseUserNote(row.notes);
       const searchUrl = buildEbaySearchUrl(row.item_name, row.athlete_person, row.authenticator);
 
-      let asin = null;
-      let orderId = null;
-      let isVineScout = false;
-      let etv = null;
-      let taxCost = null;
-      let certVerified = false;
-      let certVerifiedAt = null;
+      // Prefer normalized relational columns first
+      let asin = row.asin ? String(row.asin).trim().toUpperCase() : null;
+      let orderId = row.order_id ? String(row.order_id).trim() : null;
+      let isVineScout = Boolean(row.is_vinescout);
+      let etv = row.etv != null ? Number(row.etv) : null;
+      let taxCost = row.tax_cost != null ? Number(row.tax_cost) : null;
+      let certVerified = Boolean(row.cert_verified);
+      let certVerifiedAt = row.cert_verified_at || null;
+      let imageUrl = row.image_url ? normalizeHttps(row.image_url) : parseImageFromNotes(row.notes);
 
-      if (row.attributes) {
+      // Fallback: parse attributes JSON if explicit columns were empty
+      if (row.attributes && (!asin || !orderId || !imageUrl || !etv)) {
         try {
           const parsed = typeof row.attributes === 'string' ? JSON.parse(row.attributes) : row.attributes;
           if (parsed && typeof parsed === 'object') {
-            if (parsed.asin) asin = String(parsed.asin).trim().toUpperCase();
-            if (parsed.order_id) orderId = String(parsed.order_id).trim();
-            if (parsed.source === 'amazon_vinescout' || parsed.is_vinescout) isVineScout = true;
-            if (parsed.etv != null) etv = Number(parsed.etv);
-            if (parsed.tax_cost != null) taxCost = Number(parsed.tax_cost);
-            if (parsed.cert_verified) certVerified = true;
-            if (parsed.cert_verified_at) certVerifiedAt = parsed.cert_verified_at;
+            if (!asin && parsed.asin) asin = String(parsed.asin).trim().toUpperCase();
+            if (!orderId && parsed.order_id) orderId = String(parsed.order_id).trim();
+            if (!isVineScout && (parsed.source === 'amazon_vinescout' || parsed.is_vinescout)) isVineScout = true;
+            if (etv == null && parsed.etv != null) etv = Number(parsed.etv);
+            if (taxCost == null && parsed.tax_cost != null) taxCost = Number(parsed.tax_cost);
+            if (!certVerified && parsed.cert_verified) certVerified = true;
+            if (!certVerifiedAt && parsed.cert_verified_at) certVerifiedAt = parsed.cert_verified_at;
 
-            // Fallback: pull image_url from attributes when notes did not yield one
             if (!imageUrl) {
               if (parsed.ebay_image_url) {
                 imageUrl = normalizeHttps(parsed.ebay_image_url);
               } else if (parsed.image_url) {
                 imageUrl = normalizeHttps(parsed.image_url);
               } else if (parsed.image_urls) {
-                // Handle plain array or double-serialized JSON string
                 const imgs = Array.isArray(parsed.image_urls)
                   ? parsed.image_urls
                   : (() => { try { return JSON.parse(parsed.image_urls); } catch (_) { return []; } })();

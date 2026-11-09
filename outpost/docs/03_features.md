@@ -590,6 +590,25 @@ Decoupled Outpost Tracker from the shared `personal-budget-db` instance by provi
 3. **Synchronized CLI Tooling & UI Status Telemetry**:
    - Updated all administrative CLI scripts (`scripts/check-legacy-hashes.js`, `scripts/manage-integrations.js`, `scripts/migrate-amazon-tokens.js`, `scripts/migrate-ebay-tokens.js`) and `SettingsView.jsx` database status badge to reference `outpost-db`.
 
+## Relational Normalization & Fast-Path Column Engine [ACTION ID: DB-003]
+
+Normalized legacy monolithic JSON document blobs across active eBay listings and inventory item records into first-class relational tables and indexed columns within `outpost-db`.
+
+### Normalization Capabilities
+
+1. **Normalized Active eBay Listings (`ebay_active_listings`)**:
+   - Deconstructed the monolithic `ebay_listings_cache.listings_json` blob into discrete relational rows stored in `ebay_active_listings` with columns: `ebay_listing_id` (PRIMARY KEY), `user_id`, `sku`, `title`, `price`, `quantity`, `quantity_sold`, `buyer_shipping_cost`, `is_free_shipping`, `condition`, `status`, `image_url`, `listing_url`, `synced_at`.
+   - B-Tree Indexes: Created `idx_ebay_active_user_sku` on `(user_id, sku)` and `idx_ebay_active_user_synced` on `(user_id, synced_at)` for high-speed SKU matching and inventory reconciliation.
+   - Dual-Write Compatibility: `functions/api/ebay/listingsCache.js` dual-writes active listings to both `ebay_active_listings` and `ebay_listings_cache` during eBay synchronization, and prunes ended listings relationally.
+   - Fast-Path Reads: `getCachedEbayListings` queries `ebay_active_listings` with fallback to `listings_json` if relational rows are missing.
+2. **Promoted Fast-Path Item Columns (`auction_items`)**:
+   - Promoted frequently accessed JSON attributes onto dedicated first-class columns on `auction_items`: `asin`, `image_url`, `order_id`, `is_vinescout`, `etv`, `tax_cost`, `cert_verified`, `cert_verified_at`.
+   - Secondary Indexes: Created `idx_auction_items_asin` on `asin`, `idx_auction_items_order_id` on `order_id`, and `idx_auction_items_vinescout` on `(user_id, is_vinescout)`.
+   - Eliminated JSON Parsing Overhead: Updated `functions/api/items/enriched.js`, `functions/api/items/image-preview.js`, `functions/api/import/amazon.js`, and `functions/api/sync/vinescout-catalog.js` to read and write directly to dedicated columns, slashing repetitive in-memory `JSON.parse(row.attributes)` overhead.
+3. **Zero-Downtime Data Backfill**:
+   - Executed migration `migrations/0010_relational_normalization.sql` across local and remote `outpost-db` instances.
+   - Backfilled 33 discrete active eBay listings from existing cache blobs using SQLite `json_each()`, and backfilled 53 inventory records with extracted ASINs, order IDs, image URLs, and VineScout markers.
+
 
 
 

@@ -27,7 +27,9 @@ export async function onRequestGet(context) {
       LEFT JOIN auction_invoices v ON i.invoice_id = v.id
       WHERE i.user_id = ?
         AND (
-          v.invoice_ref LIKE 'AMAZON-%'
+          i.is_vinescout = 1
+          OR i.asin IS NOT NULL
+          OR v.invoice_ref LIKE 'AMAZON-%'
           OR i.notes LIKE '%ASIN:%'
           OR i.notes LIKE '%B0%'
           OR i.attributes LIKE '%asin%'

@@ -148,12 +148,12 @@ Outpost manages over 50 serverless endpoints organized into modular handler file
 
 ## 5. Database Infrastructure & Persistence Bindings
 
-Outpost Tracker shares the platform-wide Cloudflare D1 SQLite database:
+Outpost Tracker operates on its own dedicated Cloudflare D1 SQLite database (`outpost-db`) to isolate database usage and track quota metrics independently:
 
-- D1 Database Binding: DB mapped to personal-budget-db (ID: 10f220d4-1c10-49e9-b63e-5d4cb08d599f).
+- D1 Database Binding: DB mapped to outpost-db (ID: c41ad6c7-26f1-4ca8-9af8-82990ccb4566).
 - Durable Object: Bound to RATE_LIMIT_DO (class RateLimitCounter) with migration tag v1-rate-limit-do for distributed rate limiting.
 - Cloudflare KV: Bound to RATE_LIMIT_KV (ID: 12a9495ec88b45cdb492f1a63786066c).
-- Schema Migrations: Database structure defined in auction-schema.sql, executed via wrangler d1 execute personal-budget-db --file=./auction-schema.sql.
+- Schema Migrations: Database structure defined in auction-schema.sql, executed via wrangler d1 execute outpost-db --file=./auction-schema.sql.
 
 ## 6. Build & Deployment Lifecycle
 

@@ -4,7 +4,7 @@ import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
  * GET /api/ebay/oauth-status
  *
  * Returns the eBay OAuth connection status for the authenticated user
- * directly from D1 (personal-budget-db).
+ * directly from D1 (outpost-db).
  */
 export async function onRequestGet(context) {
   const { request, env } = context;

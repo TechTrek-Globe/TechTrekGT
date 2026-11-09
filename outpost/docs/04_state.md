@@ -242,6 +242,11 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - `functions/utils/syncLogger.js`: Tracks initialized D1 bindings per isolate via `initializedDbs = new WeakSet()`, ensuring `CREATE TABLE IF NOT EXISTS outpost_sync_history` runs at most once per isolate lifecycle and eliminating runtime `ALTER TABLE` executions.
     - `functions/api/ebay/webhook.js`: Uses deterministic `ebw_${notificationId}` keys with `INSERT OR IGNORE INTO ebay_webhook_events` to short-circuit duplicate webhook deliveries (`meta.changes === 0`).
     - `src/context/InventoryContext.jsx` & `src/components/EditItemModal.jsx`: Background `setInterval` timers check `document.visibilityState !== 'hidden'` and pass `{ manual: false }` to `syncAllEbayItems`. `EditItemModal` skips `fetchActiveListings()` when opening items in `'Sold'` or `'Returned / Refunded'` status.
+  - **Dedicated Cloudflare D1 Database State (`outpost-db`) [ACTION ID: DB-002 / INFRA-001]**:
+    - `outpost/wrangler.jsonc`: Binds `env.DB` (`"binding": "DB"`) to dedicated Cloudflare D1 database `outpost-db` (`database_id`: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`), decoupling Outpost from `personal-budget-db`.
+    - `outpost/auction-schema.sql`: Defines the complete 20-table Outpost schema (`users`, `email_verifications`, `password_resets`, `auction_invoices`, `auction_items`, `auction_sales`, `auction_comps`, `auction_platforms`, `auction_supplies`, `auction_market_alerts`, `ebay_oauth_tokens`, `ebay_webhook_events`, `ebay_fee_reconciliations`, `auction_item_analytics`, `market_comps`, `listing_traffic`, `outpost_sync_settings`, `outpost_sync_history`, `api_integrations`, `ebay_listings_cache`).
+    - All existing Outpost production records (2,141 statements / 12,456 row writes across 20 tables) were exported from `personal-budget-db` and imported into both remote and local `outpost-db` instances.
+
 
 
 

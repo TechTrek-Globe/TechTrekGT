@@ -32,7 +32,7 @@
 -- changes zero rows. (SQLite's changes() counts matched rows even when the new
 -- value equals the old, hence the explicit guards rather than a bare UPDATE.)
 --
--- APPLY WITH:  npx wrangler d1 execute personal-budget-db --remote --file=./migrations/0009_roi_pct_fraction.sql
+-- APPLY WITH:  npx wrangler d1 execute outpost-db --remote --file=./migrations/0009_roi_pct_fraction.sql
 -- =============================================================================
 
 -- Step 1 (irreversible operation): full snapshot BEFORE any mutation.

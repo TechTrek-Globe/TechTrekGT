@@ -1,6 +1,36 @@
 -- Prestine Auction Tracker -- D1 Schema
 -- Run: npm run db:migrate (remote) or npm run db:migrate:local (local)
--- Adds auction_* tables to the shared personal-budget-db alongside Finance tables.
+-- Initializes users and auction_* tables in the dedicated outpost-db database.
+
+-- ============================================================
+-- USERS (Identity, Authentication, and Session State)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS users (
+  id                    TEXT PRIMARY KEY,
+  email                 TEXT UNIQUE NOT NULL COLLATE NOCASE,
+  password_hash         TEXT NOT NULL,
+  name                  TEXT NOT NULL,
+  status                TEXT NOT NULL DEFAULT 'Active',
+  security_question     TEXT,
+  security_answer_hash  TEXT,
+  role                  TEXT NOT NULL DEFAULT 'user',
+  token_version         INTEGER NOT NULL DEFAULT 1,
+  email_verified        INTEGER NOT NULL DEFAULT 0,
+  email_verified_at     TEXT,
+  pending_email         TEXT,
+  is_admin              INTEGER NOT NULL DEFAULT 0,
+  api_key_enabled       INTEGER NOT NULL DEFAULT 0,
+  amazon_api_token      TEXT,
+  amazon_api_token_hash TEXT,
+  force_password_reset  INTEGER NOT NULL DEFAULT 0,
+  created_app           TEXT,
+  sign_in_count         INTEGER NOT NULL DEFAULT 0,
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 
 -- ============================================================
 -- AUCTION INVOICES (purchase batches)
@@ -201,6 +231,7 @@ CREATE TABLE IF NOT EXISTS password_resets (
   token       TEXT NOT NULL,
   expires_at  INTEGER NOT NULL,
   used        INTEGER DEFAULT 0,
+  attempts    INTEGER NOT NULL DEFAULT 0,
   created_at  INTEGER NOT NULL
 );
 

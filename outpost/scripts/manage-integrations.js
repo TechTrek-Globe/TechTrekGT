@@ -22,7 +22,7 @@ const command = cleanArgs[0];
 function runD1(sql) {
   const remoteFlag = isRemote ? '--remote' : '--local';
   const escapedSql = sql.replace(/"/g, '\\"');
-  const cmd = `npx wrangler d1 execute personal-budget-db ${remoteFlag} --command="${escapedSql}"`;
+  const cmd = `npx wrangler d1 execute outpost-db ${remoteFlag} --command="${escapedSql}"`;
   try {
     const stdout = execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
     // Parse json output from wrangler d1 execute if possible

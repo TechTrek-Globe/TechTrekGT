@@ -47,8 +47,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "personal-budget-db",
-      "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
+      "database_name": "outpost-db",
+      "database_id": "c41ad6c7-26f1-4ca8-9af8-82990ccb4566"
     }
   ],
   "kv_namespaces": [

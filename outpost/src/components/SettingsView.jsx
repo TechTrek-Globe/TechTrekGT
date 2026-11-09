@@ -1461,7 +1461,7 @@ export function SettingsView() {
                   <span className="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Database Connection</span>
                   <p className="text-xs font-semibold text-emerald-400 mt-1 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Cloudflare D1 (personal-budget-db)
+                    Cloudflare D1 (outpost-db)
                   </p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">

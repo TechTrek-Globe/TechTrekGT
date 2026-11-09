@@ -573,6 +573,22 @@ Eliminated high-frequency redundant Cloudflare D1 row and index writes across eB
    - Gated client-side `setInterval` auto-polling in `InventoryContext.jsx` on `document.visibilityState !== 'hidden'`, and gated `fetchActiveListings()` in `EditItemModal.jsx` to skip sold/returned items.
    - Added deterministic notification ID deduplication (`ebw_${notificationId}` with `INSERT OR IGNORE`) in `POST /api/ebay/webhook`, and connected `env?.RATE_LIMIT_DO` to `vinescout-sales.js` and `vinescout-inventory.js`.
 
+## Dedicated Cloudflare D1 Database Isolation (`outpost-db`) [ACTION ID: DB-002 / INFRA-001]
+
+Decoupled Outpost Tracker from the shared `personal-budget-db` instance by provisioning and migrating to a dedicated Cloudflare D1 SQLite database (`outpost-db`, ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`).
+
+### Dedicated Database Capabilities
+
+1. **Independent Quota & Single-Writer Lock Isolation**:
+   - Outpost binds `outpost-db` (`c41ad6c7-26f1-4ca8-9af8-82990ccb4566`) in `outpost/wrangler.jsonc` under the constant Worker binding name `DB` (`env.DB`), isolating Outpost read/write telemetry and SQLite coordinator locks from Finance OS and Wayfinder.
+   - Zero application query logic modifications were required as all Worker handlers continue to reference `env.DB`.
+2. **Self-Contained Schema Initialization (`auction-schema.sql`)**:
+   - Consolidated `CREATE TABLE IF NOT EXISTS users` (and associated indexes) directly into `outpost/auction-schema.sql` alongside all 19 Outpost domain, OAuth, analytics, and sync tables.
+   - Local and remote instances are initialized and migrated via `npm run db:migrate:local` (`wrangler d1 execute outpost-db --local --file=./auction-schema.sql`) and `npm run db:migrate` (`wrangler d1 execute outpost-db --remote --file=./auction-schema.sql`).
+3. **Synchronized CLI Tooling & UI Status Telemetry**:
+   - Updated all administrative CLI scripts (`scripts/check-legacy-hashes.js`, `scripts/manage-integrations.js`, `scripts/migrate-amazon-tokens.js`, `scripts/migrate-ebay-tokens.js`) and `SettingsView.jsx` database status badge to reference `outpost-db`.
+
+
 
 
 

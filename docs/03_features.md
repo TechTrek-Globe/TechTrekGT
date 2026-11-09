@@ -165,9 +165,9 @@ Accounts in the shared D1 database (`personal-budget-db`) enforce strict applica
 - Administrators can govern collaborator permissions (`viewer`, `editor`, `admin`) on Finance household ledgers (`finance_ledgers`) or disconnect them via `POST /api/admin/ledger-membership/remove`.
 - Universal cascading account deletion (`POST /api/admin/user-delete` and `DELETE /api/admin/user`) permanently scrubs account records, credentials, backups, shares, and invitations atomically across all domain tables.
 
-## 9. Shared D1 Write-Budget Protection & Differential Upsert Governance
+## 9. D1 Write-Budget Protection, Database Isolation & Differential Upsert Governance
 
-To keep shared `personal-budget-db` write volume well below the 100k daily row-write free-tier ceiling, all high-frequency synchronization endpoints across Outpost and VineScout enforce differential persistence:
+To keep Cloudflare D1 write volume well below the 100k daily row-write free-tier ceiling, Outpost Tracker is provisioned on its own dedicated D1 database (`outpost-db`, ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`), decoupling its quota and single-writer SQLite lock from `personal-budget-db`, and all high-frequency synchronization endpoints across Outpost and VineScout enforce differential persistence:
 - Outpost eBay Analytics (`listing_traffic`) and active inventory sync (`auction_items`) use deterministic primary keys, in-memory diffing, and conditional `ON CONFLICT DO UPDATE ... WHERE` clauses so unchanged rows and secondary indexes are never rewritten.
 - VineScout batch extension sync (`POST /api/vinescout/sync`) enforces `ON CONFLICT DO UPDATE ... WHERE` change-detection guards on both `vine_items` and `vine_asin_cache`.
 - Background client auto-polling gates execution on `document.visibilityState !== 'hidden'` and coordinates across tabs via a server-side cooldown window.

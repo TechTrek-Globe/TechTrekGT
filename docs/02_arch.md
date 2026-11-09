@@ -60,12 +60,12 @@ Third-party external API integrations are centralized in the Landing Gateway to 
 - Gateway Invocations: Sub-applications invoke gateway endpoints using absolute URLs (https://techtrekgt.com/api/...) with credentials: 'include'.
 - Application-Specific Backend API Scoping: Endpoints unique to a satellite application must be scoped under their application subpath (e.g. /finance/api/*, /outpost/api/*, /bourbon/api/*) to avoid collision with the Landing Gateway's un-prefixed /api/* namespace.
 
-## 3. Shared Cloudflare D1 SQLite Database
+## 3. Cloudflare D1 SQLite Database Architecture
 
-Applications requiring relational persistence bind a shared Cloudflare D1 SQLite database instance named personal-budget-db (ID: 10f220d4-1c10-49e9-b63e-5d4cb08d599f):
+Applications requiring relational persistence bind Cloudflare D1 SQLite database instances (`personal-budget-db` ID: `10f220d4-1c10-49e9-b63e-5d4cb08d599f`, and Outpost Tracker's dedicated `outpost-db` ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`):
 
 ```jsonc
-// wrangler.jsonc D1 configuration
+// wrangler.jsonc D1 configuration (Outpost uses database_name: "outpost-db")
 "d1_databases": [
   {
     "binding": "DB",

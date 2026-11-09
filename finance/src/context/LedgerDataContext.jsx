@@ -5,6 +5,7 @@ import { fakeDemoBudgetData } from '../demoPresetData';
 import { useBudgetMetadata } from './BudgetMetadataContext';
 import { useAuth } from './AuthContext';
 import { apiFetch, pushCloudBackupOptimistic, flushPendingCloudSync, savePendingSync, getPendingSync, clearPendingSync, pendingSyncKey } from '../utils/api';
+import { enqueueDelta, initDeltaQueueLifecycle, clearDeltaQueue } from '../utils/deltaQueue';
 import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData, migrateLegacyBudgetToUser, listBudgetRecordKeys, getCurrentUserId, budgetRecordKey, openDB, LEGACY_BUDGET_KEY } from '../utils/indexedDB';
 import { processSpreadsheetImport } from '../utils/spreadsheet';
 import { isBillDueInMonth, effectiveDueDay } from '../utils/paydayUtils';
@@ -212,11 +213,17 @@ export function LedgerDataProvider({ children }) {
       setLedgerPermissions({ read: true, edit: true, manageShares: true, isOwner: true, role: 'owner' });
       setAvailableLedgers([]);
       setIsShareModalOpen(false);
+      clearDeltaQueue();
       try { window.sessionStorage.removeItem('finance_active_ledger_id'); } catch {}
     };
     window.addEventListener('techtrek:user-logout', handleUserLogout);
     return () => window.removeEventListener('techtrek:user-logout', handleUserLogout);
   }, [flushSaveToIndexedDB, currentUserId]);
+
+  // FIX-31: Initialize browser lifecycle hooks to flush pending delta mutations on tab hide / unload
+  useEffect(() => {
+    initDeltaQueueLifecycle(() => activeLedgerId || currentUserId || getCurrentUserId());
+  }, [activeLedgerId, currentUserId]);
 
 
 
@@ -844,9 +851,10 @@ export function LedgerDataProvider({ children }) {
     })();
   }, [isAuthenticated, isDbLoaded, isSyncOnLoadEnabled, restoreFromBackup, pushCloudBackup, syncPasscode, setLastCloudSyncTime, currentUserId, computePayloadFingerprint]);
 
-  // Debounced Auto Cloud Backup effect (5-second debounce on any data change)
+  // Debounced Auto Cloud Backup effect (5-second debounce on structural/non-matrix changes)
+  // FIX-31: matrixVersion removed from deps - matrix changes are delta-synced via deltaQueue.
   const isInitialMountRef = useRef(true);
-  const lastSeenDataRef = useRef({ ui: null, mv: null });
+  const lastSeenDataRef = useRef({ ui: null });
   const autoPushPendingRef = useRef(false);
   useEffect(() => {
     if (!isDbLoaded || !isSeedHydratedRef.current || !isAuthenticated) return;
@@ -855,12 +863,12 @@ export function LedgerDataProvider({ children }) {
     // Skip the initial mount trigger before the first sync check completes
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
-      lastSeenDataRef.current = { ui: budgetForUI, mv: matrixVersion };
+      lastSeenDataRef.current = { ui: budgetForUI };
       return;
     }
 
-    const dataChanged = lastSeenDataRef.current.ui !== budgetForUI || lastSeenDataRef.current.mv !== matrixVersion;
-    lastSeenDataRef.current = { ui: budgetForUI, mv: matrixVersion };
+    const dataChanged = lastSeenDataRef.current.ui !== budgetForUI;
+    lastSeenDataRef.current = { ui: budgetForUI };
     if (dataChanged) {
       if (Date.now() < suppressDirtyUntilRef.current) {
         autoPushPendingRef.current = false;
@@ -885,7 +893,7 @@ export function LedgerDataProvider({ children }) {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [budgetForUI, matrixVersion, isDbLoaded, isAutoCloudBackupEnabled, isAuthenticated, syncPasscode, pushCloudBackup, currentUserId, activeLedgerId, syncConflict]);
+  }, [budgetForUI, isDbLoaded, isAutoCloudBackupEnabled, isAuthenticated, syncPasscode, pushCloudBackup, currentUserId, activeLedgerId, syncConflict]);
 
   // Load 100% Fake Demo Preset Data
   const loadDemoPreset = useCallback(() => {
@@ -1232,7 +1240,16 @@ export function LedgerDataProvider({ children }) {
     dailyMatrixRef.current[key] = cleanValue;
     setDailyMatrix({ ...dailyMatrixRef.current });
     setMatrixVersion(v => v + 1);
-  }, [ledgerRole, ledgerPermissions]);
+
+    // Delta sync (FIX-31): Enqueue granular cell upsert
+    enqueueDelta({
+      op: 'upsert_matrix_cell',
+      ledgerId: activeLedgerId || currentUserId,
+      key,
+      numValue: isTextField ? null : (cleanValue === '' ? null : cleanValue),
+      strValue: isTextField ? cleanValue : null
+    });
+  }, [ledgerRole, ledgerPermissions, activeLedgerId, currentUserId]);
 
   const updateDailyMatrixCells = useCallback((updates) => {
     if (ledgerRole === 'viewer' || !ledgerPermissions.edit) {
@@ -1254,8 +1271,23 @@ export function LedgerDataProvider({ children }) {
       });
       setDailyMatrix({ ...dailyMatrixRef.current });
       setMatrixVersion(v => v + 1);
+
+      // Delta sync (FIX-31): Enqueue granular batch cell upserts
+      const lid = activeLedgerId || currentUserId;
+      for (const [k, v] of Object.entries(updates)) {
+        const isText = k.endsWith('_desc');
+        const numVal = isText ? null : (typeof v === 'number' && Number.isFinite(v) ? v : (v === '' || v == null ? null : Number(v)));
+        const strVal = isText ? (v || '') : null;
+        enqueueDelta({
+          op: 'upsert_matrix_cell',
+          ledgerId: lid,
+          key: k,
+          numValue: numVal,
+          strValue: strVal
+        });
+      }
     }
-  }, [ledgerRole, ledgerPermissions]);
+  }, [ledgerRole, ledgerPermissions, activeLedgerId, currentUserId]);
 
   const moveDailyMatrixCell = useCallback((accountId, sourceMonthKey, sourceDay, targetMonthKey, targetDay, field, value, extraData = {}, targetField) => {
     if (ledgerRole === 'viewer' || !ledgerPermissions.edit) {
@@ -1322,6 +1354,44 @@ export function LedgerDataProvider({ children }) {
       if (hasChanges) {
         setDailyMatrix({ ...dailyMatrixRef.current });
         setMatrixVersion(v => v + 1);
+
+        // Delta sync (FIX-31): Enqueue relocated cell updates
+        const lid = activeLedgerId || currentUserId;
+        enqueueDelta({
+          op: 'upsert_matrix_cell',
+          ledgerId: lid,
+          key: sourceKey,
+          numValue: 0,
+          strValue: null
+        });
+        enqueueDelta({
+          op: 'upsert_matrix_cell',
+          ledgerId: lid,
+          key: targetKey,
+          numValue: cleanValue,
+          strValue: null
+        });
+        if (sourceDescKey) {
+          enqueueDelta({
+            op: 'upsert_matrix_cell',
+            ledgerId: lid,
+            key: sourceDescKey,
+            numValue: null,
+            strValue: ''
+          });
+        }
+        if (targetDescKey) {
+          const sourceDescVal = field === 'other_amount'
+            ? (extraData.otherDesc ?? (dailyMatrixRef.current[sourceDescKey] || ''))
+            : (extraData.otherCreditDesc ?? (dailyMatrixRef.current[sourceDescKey] || ''));
+          enqueueDelta({
+            op: 'upsert_matrix_cell',
+            ledgerId: lid,
+            key: targetDescKey,
+            numValue: null,
+            strValue: sourceDescVal
+          });
+        }
       }
     } catch (err) {
       // Optimistic state rollback upon failure
@@ -1334,7 +1404,7 @@ export function LedgerDataProvider({ children }) {
       console.error('Failed to move matrix cell, rolled back state:', err);
       throw err;
     }
-  }, [ledgerRole, ledgerPermissions]);
+  }, [ledgerRole, ledgerPermissions, activeLedgerId, currentUserId]);
 
   // Calculates true running balance from start date to target date using matrix simulation rules
   const getCalculatedBalanceAsOf = useCallback((accountId, targetDateObj) => {

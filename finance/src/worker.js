@@ -21,7 +21,8 @@ import { handleLedgerShares } from '../functions/api/finance/ledger-shares.js';
 import {
   ensureStructuredFinanceTables,
   buildStructuredWriteStatements,
-  readStructuredBudget
+  readStructuredBudget,
+  parseMatrixCompositeKey
 } from '../functions/utils/structuredBudgetStore.js';
 import {
   authenticate,
@@ -38,6 +39,8 @@ import {
 import { enforceRateLimit } from '../functions/utils/rateLimit.js';
 
 export { RateLimiter } from './RateLimiter.js';
+
+const MAX_BODY_DELTA = 64 * 1024; // 64 KB limit for delta payloads (FIX-31)
 
 /* ------------------------------------------------------------------ */
 /* Allowed Origins & Security Configuration                            */
@@ -784,6 +787,72 @@ async function handleSyncBackup(context) {
   }
 }
 
+async function handleSyncDelta(context) {
+  const { request, env } = context;
+  try {
+    const auth = await authenticate(context, { requireCsrf: true });
+    if (auth.error) return auth.error;
+    const userId = auth.user.id;
+
+    const body = await readJson(request, MAX_BODY_DELTA);
+    if (!body) return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid or oversized request body.');
+
+    const targetLedgerId = (body && typeof body.ledgerId === 'string' && body.ledgerId.trim())
+      || (new URL(request.url).searchParams.get('ledgerId'))
+      || userId;
+
+    const { ledger, role } = await resolveLedgerAccess(env, targetLedgerId, auth.user);
+    if (!ledger || !canEdit(role)) {
+      return fail(ERROR_CODES.FORBIDDEN, 403, 'Forbidden: Write access denied for this ledger.', context.requestId);
+    }
+
+    const mutations = body?.mutations;
+    if (!Array.isArray(mutations) || mutations.length === 0 || mutations.length > 50) {
+      return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'mutations must be a non-empty array of at most 50 ops');
+    }
+
+    await ensureStructuredFinanceTables(env.DB);
+
+    const stmts = [];
+    for (const mut of mutations) {
+      if (!mut || typeof mut !== 'object') continue;
+      switch (mut.op) {
+        case 'upsert_matrix_cell': {
+          if (typeof mut.key !== 'string' || !mut.key) continue;
+          const { accountId, monthKey, dayNum } = parseMatrixCompositeKey(mut.key);
+          const numVal = typeof mut.numValue === 'number' && Number.isFinite(mut.numValue) ? mut.numValue : null;
+          const strVal = typeof mut.strValue === 'string' ? mut.strValue : (mut.numValue === null ? '__NULL__' : null);
+          stmts.push(env.DB.prepare(
+            `INSERT INTO finance_daily_matrix (ledger_id, account_id, month_key, day_num, field_key, num_value, str_value)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(ledger_id, field_key) DO UPDATE SET
+               num_value = excluded.num_value,
+               str_value = excluded.str_value`
+          ).bind(targetLedgerId, accountId, monthKey, dayNum, mut.key, numVal, strVal));
+          break;
+        }
+        case 'delete_matrix_cell': {
+          if (typeof mut.key !== 'string' || !mut.key) continue;
+          stmts.push(env.DB.prepare(
+            `DELETE FROM finance_daily_matrix WHERE ledger_id = ? AND field_key = ?`
+          ).bind(targetLedgerId, mut.key));
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    if (stmts.length === 0) return json({ success: true, unchanged: true });
+    await env.DB.batch(stmts);
+    emitMetric('sync.delta.success', context.requestId);
+    return json({ success: true, ops: stmts.length });
+  } catch (err) {
+    console.error('[sync/delta] error:', context.requestId ? { requestId: context.requestId } : '', err && err.message);
+    return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Delta sync failed.', context.requestId);
+  }
+}
+
 async function handleSyncRestore(context) {
   const { request, env } = context;
   try {
@@ -1016,6 +1085,7 @@ const ROUTES = {
   // Pre-login invocation is no longer permitted. Per-account rate limiting is keyed on auth.user.id.
   'POST /api/verify-sync-code': handleVerifySyncCode,
   'POST /api/sync/backup': handleSyncBackup,
+  'POST /api/sync/delta': handleSyncDelta,
   'GET /api/sync/restore': handleSyncRestore,
   'GET /api/sync/versions': handleSyncVersions,
   'POST /api/sync/restore-version': handleSyncRestoreVersion,

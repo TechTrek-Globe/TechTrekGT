@@ -53,6 +53,13 @@ State is partitioned into four primary layers in the component tree:
   - **Deterministic Payload Hash Guard (`lastSyncedPayloadHashRef`):** `computePayloadFingerprint` calculates a fast FNV-1a digest over `ALLOWED_BUDGET_KEYS`. Automated pushes (`options.auto === true`) skip network and D1 writes when the ledger fingerprint matches `lastSyncedPayloadHashRef.current`.
   - **Server-Side No-Op Write Guard:** `handleSyncBackup` (`src/worker.js`) checks `CASE WHEN data_byte_length = ? AND data = ? THEN 1 ELSE 0 END AS is_identical` in D1 and short-circuits with `{ success: true, unchanged: true }` when an automated sync payload is unchanged.
   - **Offline Sync Queue Terminal Cleanup:** `pushCloudBackupOptimistic` and `flushPendingCloudSync` (`src/utils/api.js`) immediately purge `cf_pending_sync:${targetLid}` on HTTP 409 Conflict or 4xx validation/permission errors, and refuse to flush queued payloads without a valid `baseVersion` (eliminating blind `force: true` overwrites).
+- **Granular Delta Synchronization (FIX-31):**
+  - **Endpoint:** `POST /api/sync/delta`
+  - **Mutation Op Stream:** Accepts batch payloads (`mutations` array, max 50 ops, capped by `MAX_BODY_DELTA = 64KB`) containing typed mutation operations (`upsert_matrix_cell`, `delete_matrix_cell`).
+  - **Targeted D1 Writes:** Emits `INSERT INTO finance_daily_matrix (...) VALUES (...) ON CONFLICT(ledger_id, field_key) DO UPDATE SET num_value = excluded.num_value, str_value = excluded.str_value`, targeting only modified cells. Backed by unique index `idx_finance_daily_matrix_ledger_field` (`0013_delta_sync_constraints.sql`).
+  - **Lossless Key Normalization:** Delta endpoint imports `parseMatrixCompositeKey` from `structuredBudgetStore.js` to ensure consistent `accountId`, `monthKey`, and `dayNum` field normalization with snapshot writes while storing the full client key in `field_key`.
+  - **Client-Side In-Memory Queue (`src/utils/deltaQueue.js`):** Deduplicates ops by key in a `Map`. Flushes after a 400ms debounce with a 2-second max-wait cap (`MAX_FLUSH_DELAY = 2000`) to guarantee writes dispatch even during continuous editing sessions. Automatically flushes upon reconnect and uses keepalive fetch during `visibilitychange` (`hidden`) and `beforeunload`.
+  - **Snapshot Decoupling:** `matrixVersion` is excluded from the auto-backup effect dependencies in `LedgerDataContext.jsx`, stopping full-budget D1 snapshot rewrites on matrix edits while preserving the snapshot path for structural metadata, line item, and transaction changes.
 
 ## 5. Backend Transactional Integrity & Compensating Rollbacks (FIN-AUDIT-001)
 

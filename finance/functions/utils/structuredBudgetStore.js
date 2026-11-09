@@ -211,7 +211,9 @@ const STRUCTURED_TABLES_DDL = [
     sort_order INTEGER NOT NULL DEFAULT 0,
     extra_json TEXT DEFAULT '{}',
     PRIMARY KEY (ledger_id, id)
-  )`
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_finance_daily_matrix_ledger_field
+    ON finance_daily_matrix(ledger_id, field_key)`
 ];
 
 export async function ensureStructuredFinanceTables(db) {
@@ -235,7 +237,7 @@ function parseJsonSafe(str, fallback) {
   }
 }
 
-function parseMatrixCompositeKey(rawKey) {
+export function parseMatrixCompositeKey(rawKey) {
   const parts = String(rawKey).split('-');
   if (parts.length >= 5) {
     const fieldKey = parts.pop();

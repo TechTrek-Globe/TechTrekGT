@@ -28,6 +28,7 @@ Finance OS is the personal budget tracking and financial projection application 
   - Strict tenant isolation: accounts originating from other applications (Wayfinder, Outpost) are completely excluded from Finance OS. Finance only returns and displays users registered for Finance or collaborating on a Finance ledger.
   - **Collaborator Management (`/api/admin/ledger-membership`):** Administrative controls enable updating collaborator permissions (`viewer`, `editor`, `admin`) on Finance household ledgers, or disconnecting them.
   - **Universal Account Deletion (`/api/admin/user-delete`):** Permanent cascading deletion wiping user records, backups, shares, invites, and credentials atomically across SQLite tables.
+- **Granular Delta Sync Architecture (FIX-31):** Eliminates write storms caused by full-snapshot replaces on single cell edits. Matrix cell updates (`updateDailyMatrixCell`, `updateDailyMatrixCells`, `moveDailyMatrixCell`) enqueue granular mutations into `deltaQueue.js`, flushing to `POST /api/sync/delta` after a 400ms debounce (with a 2-second max-wait cap to prevent indefinite deferral). The backend executes targeted `ON CONFLICT(ledger_id, field_key) DO UPDATE` statements against `finance_daily_matrix` (supported by unique index `idx_finance_daily_matrix_ledger_field`), slashing D1 row writes per cell edit from 500-12,000+ down to exactly 1 write. `matrixVersion` is uncoupled from the auto-backup snapshot effect, while non-matrix and structural mutations continue triggering debounced snapshots. Browser lifecycle events (`visibilitychange`, `beforeunload`) flush pending deltas using keepalive fetch, and reconnect listeners auto-flush on restored connectivity.
 
 ## 2. Serverless API Routes
 
@@ -35,6 +36,7 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
 
 | Endpoint | Method | Auth Required | Description |
 |---|---|---|---|
+| `/api/sync/delta` | POST | Yes (CSRF) | Targeted atomic delta sync executing up to 50 granular mutations against `finance_daily_matrix` via `ON CONFLICT(ledger_id, field_key)` (FIX-31) |
 | `/api/sync/backup` | POST | Yes (CSRF) | CAS cloud backup save: auto-sync updates single ongoing sync; manual saves record up to 10 historical rollback snapshots (hardened with `resolveLedgerAccess` tenant verification) |
 | `/api/sync/restore` | GET | Yes | Retrieves current user backup with conditional 304 ETag support (hardened with `resolveLedgerAccess`) |
 | `/api/sync/versions` | GET | Yes | Lists up to 10 stored manual backup versions for the user plus metadata for ongoing single sync (hardened with `resolveLedgerAccess`) |

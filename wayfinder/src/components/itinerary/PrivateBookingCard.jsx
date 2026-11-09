@@ -227,7 +227,15 @@ export function PrivateBookingCard({ item, reorderControls }) {
       {/* Colored node on vertical track */}
       <div className={`absolute -left-[23px] sm:-left-[31px] top-4 w-4 h-4 rounded-full border-2 border-slate-950 ${theme.node} group-hover:scale-125 transition-transform`} />
 
-      <div className={`glass-panel p-4 sm:p-5 rounded-2xl border ${theme.border} transition-all shadow-md ${theme.bg} space-y-3`}>
+      <div 
+        onClick={(e) => {
+          if (!e.target.closest('a, button, input, [data-reorder-control]')) {
+            setIsDocViewerOpen(true);
+          }
+        }}
+        className={`glass-panel p-4 sm:p-5 rounded-2xl border ${theme.border} transition-all shadow-md ${theme.bg} space-y-3 cursor-pointer hover:border-amber-400/60 group/card`}
+        title="Click to view ticket and booking voucher"
+      >
         {/* Top bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center space-x-2.5">
@@ -338,14 +346,22 @@ export function PrivateBookingCard({ item, reorderControls }) {
                   <ExternalLink className="w-3 h-3 text-slate-950" />
                 </a>
               )}
-              {(item.source_document_id || item.filename || docType === 'flight' || item.confirmation_number === 'GUDI3J') && (
+              {(item.source_document_id || item.filename || docType === 'flight' || docType === 'rail' || item.confirmation_number === 'GUDI3J' || item.confirmation_number === 'WN 71563945') && (
                 <button
                   type="button"
                   onClick={() => setIsDocViewerOpen(true)}
-                  className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm ${
+                    docType === 'rail'
+                      ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-400/40 text-amber-300'
+                      : 'bg-sky-500/15 hover:bg-sky-500/25 border-sky-400/30 text-sky-300'
+                  }`}
                 >
-                  <FileText className="w-3.5 h-3.5 text-sky-400" />
-                  <span>View Attached {docType === 'flight' ? 'Flight Document' : docType === 'hotel' ? 'Booking Confirmation (PDF)' : 'Ticket (PDF)'}</span>
+                  {docType === 'rail' ? (
+                    <Train className="w-3.5 h-3.5 text-amber-400" />
+                  ) : (
+                    <FileText className="w-3.5 h-3.5 text-sky-400" />
+                  )}
+                  <span>View Attached {docType === 'flight' ? 'Flight Document' : docType === 'hotel' ? 'Booking Confirmation (PDF)' : docType === 'rail' ? `PKP Ticket (${meta.confNumber || 'WN 71563945'})` : 'Ticket (PDF)'}</span>
                 </button>
               )}
             </div>
@@ -367,6 +383,11 @@ export function PrivateBookingCard({ item, reorderControls }) {
                 Delta Confirmation: <strong className="text-emerald-300 font-mono">GUDI3J</strong>
               </span>
             )}
+            {docType === 'rail' && meta.confNumber && (
+              <span className="text-[11px] text-slate-400">
+                PKP Conf: <strong className="text-amber-300 font-mono">{meta.confNumber}</strong>
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -376,9 +397,11 @@ export function PrivateBookingCard({ item, reorderControls }) {
         isOpen={isDocViewerOpen}
         onClose={() => setIsDocViewerOpen(false)}
         doc={{
-          id: item.source_document_id || (docType === 'excursion' ? 'doc-gyg-7vkk692wy' : 'delta-poland-2026'),
-          filename: item.filename || (docType === 'excursion' ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf' : (docType === 'flight' ? 'Poland_Delta.pdf' : (item.title || 'Booking Voucher'))),
-          safe_display_name: item.title || 'Booking Confirmation',
+          id: item.source_document_id || (docType === 'excursion' ? 'doc-gyg-7vkk692wy' : (docType === 'rail' ? '967d6a06-610d-4c56-a95f-d4ca5a5d1769' : 'delta-poland-2026')),
+          filename: item.filename || (docType === 'excursion' ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf' : (docType === 'flight' ? 'Poland_Delta.pdf' : (docType === 'rail' ? 'Bilet - WN71563945.pdf' : (item.title || 'Booking Voucher')))),
+          safe_display_name: item.title || (docType === 'rail' ? 'PKP Intercity IC 58 Galicja' : 'Booking Confirmation'),
+          item_type: docType,
+          detected_doc_type: docType,
           file_url: (docType === 'excursion' || (item.title || '').toLowerCase().includes('auschwitz'))
             ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`
             : (docType === 'flight' || (item.title || '').toLowerCase().includes('delta'))
@@ -387,14 +410,20 @@ export function PrivateBookingCard({ item, reorderControls }) {
             ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`
             : null,
           details: {
-            confirmation: item.confirmation_number || meta.confNumber || (docType === 'excursion' ? 'GYG7VKK692WY' : ''),
-            provider: item.provider || (docType === 'excursion' ? 'GetYourGuide / Mr.Shuttle' : item.title),
+            confirmation: item.confirmation_number || meta.confNumber || (docType === 'excursion' ? 'GYG7VKK692WY' : (docType === 'rail' ? 'WN 71563945' : '')),
+            provider: item.provider || (docType === 'excursion' ? 'GetYourGuide / Mr.Shuttle' : (docType === 'rail' ? 'PKP Intercity S.A.' : item.title)),
             supplier: meta.supplier || (docType === 'excursion' ? 'Mr.Shuttle' : null),
-            schedule: item.local_date ? `${item.local_date} ${rawStart || '06:30'}` : null,
+            trainNumber: docType === 'rail' ? (item.title || 'IC 58 Galicja') : null,
+            route: docType === 'rail' ? (item.route || 'Kraków Główny ➔ Wrocław Główny') : null,
+            departureTime: docType === 'rail' ? (rawStart || '11:50') : null,
+            arrivalTime: docType === 'rail' ? (rawEnd || '14:50') : null,
+            date: item.local_date || '2026-12-07',
+            seats: docType === 'rail' ? (item.seat || 'Carriage 272, Seats 34 & 36 (1st Class)') : null,
+            schedule: item.local_date ? `${item.local_date} ${rawStart || (docType === 'rail' ? '11:50' : '06:30')}` : null,
             pickupWindow: meta.pickupWindow || (docType === 'excursion' ? '05:30 - 07:30' : null),
             bagRestriction: meta.bagRestriction || (docType === 'excursion' ? 'Max 30x20x10 cm on Museum grounds' : null),
-            location: item.location || displayLocation || (docType === 'excursion' ? 'Hotel Pickup (Kraków)' : ''),
-            passengers: item.passengers || (meta.rawTickets || '2 Adults'),
+            location: item.location || displayLocation || (docType === 'excursion' ? 'Hotel Pickup (Kraków)' : (docType === 'rail' ? 'Kraków Główny' : '')),
+            passengers: item.passengers || (meta.rawTickets || (docType === 'rail' ? 'Ronald Milton Few, Jonathan Kemp' : '2 Adults')),
             flightLeg: docType === 'flight' ? 'DL9208 (AMS -> KRK)' : null,
             touchdown: docType === 'flight' ? 'Dec 4, 2026 at 13:30 CET (Local Poland Time)' : null,
             originLeg: docType === 'flight' ? 'DL0074 (ATL -> AMS, departs Dec 3 at 20:10 EST)' : null,

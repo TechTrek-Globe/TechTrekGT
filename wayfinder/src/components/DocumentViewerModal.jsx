@@ -325,6 +325,40 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
               </div>
             )}
           </div>
+        ) : isRail ? (
+          <div className="bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border-b border-amber-500/20 p-3 px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-300">
+              <span className="flex items-center space-x-1.5">
+                <Train className="w-3.5 h-3.5 text-amber-400" />
+                <strong className="text-white">{activeDoc.details?.trainNumber || activeDoc.safe_display_name || 'PKP Intercity IC'}</strong>
+                <span className="text-slate-400">({activeDoc.details?.route || 'Kraków Gł. ➔ Wrocław Gł.'})</span>
+              </span>
+              <span>:</span>
+              <span className="flex items-center space-x-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Departure:</span>
+                <strong className="text-amber-300">{activeDoc.details?.departureTime || '11:50'} CET</strong>
+                <span className="text-slate-400">({activeDoc.details?.date || 'Dec 7, 2026'})</span>
+              </span>
+              {activeDoc.details?.seats && (
+                <>
+                  <span>:</span>
+                  <span>Seats: <strong className="text-emerald-300">{activeDoc.details.seats}</strong></span>
+                </>
+              )}
+              {activeDoc.details?.confirmation && (
+                <>
+                  <span>:</span>
+                  <span>Conf: <strong className="font-mono text-emerald-300">{activeDoc.details.confirmation}</strong></span>
+                </>
+              )}
+            </div>
+
+            <div className="text-[11px] text-amber-300/90 flex items-center space-x-1.5">
+              <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>1st-Class PKP Intercity Rail Connection • Dedicated luggage racks</span>
+            </div>
+          </div>
         ) : null}
 
         {attachMessage && (
@@ -431,6 +465,31 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
                         <span>Address: <strong className="text-white">{activeDoc.details.location}</strong></span>
                       </div>
                     )}
+                  </div>
+                </div>
+              ) : isRail ? (
+                <div className="w-full text-left p-4 rounded-2xl bg-wf-navy border border-amber-500/30 space-y-3 text-xs">
+                  <div className="font-bold text-amber-300 flex items-center justify-between border-b border-white/10 pb-2">
+                    <span className="flex items-center space-x-1.5">
+                      <Train className="w-4 h-4 text-amber-400" />
+                      <span>{activeDoc.details?.trainNumber || activeDoc.safe_display_name || 'PKP Intercity Rail Ticket'}</span>
+                    </span>
+                    {activeDoc.details?.confirmation && (
+                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[11px] font-bold">
+                        Conf: {activeDoc.details.confirmation}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-300 pt-1">
+                    <div>Route: <strong className="text-white">{activeDoc.details?.route || 'Kraków Gł. ➔ Wrocław Gł.'}</strong></div>
+                    <div>Schedule: <strong className="text-amber-300">{activeDoc.details?.departureTime || '11:50'} - {activeDoc.details?.arrivalTime || '14:50'} CET</strong></div>
+                    <div>Date: <strong className="text-white">{activeDoc.details?.date || 'Monday, Dec 7, 2026'}</strong></div>
+                    <div>Class & Carriage: <strong className="text-amber-300">1st Class (1. Klasa) • {activeDoc.details?.seats || 'Carriage 272'}</strong></div>
+                    <div>Passengers: <strong className="text-white">{activeDoc.details?.passengers || '2 Adults'}</strong></div>
+                    <div>Carrier: <strong className="text-white">{activeDoc.details?.provider || 'PKP Intercity S.A.'}</strong></div>
+                    <div className="col-span-1 sm:col-span-2 text-slate-400 text-[11px] pt-1">
+                      Luggage & Amenities: 1st-class carriages feature dedicated end-of-carriage luggage compartments, overhead racks, and 230V at-seat power sockets.
+                    </div>
                   </div>
                 </div>
               ) : null}

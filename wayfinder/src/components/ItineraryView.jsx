@@ -33,6 +33,7 @@ export function ItineraryView() {
     return 'all';
   });
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const [viewerDoc, setViewerDoc] = useState(null);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [customOrder, setCustomOrder] = useState(() => getCustomTimelineOrder());
   const [draggedItem, setDraggedItem] = useState(null);
@@ -202,6 +203,122 @@ export function ItineraryView() {
   const validPrivateItems = (privateItems || []).filter(item => !item.notes?.includes('gmail:'));
 
   const getAccommodationsForDay = (dayDate) => accommodations.filter(item => item.check_in_date === dayDate);
+
+  const handleOpenTravelDoc = (data, dayItem) => {
+    const itemType = (data?.itemType || data?.item_type || data?.docType || '').toLowerCase();
+    const isTrain = itemType === 'rail' || itemType === 'train';
+
+    if (isTrain) {
+      let customDoc = null;
+      if (dayItem.day === 4) {
+        customDoc = {
+          id: '967d6a06-610d-4c56-a95f-d4ca5a5d1769',
+          filename: 'Bilet - WN71563945.pdf',
+          safe_display_name: 'PKP Intercity IC 58 Galicja: Kraków Gł. - Wrocław Gł.',
+          item_type: 'rail',
+          detected_doc_type: 'rail',
+          details: {
+            confirmation: 'WN 71563945',
+            trainNumber: 'IC 58 Galicja',
+            route: 'Kraków Główny ➔ Wrocław Główny',
+            departureTime: '11:50',
+            arrivalTime: '14:50',
+            date: 'Monday, Dec 7, 2026',
+            seats: 'Carriage 272, Seats 34 & 36 (1st Class)',
+            passengers: 'Ronald Milton Few, Jonathan Kemp',
+            provider: 'PKP Intercity S.A.',
+            fare: '128.00 PLN (~$34.13 USD)',
+            location: 'Kraków Główny Central Station'
+          }
+        };
+      } else if (dayItem.day === 6) {
+        customDoc = {
+          id: 'pkp-wroclaw-poznan',
+          filename: 'PKP_Intercity_Wroclaw_Poznan.pdf',
+          safe_display_name: 'PKP Intercity IC: Wrocław Główny ➔ Poznań Główny',
+          item_type: 'rail',
+          detected_doc_type: 'rail',
+          details: {
+            confirmation: 'SCHEDULED-PKP-06',
+            trainNumber: 'PKP Intercity IC Direct',
+            route: 'Wrocław Główny ➔ Poznań Główny',
+            departureTime: '10:35',
+            arrivalTime: '12:15',
+            date: 'Wednesday, Dec 9, 2026',
+            seats: '1st Class Assigned Seating (Quiet Zone)',
+            passengers: '2 Adults',
+            provider: 'PKP Intercity S.A.',
+            location: 'Wrocław Główny Central Station'
+          }
+        };
+      } else if (dayItem.day === 7 && ((data.time || '').startsWith('08') || (data.title || '').toLowerCase().includes('poznań') || (data.title || '').toLowerCase().includes('poznan'))) {
+        customDoc = {
+          id: 'pkp-poznan-torun',
+          filename: 'PKP_Morning_Poznan_Torun.pdf',
+          safe_display_name: 'PKP Morning Rail: Poznań Główny ➔ Toruń Główny',
+          item_type: 'rail',
+          detected_doc_type: 'rail',
+          details: {
+            confirmation: 'SCHEDULED-PKP-07A',
+            trainNumber: 'PKP Morning Rail (Day Stop)',
+            route: 'Poznań Główny ➔ Toruń Główny',
+            departureTime: '08:30',
+            arrivalTime: '10:15',
+            date: 'Thursday, Dec 10, 2026',
+            seats: '1st Class Seating',
+            passengers: '2 Adults',
+            provider: 'PKP Intercity S.A.',
+            location: 'Poznań Główny'
+          }
+        };
+      } else {
+        customDoc = {
+          id: 'pkp-torun-gdansk',
+          filename: 'PKP_Coastal_Torun_Gdansk.pdf',
+          safe_display_name: 'PKP Coastal Rail: Toruń Główny ➔ Gdańsk Główny',
+          item_type: 'rail',
+          detected_doc_type: 'rail',
+          details: {
+            confirmation: 'SCHEDULED-PKP-07B',
+            trainNumber: 'PKP Coastal Intercity',
+            route: 'Toruń Główny ➔ Gdańsk Główny',
+            departureTime: '15:45',
+            arrivalTime: '17:30',
+            date: 'Thursday, Dec 10, 2026',
+            seats: '1st Class Seating',
+            passengers: '2 Adults',
+            provider: 'PKP Intercity S.A.',
+            location: 'Toruń Główny'
+          }
+        };
+      }
+      setViewerDoc(customDoc);
+      setIsDocViewerOpen(true);
+      return;
+    }
+
+    // Flight items
+    if (dayItem.day === 10) {
+      setViewerDoc({
+        id: 'delta-return-poland',
+        filename: 'Poland_Delta_Return.pdf',
+        safe_display_name: 'Delta Air Lines DL9528: Gdańsk (GDN) ➔ Atlanta (ATL)',
+        item_type: 'flight',
+        detected_doc_type: 'flight',
+        details: {
+          confirmation: 'GUDI3J',
+          passengers: 'Ronald Milton Few, Jonathan Kemp',
+          flightLeg: 'DL9528 (GDN ➔ AMS ➔ ATL)',
+          departureTime: '06:45 CET',
+          touchdown: 'Dec 13, 2026',
+          layover: 'Amsterdam Schiphol (AMS)'
+        }
+      });
+    } else {
+      setViewerDoc(null);
+    }
+    setIsDocViewerOpen(true);
+  };
 
   return (
     <div className="w-full space-y-8 animate-fade-in">
@@ -461,6 +578,29 @@ export function ItineraryView() {
                     const isDragging = draggedItem?.day === dayItem.day && draggedItem?.index === idx;
                     const isDropTarget = dropTarget?.day === dayItem.day && dropTarget?.index === idx;
 
+                    const itemType = (timelineItem.data.itemType || timelineItem.data.item_type || timelineItem.data.docType || '').toLowerCase();
+                    const isTrainItem = itemType === 'rail' || itemType === 'train';
+                    const isFlightItem = itemType === 'flight' || (timelineItem.data.title || '').includes('DL9208') || (timelineItem.data.title || '').includes('Return Flight');
+
+                    let travelDomId = null;
+                    if (isFlightItem && dayItem.day === 1) {
+                      travelDomId = 'travel-flight-krk';
+                    } else if (isFlightItem && dayItem.day === 10) {
+                      travelDomId = 'travel-flight-gdn';
+                    } else if (isTrainItem && dayItem.day === 4) {
+                      travelDomId = 'travel-train-krakow-wroclaw';
+                    } else if (isTrainItem && dayItem.day === 6) {
+                      travelDomId = 'travel-train-wroclaw-poznan';
+                    } else if (isTrainItem && dayItem.day === 7) {
+                      const timeStr = timelineItem.data.time || timelineItem.data.local_time || '';
+                      if (timeStr.startsWith('08') || (timelineItem.data.title || '').toLowerCase().includes('poznań') || (timelineItem.data.title || '').toLowerCase().includes('poznan') || (timelineItem.data.title || '').toLowerCase().includes('toruń') || (timelineItem.data.title || '').toLowerCase().includes('torun')) {
+                        travelDomId = 'travel-train-poznan-torun';
+                      } else {
+                        travelDomId = 'travel-train-torun-gdansk';
+                      }
+                    }
+
+                    const isTravelCard = isTrainItem || isFlightItem;
                     const destination = getItemDestination(timelineItem.data, dayItem.cityId);
 
                     const reorderControls = (
@@ -504,7 +644,9 @@ export function ItineraryView() {
                     return (
                       <div
                         key={timelineItem.key}
+                        id={travelDomId || timelineItem.key}
                         data-timeline-card="true"
+                        data-travel-id={travelDomId}
                         onDragOver={(e) => handleDragOver(e, dayItem.day, idx)}
                         onDrop={(e) => handleDrop(e, dayItem.day, idx, dayTimelineItems)}
                         className={`select-text transition-all duration-150 ${isDragging ? 'opacity-40 scale-[0.98]' : ''}`}
@@ -521,7 +663,17 @@ export function ItineraryView() {
                             {/* Node on Vertical Track */}
                             <div className="absolute -left-[23px] sm:-left-[31px] top-4 w-4 h-4 sm:w-4 sm:h-4 rounded-full border-2 border-slate-950 bg-amber-400 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
 
-                            <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 group-hover:border-amber-500/40 transition-all shadow-md bg-slate-900/90 space-y-3">
+                            <div 
+                              onClick={(e) => {
+                                if (isTravelCard && !e.target.closest('a, button, input')) {
+                                  handleOpenTravelDoc(timelineItem.data, dayItem);
+                                }
+                              }}
+                              className={`glass-panel p-4 sm:p-5 rounded-2xl border ${
+                                isTravelCard ? 'border-white/15 hover:border-amber-400/60 cursor-pointer' : 'border-white/10 group-hover:border-amber-500/40'
+                              } transition-all shadow-md bg-slate-900/90 space-y-3`}
+                              title={isTravelCard ? "Click to view ticket and travel details" : undefined}
+                            >
                               {/* Top Bar: Time, Category Icon, Title, Badge, and Reorder Controls */}
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <div className="flex items-center space-x-2.5">
@@ -634,15 +786,34 @@ export function ItineraryView() {
                                 </div>
                               )}
 
-                              {/* Flight Arrival Document Trigger: ONLY when signed in */}
-                              {isAuthenticated && (timelineItem.data.itemType === 'flight' || timelineItem.data.title?.includes('DL9208')) && (
-                                <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                              {/* Rail Ticket & Pass Action Trigger */}
+                              {isTrainItem && (
+                                <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => setIsDocViewerOpen(true)}
-                                    className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
+                                    onClick={() => handleOpenTravelDoc(timelineItem.data, dayItem)}
+                                    className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 text-amber-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm group/btn"
+                                    title="Click to view train ticket and transit pass"
                                   >
-                                    <FileText className="w-3.5 h-3.5 text-sky-400" />
+                                    <Train className="w-3.5 h-3.5 text-amber-400 group-hover/btn:scale-110 transition-transform" />
+                                    <span>View PKP Rail Ticket & Transit Details</span>
+                                  </button>
+                                  <span className="text-[11px] text-amber-300/80 font-mono">
+                                    1st-Class PKP Intercity
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Flight Arrival/Departure Document Trigger */}
+                              {isFlightItem && (
+                                <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenTravelDoc(timelineItem.data, dayItem)}
+                                    className="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm group/btn"
+                                    title="Click to view flight ticket and confirmation"
+                                  >
+                                    <Plane className="w-3.5 h-3.5 text-sky-400 group-hover/btn:scale-110 transition-transform" />
                                     <span>View Delta Flight Confirmation</span>
                                   </button>
                                   <span className="text-[11px] text-slate-400 font-mono">
@@ -695,7 +866,11 @@ export function ItineraryView() {
       {/* Universal Document Preview Modal */}
       <DocumentViewerModal
         isOpen={isDocViewerOpen}
-        onClose={() => setIsDocViewerOpen(false)}
+        onClose={() => {
+          setIsDocViewerOpen(false);
+          setViewerDoc(null);
+        }}
+        doc={viewerDoc}
       />
 
       {/* Calendar Subscription & Export Modal */}

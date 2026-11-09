@@ -25,6 +25,9 @@ Client state is partitioned into specialized React Context providers:
   - Store: `localStorage` key `wayfinder_timeline_order_v1`.
   - Structure: Record mapping day numbers to ordered arrays of timeline item keys (e.g. `{ "1": ["pub-1-confirmed_arrival...-13:30", "pub-1-ska1_airport...-14:15", "acc-1", ...] }`).
   - Synchronization: Broadcasts window event `wayfinder:timeline-order-changed` on every reorder or reset, syncing state across [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) and [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) without page reload.
+- Map Travel Navigation & Document Preview State: Governed by [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) and [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx).
+  - State Fields: `highlightedTravelId` (DOM id of active travel event, e.g. `travel-train-krakow-wroclaw`), `viewerDoc` (active document or synthetic ticket object passed to [DocumentViewerModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentViewerModal.jsx)), and `isDocViewerOpen`.
+  - Capabilities: Highlights matched cards with a pulsating amber ring for 3.5s after clicking map train or airplane badges, and surfaces ticket inspection modal without requiring user authentication.
 
 ## 3. Static POI Catalog Memory Model
 

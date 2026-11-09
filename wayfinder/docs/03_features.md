@@ -41,9 +41,14 @@ Wayfinder features an extensive, structured repository covering six premier dest
 
 ## 3. Interactive Route and Logistics Visualization
 
-Wayfinder visualizes the complete winter travel itinerary in [wayfinder/src/components/RouteVisualization.jsx](file:///e:/TechTrekGT/wayfinder/src/components/RouteVisualization.jsx):
+Wayfinder visualizes the complete winter travel itinerary in [wayfinder/src/components/RouteVisualization.jsx](file:///e:/TechTrekGT/wayfinder/src/components/RouteVisualization.jsx) and the interactive 3D route map in [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx):
 
-- Sequential Journey Map: Connects Wrocław, Poznań, Toruń, Gdańsk, Warsaw, and Kraków in optimal travel order.
+- Sequential Journey Map: Connects Wrocław, Poznań, Toruń, Gdańsk, Warsaw, and Kraków in optimal travel order with stylized topographical contours and glowing rail tracks.
+- Interactive 3D Map Train & Flight Navigation:
+  - Interactive Golden Rail Track Badges: 4 circular train badges positioned along the curved rail tracks (Day 4: Kraków ➔ Wrocław, Day 6: Wrocław ➔ Poznań, Day 7 Morning: Poznań ➔ Toruń, Day 7 Afternoon: Toruń ➔ Gdańsk) featuring train icons, hover scaling, and label pills.
+  - Interactive Flight Badges: Clickable `FLY IN: KRK` (Day 1) and `FLY OUT: GDN` (Day 10) badges.
+  - 1-Click Smooth Navigation: Clicking any train or airplane badge automatically transitions viewMode to 'schedule', expands the target city's schedule section, scrolls the screen directly to the specific travel event placeholder/card, and highlights it with an amber ring (`ring-4 ring-amber-400`).
+  - Interactive Ticket & Transit Inspection: Clicking directly on the travel card or the "View PKP Rail Ticket & Transit Details" / "View Delta Flight Confirmation" buttons opens the universal `DocumentViewerModal` displaying verified travel documents (e.g. PKP Intercity IC 58 Galicja with carriage 272, seats 34 & 36, confirmation `WN 71563945`, or Delta confirmation `GUDI3J`).
 - Rail Travel Durations: Displays calculated PKP Intercity transit times between each city pair, helping travelers schedule departures.
 - Transfer Details: Outlines departure stations, train classifications (EIP Express InterCity Premium, IC, TLK), and seat reservation advisories.
 

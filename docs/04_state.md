@@ -2,7 +2,7 @@
 
 ## 1. Shared Cloudflare D1 SQLite Schema Rules and Namespace Governance
 
-The TechTrekGT platform utilizes Cloudflare D1 SQLite databases: the shared `personal-budget-db` (ID: `10f220d4-1c10-49e9-b63e-5d4cb08d599f`) and the dedicated Outpost Tracker database `outpost-db` (ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`). All applications requiring relational persistence bind their database instance as `env.DB`.
+The TechTrekGT platform utilizes Cloudflare D1 SQLite databases: the shared `personal-budget-db` (ID: `10f220d4-1c10-49e9-b63e-5d4cb08d599f`), the dedicated Finance OS database `finance-os-db` (ID: `1746a2c8-2653-4136-8301-d217748621fa`), and the dedicated Outpost Tracker database `outpost-db` (ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`). All applications requiring relational persistence bind their database instance as `env.DB`.
 
 ### 1.1 Canonical Shared Users Schema
 
@@ -47,7 +47,7 @@ CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 
 To prevent cross-app schema collisions and maintain developer velocity, each application maintains full ownership of its domain-specific tables through isolated schema files:
 
-- Finance OS (finance/schema.sql): Manages personal accounting tables (accounts, bills, line_items, loans, household_settings, user_backups, user_backup_versions, finance_ledgers, ledger_invites, ledger_shares). Note: Legacy relational tables from earlier revisions have been archived into _bak_* tables.
+- Finance OS (`finance/finance-schema.sql` and `finance/schema.sql` on dedicated `finance-os-db`, ID: `1746a2c8-2653-4136-8301-d217748621fa`): Manages structured personal accounting and cash-flow tables (`users`, `password_resets`, `email_verifications`, `finance_ledgers`, `ledger_invites`, `ledger_shares`, `finance_ledger_settings`, `finance_accounts`, `finance_people`, `finance_bills`, `finance_transactions`, `finance_line_items`, `finance_funding_goals`, `finance_loans`, `finance_daily_matrix`, `user_backups`, `user_backup_versions`).
 - Outpost Tracker (`outpost/auction-schema.sql` on dedicated `outpost-db`, ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`): Manages commercial resale tables (`users`, `email_verifications`, `password_resets`, `auction_invoices`, `auction_items`, `auction_sales`, `auction_platforms`, `auction_comps`, `market_comps`, `auction_supplies`, `listing_traffic`, `auction_item_analytics`, `outpost_sync_settings`, `outpost_sync_history`, `api_integrations`, `ebay_oauth_tokens`, `ebay_webhook_events`, `ebay_fee_reconciliations`, `ebay_listings_cache`).
 - VineScout (vinescout/vinescout-schema.sql): Manages Amazon Vine analytics tables (vine_items, vine_orders, vine_tax_settings, vine_asin_cache).
 - Wayfinder (wayfinder/schema-wayfinder.sql): Manages travel coordination tables (journeys, itinerary_items, documents, import_jobs, budgets, wayfinder_email_inboxes, wayfinder_packing_items, wayfinder_calendar_tokens, wayfinder_expenses, wayfinder_expense_splits, wayfinder_expense_settlements).

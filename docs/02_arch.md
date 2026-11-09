@@ -62,15 +62,15 @@ Third-party external API integrations are centralized in the Landing Gateway to 
 
 ## 3. Cloudflare D1 SQLite Database Architecture
 
-Applications requiring relational persistence bind Cloudflare D1 SQLite database instances (`personal-budget-db` ID: `10f220d4-1c10-49e9-b63e-5d4cb08d599f`, and Outpost Tracker's dedicated `outpost-db` ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`):
+Applications requiring relational persistence bind Cloudflare D1 SQLite database instances (`personal-budget-db` ID: `10f220d4-1c10-49e9-b63e-5d4cb08d599f`, Finance OS's dedicated `finance-os-db` ID: `1746a2c8-2653-4136-8301-d217748621fa`, and Outpost Tracker's dedicated `outpost-db` ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`):
 
 ```jsonc
-// wrangler.jsonc D1 configuration (Outpost uses database_name: "outpost-db")
+// wrangler.jsonc D1 configuration (Finance uses "finance-os-db"; Outpost uses "outpost-db")
 "d1_databases": [
   {
     "binding": "DB",
-    "database_name": "personal-budget-db",
-    "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
+    "database_name": "finance-os-db",
+    "database_id": "1746a2c8-2653-4136-8301-d217748621fa"
   }
 ]
 ```

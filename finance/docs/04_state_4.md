@@ -202,8 +202,9 @@ For every existing user, their personal ledger ID is identical to their user ID 
 
 ## 11. Cross-App Account Isolation & Administration State
 
-### 11.1 Dynamic App Filtering (`GET /api/admin/stats`)
-- Accounts in the shared D1 database (`personal-budget-db`) are strictly filtered so Finance OS has zero awareness of other platforms:
+### 11.1 Dynamic App Filtering (`GET /api/admin/stats`) & Dedicated D1 Database (`finance-os-db`)
+- Finance OS operates on its dedicated Cloudflare D1 database `finance-os-db` (ID: `1746a2c8-2653-4136-8301-d217748621fa`) with 17 structured tables defined in `finance/finance-schema.sql`.
+- Accounts in the D1 database (`finance-os-db`) are strictly filtered so Finance OS has zero awareness of other platforms:
   - A user is recognized as a Finance user only if they have active rows in `user_backups`, `user_backup_versions`, `finance_ledgers`, or `ledger_shares`, or if their `users.created_app` is `'finance'` or role is `'admin'`.
   - Accounts belonging exclusively to other platforms (such as Wayfinder or Outpost) are completely omitted from API responses and never rendered in the UI.
 - `totalUsers` and `users` reflect strictly Finance-scoped accounts.

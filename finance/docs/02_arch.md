@@ -86,9 +86,10 @@ API routes are registered in a centralized dispatch table (ROUTES) mapping HTTP 
 
 ## 5. Database Infrastructure & Persistence Bindings
 
-Finance OS connects to the TechTrekGT shared Cloudflare D1 SQLite database:
+Finance OS connects to its dedicated Cloudflare D1 SQLite database (`finance-os-db`):
 
-- D1 Binding: DB bound to database personal-budget-db (ID: 10f220d4-1c10-49e9-b63e-5d4cb08d599f).
+- D1 Binding: DB bound to dedicated database `finance-os-db` (ID: `1746a2c8-2653-4136-8301-d217748621fa`), decoupled from `personal-budget-db` to isolate single-writer SQLite lock contention and quota metrics.
+- Structured Relational Schema (`finance/finance-schema.sql`): Persists Finance OS domain entities in discrete indexed SQLite tables (`finance_ledger_settings`, `finance_accounts`, `finance_people`, `finance_bills`, `finance_transactions`, `finance_line_items`, `finance_funding_goals`, `finance_loans`, `finance_daily_matrix`) alongside auth and collaboration tables (`users`, `email_verifications`, `password_resets`, `finance_ledgers`, `ledger_invites`, `ledger_shares`, `user_backups`, `user_backup_versions`).
 - Durable Object Rate Limiting: Bound to RATE_LIMITER (class RateLimiter) with SQLite storage migration tag v1 for coordinated brute-force defense.
 - Client Persistence: Local-first IndexedDB storage keying full budget snapshots per user ID, enabling immediate offline interaction and network reconnection syncing.
 

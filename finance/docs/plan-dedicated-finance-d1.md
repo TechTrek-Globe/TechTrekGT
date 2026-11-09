@@ -29,13 +29,13 @@ Wrangler will provision the remote D1 database on Cloudflare edge and output the
     {
       "binding": "DB",
       "database_name": "finance-os-db",
-      "database_id": "<NEW_FINANCE_OS_DATABASE_UUID>"
+      "database_id": "1746a2c8-2653-4136-8301-d217748621fa"
     }
   ]
 }
 ```
 
-Record `<NEW_FINANCE_OS_DATABASE_UUID>` from the PowerShell output for Step 2.
+Record `1746a2c8-2653-4136-8301-d217748621fa` from the PowerShell output for Step 2.
 
 ---
 
@@ -52,7 +52,7 @@ Record `<NEW_FINANCE_OS_DATABASE_UUID>` from the PowerShell output for Step 2.
 -      "database_name": "personal-budget-db",
 -      "database_id": "10f220d4-1c10-49e9-b63e-5d4cb08d599f"
 +      "database_name": "finance-os-db",
-+      "database_id": "<NEW_FINANCE_OS_DATABASE_UUID>"
++      "database_id": "1746a2c8-2653-4136-8301-d217748621fa"
      }
    ],
 ```
@@ -62,7 +62,7 @@ Record `<NEW_FINANCE_OS_DATABASE_UUID>` from the PowerShell output for Step 2.
 [[d1_databases]]
 binding = "DB"
 database_name = "finance-os-db"
-database_id = "<NEW_FINANCE_OS_DATABASE_UUID>"
+database_id = "1746a2c8-2653-4136-8301-d217748621fa"
 ```
 
 ### 2.2 NPM Migration Scripts Update in [finance/package.json](file:///e:/TechTrekGT/finance/package.json#L6-L21)

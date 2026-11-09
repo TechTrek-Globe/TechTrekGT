@@ -128,8 +128,8 @@ export async function handleDocuments(context, url, method) {
         ).bind(id, user.userId, journey_id || null, original_filename, safeName,
                mime_type, file_size_bytes || null, file_hash || null),
         env.DB.prepare(
-          'INSERT INTO wayfinder_extraction_jobs (id, document_id, status) VALUES (?,?,?)'
-        ).bind(jobId, id, 'pending'),
+          'INSERT INTO wayfinder_extraction_jobs (id, document_id, user_id, status) VALUES (?,?,?,?)'
+        ).bind(jobId, id, user.userId, 'pending'),
         env.DB.prepare(
           'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
         ).bind(auditId, user.userId, journey_id || null, 'document', id, 'register')
@@ -174,7 +174,7 @@ export async function handleDocuments(context, url, method) {
           'UPDATE wayfinder_documents SET safe_display_name = ? WHERE id = ?'
         ).bind(newTitle, docId),
         env.DB.prepare(
-          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, details) VALUES (?,?,?,?,?,?,?)'
+          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, previous_value, new_value, metadata_summary, details) VALUES (?,?,?,?,?,?,?,?,?,?)'
         ).bind(
           auditId,
           user.userId,
@@ -182,6 +182,9 @@ export async function handleDocuments(context, url, method) {
           'document',
           docId,
           'rename',
+          doc.safe_display_name || null,
+          newTitle,
+          `old_title=${doc.safe_display_name}; new_title=${newTitle}`,
           JSON.stringify({ old_title: doc.safe_display_name, new_title: newTitle })
         )
       ]);
@@ -255,7 +258,7 @@ export async function handleDocuments(context, url, method) {
       // 7. Audit event
       batchStmts.push(
         env.DB.prepare(
-          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, details) VALUES (?,?,?,?,?,?,?)'
+          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, previous_value, metadata_summary, details) VALUES (?,?,?,?,?,?,?,?,?)'
         ).bind(
           auditId, 
           user.userId, 
@@ -263,6 +266,8 @@ export async function handleDocuments(context, url, method) {
           'document', 
           docId, 
           'delete_cascade',
+          doc.safe_display_name || doc.original_filename || null,
+          `filename=${doc.original_filename}; purged_expenses=${expenseIds.length}`,
           JSON.stringify({
             filename: doc.original_filename,
             safe_name: doc.safe_display_name,

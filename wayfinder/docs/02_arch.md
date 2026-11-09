@@ -39,11 +39,11 @@ Wayfinder executes on the Cloudflare edge runtime as an ESM Worker defined in [w
   - Protected API Routes: All requests to /api/wayfinder/journeys, /api/wayfinder/itinerary, /api/wayfinder/documents, /api/wayfinder/import-jobs, and /api/wayfinder/budget execute behind requireAuth, verifying the shared SSO JWT token.
 - Static Asset Fallback: All non-API paths rewrite their subpath and serve static assets from env.ASSETS.fetch, injecting edge security headers.
 
-## 4. Shared Relational Database and KV Bindings
+## 4. Dedicated Relational Database and KV Bindings
 
-Wayfinder integrates with the platform-wide data layer configured in [wayfinder/wrangler.jsonc](file:///e:/TechTrekGT/wayfinder/wrangler.jsonc):
+Wayfinder integrates with its dedicated data layer configured in [wayfinder/wrangler.jsonc](file:///e:/TechTrekGT/wayfinder/wrangler.jsonc):
 
-- Shared Cloudflare D1 Database: Bound as env.DB pointing to personal-budget-db (database id: 10f220d4-1c10-49e9-b63e-5d4cb08d599f). Stores shared user accounts alongside Wayfinder-specific tables declared in [wayfinder/schema-wayfinder.sql](file:///e:/TechTrekGT/wayfinder/schema-wayfinder.sql).
+- Dedicated Cloudflare D1 Database: Bound as env.DB pointing to wayfinder-db (database id: f95ad16e-8b63-419e-b828-d749b6fdd8f1). Stores identity and authentication tables alongside all 16 normalized Wayfinder tables declared in [wayfinder/schema-wayfinder.sql](file:///e:/TechTrekGT/wayfinder/schema-wayfinder.sql), completely decoupled from personal-budget-db.
 - Rate Limiting KV: Bound as env.RATE_LIMIT_KV to protect authentication endpoints from brute-force credential stuffing.
 
 ## 5. Security Perimeter, CORS, and Content Security Policy (CSP)

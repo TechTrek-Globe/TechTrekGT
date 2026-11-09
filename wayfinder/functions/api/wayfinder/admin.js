@@ -327,9 +327,9 @@ export async function handleAdmin(context, url, method) {
 
         const auditId = crypto.randomUUID();
         await env.DB.prepare(`
-          INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, details)
-          VALUES (?, ?, ?, 'share', ?, 'admin_unaffiliate_trip_user', ?)
-        `).bind(auditId, user.userId, journey.id, userId, JSON.stringify({ unaffiliatedEmail: targetUser.email })).run().catch(() => {});
+          INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, new_value, metadata_summary, details)
+          VALUES (?, ?, ?, 'share', ?, 'admin_unaffiliate_trip_user', ?, ?, 'none', ?, ?)
+        `).bind(auditId, user.userId, journey.id, userId, userId, targetUser.email, `unaffiliatedEmail=${targetUser.email}`, JSON.stringify({ unaffiliatedEmail: targetUser.email })).run().catch(() => {});
 
         return json({
           success: true,
@@ -349,9 +349,9 @@ export async function handleAdmin(context, url, method) {
 
       const auditId = crypto.randomUUID();
       await env.DB.prepare(`
-        INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, details)
-        VALUES (?, ?, ?, 'share', ?, 'admin_assign_trip_role', ?)
-      `).bind(auditId, user.userId, journey.id, userId, JSON.stringify({ assignedRole: role, targetEmail: targetUser.email })).run().catch(() => {});
+        INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, new_value, metadata_summary, details)
+        VALUES (?, ?, ?, 'share', ?, 'admin_assign_trip_role', ?, ?, ?, ?, ?)
+      `).bind(auditId, user.userId, journey.id, userId, userId, targetUser.email, role, `assignedRole=${role}; targetEmail=${targetUser.email}`, JSON.stringify({ assignedRole: role, targetEmail: targetUser.email })).run().catch(() => {});
 
       return json({
         success: true,
@@ -399,9 +399,9 @@ export async function handleAdmin(context, url, method) {
 
       const auditId = crypto.randomUUID();
       await env.DB.prepare(`
-        INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, details)
-        VALUES (?, ?, ?, 'share', ?, 'admin_remove_trip_share', ?)
-      `).bind(auditId, user.userId, journey.id, userId, JSON.stringify({ removedEmail: targetUser?.email })).run().catch(() => {});
+        INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, new_value, metadata_summary, details)
+        VALUES (?, ?, ?, 'share', ?, 'admin_remove_trip_share', ?, ?, 'removed', ?, ?)
+      `).bind(auditId, user.userId, journey.id, userId, userId, targetUser?.email || null, `removedEmail=${targetUser?.email || userId}`, JSON.stringify({ removedEmail: targetUser?.email })).run().catch(() => {});
 
       return json({
         success: true,

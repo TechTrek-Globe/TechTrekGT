@@ -51,7 +51,12 @@ export async function handleItinerary(context, url, method) {
       const body = await request.json().catch(() => ({}));
       const journey_id = body.journey_id || body.journeyId;
       const { item_type, title, destination_id, local_date, local_time,
-              end_date, end_time, timezone, location, provider, notes, source_document_id } = body;
+              end_date, end_time, timezone, location, provider, supplier,
+              confirmation_number, booking_reference, origin, destination,
+              room_type, seat, guests, tickets, language, duration,
+              pickup_window, bag_restriction, mobile_ticket_url, activity_details_url,
+              purchase_site, payment_method, import_source,
+              notes, source_document_id } = body;
 
       if (!journey_id || !item_type || !title) {
         return json({ error: 'journey_id, item_type, title required' }, 400);
@@ -70,14 +75,26 @@ export async function handleItinerary(context, url, method) {
       await env.DB.batch([
         env.DB.prepare(
           `INSERT INTO wayfinder_itinerary_items
-           (id, journey_id, destination_id, user_id, item_type, title, provider,
-            local_date, local_time, end_date, end_time, timezone, location, notes,
-            source_document_id, status, verification_status)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'planned','unverified')`
+           (id, journey_id, destination_id, user_id, item_type, title, provider, supplier,
+            confirmation_number, booking_reference,
+            local_date, local_time, end_date, end_time, timezone, location,
+            origin, destination, room_type, seat, guests, tickets, language, duration,
+            pickup_window, bag_restriction, mobile_ticket_url, activity_details_url,
+            purchase_site, payment_method, import_source,
+            notes, source_document_id, status, verification_status)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'planned','unverified')`
         ).bind(id, finalJourneyId, destination_id || null, user.userId, item_type, title,
-               provider || null, local_date || null, local_time || null,
+               provider || null, supplier || null,
+               confirmation_number || null, booking_reference || null,
+               local_date || null, local_time || null,
                end_date || null, end_time || null, timezone || null,
-               location || null, notes || null, source_document_id || null),
+               location || null, origin || null, destination || null,
+               room_type || null, seat || null, guests || null,
+               tickets || null, language || null, duration || null,
+               pickup_window || null, bag_restriction || null,
+               mobile_ticket_url || null, activity_details_url || null,
+               purchase_site || null, payment_method || null, import_source || 'manual',
+               notes || null, source_document_id || null),
         env.DB.prepare(
           'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
         ).bind(auditId, user.userId, finalJourneyId, 'itinerary_item', id, 'create')
@@ -120,27 +137,45 @@ function sanitizeItem(item) {
   // Do not return raw sensitive fields - they are stored in extracted_fields table
   if (!item) return null;
   return {
-    id:                  item.id,
-    journey_id:          item.journey_id,
-    destination_id:      item.destination_id,
-    item_type:           item.item_type,
-    title:               item.title,
-    provider:            item.provider,
-    status:              item.status,
-    verification_status: item.verification_status,
-    local_date:          item.local_date,
-    local_time:          item.local_time,
-    end_date:            item.end_date,
-    end_time:            item.end_time,
-    timezone:            item.timezone,
-    location:            item.location,
-    notes:               item.notes,
-    confirmation_number: item.notes?.match(/confirmation:\s*([A-Za-z0-9]+)/i)?.[1] || null,
-    has_conflict:        item.has_conflict,
-    conflict_notes:      item.conflict_notes,
-    source_document_id:  item.source_document_id,
-    created_at:          item.created_at,
-    updated_at:          item.updated_at,
+    id:                   item.id,
+    journey_id:           item.journey_id,
+    destination_id:       item.destination_id,
+    item_type:            item.item_type,
+    title:                item.title,
+    provider:             item.provider,
+    supplier:             item.supplier || null,
+    status:               item.status,
+    verification_status:  item.verification_status,
+    local_date:           item.local_date,
+    local_time:           item.local_time,
+    end_date:             item.end_date,
+    end_time:             item.end_time,
+    timezone:             item.timezone,
+    location:             item.location,
+    location_address:     item.location_address || null,
+    origin:               item.origin || null,
+    destination:          item.destination || null,
+    room_type:            item.room_type || null,
+    seat:                 item.seat || null,
+    guests:               item.guests || null,
+    tickets:              item.tickets || null,
+    language:             item.language || null,
+    duration:             item.duration || null,
+    pickup_window:        item.pickup_window || null,
+    bag_restriction:      item.bag_restriction || null,
+    mobile_ticket_url:    item.mobile_ticket_url || null,
+    activity_details_url: item.activity_details_url || null,
+    import_source:        item.import_source || null,
+    purchase_site:        item.purchase_site || null,
+    payment_method:       item.payment_method || null,
+    notes:                item.notes,
+    confirmation_number:  item.confirmation_number || item.notes?.match(/confirmation:\s*([A-Za-z0-9]+)/i)?.[1] || null,
+    booking_reference:    item.booking_reference || null,
+    has_conflict:         item.has_conflict,
+    conflict_notes:       item.conflict_notes,
+    source_document_id:   item.source_document_id,
+    created_at:           item.created_at,
+    updated_at:           item.updated_at,
   };
 }
 

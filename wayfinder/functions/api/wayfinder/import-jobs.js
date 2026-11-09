@@ -105,10 +105,10 @@ export async function handleImportJobs(context, url, method) {
       const jobId = generateId();
       const nowIso = new Date().toISOString();
       await env.DB.prepare(
-        `INSERT INTO wayfinder_extraction_jobs (id, document_id, status, created_at)
-         VALUES (?, ?, 'ready_for_review', ?)`
-      ).bind(jobId, docId, nowIso).run();
-      job = { id: jobId, document_id: docId, status: 'ready_for_review', created_at: nowIso };
+        `INSERT INTO wayfinder_extraction_jobs (id, document_id, user_id, status, created_at)
+         VALUES (?, ?, ?, 'ready_for_review', ?)`
+      ).bind(jobId, docId, doc.user_id || user.userId, nowIso).run();
+      job = { id: jobId, document_id: docId, user_id: doc.user_id || user.userId, status: 'ready_for_review', created_at: nowIso };
     }
 
     // If approving a document whose virtual fields have not yet been persisted, materialize them first
@@ -347,42 +347,100 @@ export async function handleImportJobs(context, url, method) {
 
       const purchaseSite = fieldMap.purchase_site || null;
       const paymentMethod = fieldMap.payment_method || null;
+      const confNumber = fieldMap.confirmation_number || null;
+      const bookingRef = fieldMap.booking_reference || null;
+      const supplierVal = fieldMap.supplier || fieldMap.operator || null;
+      const roomTypeVal = fieldMap.room_type || null;
+      const seatVal = fieldMap.seat || null;
+      const guestsVal = fieldMap.guests || fieldMap.traveler_name || null;
+      const ticketsVal = fieldMap.tickets || null;
+      const languageVal = fieldMap.language || null;
+      const durationVal = fieldMap.duration || null;
+      const pickupWindowVal = fieldMap.pickup_window || null;
+      const bagRestrictionVal = fieldMap.bag_restriction || null;
+      const mobileTicketUrlVal = fieldMap.mobile_ticket_url || null;
+      const activityDetailsUrlVal = fieldMap.activity_details_url || null;
+      const originVal = fieldMap.origin_airport || fieldMap.origin_station || fieldMap.origin || null;
+      const destinationVal = fieldMap.destination_airport || fieldMap.destination_station || fieldMap.destination || null;
 
       const batchStmts = [
         existingItem
           ? env.DB.prepare(
               `UPDATE wayfinder_itinerary_items
-               SET title = ?, provider = ?, local_date = COALESCE(?, local_date),
+               SET title = ?, provider = ?, supplier = COALESCE(?, supplier),
+                   confirmation_number = COALESCE(?, confirmation_number),
+                   booking_reference = COALESCE(?, booking_reference),
+                   local_date = COALESCE(?, local_date),
                    local_time = COALESCE(?, local_time), end_date = COALESCE(?, end_date),
                    end_time = COALESCE(?, end_time), location = COALESCE(?, location),
+                   origin = COALESCE(?, origin), destination = COALESCE(?, destination),
+                   room_type = COALESCE(?, room_type), seat = COALESCE(?, seat),
+                   guests = COALESCE(?, guests), tickets = COALESCE(?, tickets),
+                   language = COALESCE(?, language), duration = COALESCE(?, duration),
+                   pickup_window = COALESCE(?, pickup_window), bag_restriction = COALESCE(?, bag_restriction),
+                   mobile_ticket_url = COALESCE(?, mobile_ticket_url), activity_details_url = COALESCE(?, activity_details_url),
                    purchase_site = COALESCE(?, purchase_site), payment_method = COALESCE(?, payment_method),
                    status = 'imported', verification_status = 'user_verified'
                WHERE id = ?`
             ).bind(
               title,
               fieldMap.airline || fieldMap.hotel_name || fieldMap.carrier || fieldMap.supplier || fieldMap.provider || doc.detected_provider || null,
+              supplierVal,
+              confNumber,
+              bookingRef,
               fieldMap.departure_date || fieldMap.check_in_date || fieldMap.start_date || fieldMap.tour_date || null,
               fieldMap.departure_time || fieldMap.check_in_time || fieldMap.pickup_time || fieldMap.start_time || null,
               fieldMap.arrival_date || fieldMap.check_out_date || fieldMap.end_date || null,
               fieldMap.arrival_time || fieldMap.check_out_time || fieldMap.end_time || null,
               fieldMap.hotel_address || fieldMap.pickup_location || fieldMap.meeting_point || fieldMap.location || fieldMap.destination_station || fieldMap.destination_airport || fieldMap.destination || null,
+              originVal,
+              destinationVal,
+              roomTypeVal,
+              seatVal,
+              guestsVal,
+              ticketsVal,
+              languageVal,
+              durationVal,
+              pickupWindowVal,
+              bagRestrictionVal,
+              mobileTicketUrlVal,
+              activityDetailsUrlVal,
               purchaseSite,
               paymentMethod,
               existingItem.id
             )
           : env.DB.prepare(
               `INSERT INTO wayfinder_itinerary_items
-               (id, journey_id, user_id, item_type, title, provider, local_date, local_time,
-                end_date, end_time, location, purchase_site, payment_method, source_document_id, status, verification_status, visibility)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'imported','user_verified','private')`
+               (id, journey_id, user_id, item_type, title, provider, supplier,
+                confirmation_number, booking_reference, local_date, local_time,
+                end_date, end_time, location, origin, destination,
+                room_type, seat, guests, tickets, language, duration,
+                pickup_window, bag_restriction, mobile_ticket_url, activity_details_url,
+                import_source, purchase_site, payment_method, source_document_id, status, verification_status, visibility)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'document-upload',?,?,?,'imported','user_verified','private')`
             ).bind(
               itemId, finalJourneyId, user.userId, itemType, title,
               fieldMap.airline || fieldMap.hotel_name || fieldMap.carrier || fieldMap.supplier || fieldMap.provider || doc.detected_provider || null,
+              supplierVal,
+              confNumber,
+              bookingRef,
               fieldMap.departure_date || fieldMap.check_in_date || fieldMap.start_date || fieldMap.tour_date || null,
               fieldMap.departure_time || fieldMap.check_in_time || fieldMap.pickup_time || fieldMap.start_time || null,
               fieldMap.arrival_date || fieldMap.check_out_date || fieldMap.end_date || null,
               fieldMap.arrival_time || fieldMap.check_out_time || fieldMap.end_time || null,
               fieldMap.hotel_address || fieldMap.pickup_location || fieldMap.meeting_point || fieldMap.location || fieldMap.destination_station || fieldMap.destination_airport || fieldMap.destination || null,
+              originVal,
+              destinationVal,
+              roomTypeVal,
+              seatVal,
+              guestsVal,
+              ticketsVal,
+              languageVal,
+              durationVal,
+              pickupWindowVal,
+              bagRestrictionVal,
+              mobileTicketUrlVal,
+              activityDetailsUrlVal,
               purchaseSite,
               paymentMethod,
               docId
@@ -598,7 +656,7 @@ function generateInitialFields(doc, linkedItem) {
   const notes = linkedItem?.notes || '';
 
   const confMatch = notes.match(/Confirmation:\s*([^\r\n]+)/i) || title.match(/\b([A-Z0-9]{5,15})\b/i);
-  const confNumber = confMatch ? confMatch[1].trim() : null;
+  const confNumber = linkedItem?.confirmation_number || (confMatch ? confMatch[1].trim() : null);
 
   const costMatch = notes.match(/Cost:\s*([^\r\n]+)/i);
   const costVal = costMatch ? costMatch[1].trim() : null;

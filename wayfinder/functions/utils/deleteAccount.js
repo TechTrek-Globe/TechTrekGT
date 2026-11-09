@@ -49,7 +49,7 @@ export async function deleteUserAccount(db, targetUserId, actorUserId) {
 
     // Clear documents, extracted fields, extraction jobs, and personal expenses
     db.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id IN (SELECT id FROM wayfinder_documents WHERE user_id = ?)').bind(targetUserId),
-    db.prepare('DELETE FROM wayfinder_extraction_jobs WHERE user_id = ?').bind(targetUserId),
+    db.prepare('DELETE FROM wayfinder_extraction_jobs WHERE user_id = ? OR document_id IN (SELECT id FROM wayfinder_documents WHERE user_id = ?)').bind(targetUserId, targetUserId),
     db.prepare('DELETE FROM wayfinder_documents WHERE user_id = ?').bind(targetUserId),
     db.prepare('DELETE FROM wayfinder_expenses WHERE user_id = ?').bind(targetUserId),
 
@@ -61,12 +61,15 @@ export async function deleteUserAccount(db, targetUserId, actorUserId) {
 
     // Log deletion event in audit log
     db.prepare(`
-      INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, details)
-      VALUES (?, ?, 'system', 'user', ?, 'account_deleted', ?)
+      INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, metadata_summary, details)
+      VALUES (?, ?, 'system', 'user', ?, 'account_deleted', ?, ?, ?, ?)
     `).bind(
       crypto.randomUUID(),
       actorUserId || 'system',
       targetUserId,
+      targetUserId,
+      email,
+      `deletedUserId=${targetUserId}; deletedEmail=${email}; isSelf=${isSelf}`,
       JSON.stringify({ deletedUserId: targetUserId, deletedEmail: email, isSelf })
     ),
 

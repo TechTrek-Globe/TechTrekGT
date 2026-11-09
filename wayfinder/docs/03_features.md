@@ -677,7 +677,7 @@ Empowers both regular users and platform administrators to permanently erase use
   - Deleting another user permanently scrubs their account and refreshes admin metrics.
   - Deleting self triggers a critical confirmation alert, executes `POST /api/wayfinder/admin/user-delete`, clears the administrator's session cookie, and signs them out to the public landing page.
 - Comprehensive Relational Data Scrubbing (`functions/utils/deleteAccount.js`):
-  - Atomic batch cleanup across all D1 tables in `personal-budget-db`:
+  - Atomic batch cleanup across all D1 tables in `wayfinder-db`:
     - `wayfinder_agenda_shares` (membership rows)
     - `wayfinder_agenda_invites` (sent, received, or accepted invites)
     - `email_verifications` & `password_resets` (verification and reset codes)
@@ -729,6 +729,22 @@ Eliminates runaway D1 write amplification across Wayfinder backend endpoints, in
   - `PackingManager.jsx` coalesces rapid `+`/`-` quantity clicks and checkbox toggles per item using a 400ms debounce timer (`scheduleDebouncedItemPut`) and cancels pending timers if the item is deleted.
   - `mutationQueue.js` enforces a maximum of 5 retry attempts (`nextAttempts >= 5`) for 5xx and network errors in `flushQueue()`, preventing poison-pill mutations from looping on every window focus event.
   - `requireAuth` (`worker.js`) and `GET /api/auth/me` (`me.js`) attach `Set-Cookie: auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0` on HTTP 401 responses when an invalid or expired token is presented.
+
+## 37. Dedicated Cloudflare D1 Database (`wayfinder-db`) & Relational Normalization
+
+Decouples Wayfinder Guide from the shared `personal-budget-db` instance onto its own dedicated Cloudflare D1 database (`wayfinder-db`, ID: `f95ad16e-8b63-419e-b828-d749b6fdd8f1`) and normalizes semi-structured booking and audit blobs into typed scalar columns:
+
+- Dedicated Database Provisioning & Binding ([wrangler.jsonc](file:///e:/TechTrekGT/wayfinder/wrangler.jsonc), [schema-wayfinder.sql](file:///e:/TechTrekGT/wayfinder/schema-wayfinder.sql)):
+  - Bound via `env.DB` to `wayfinder-db` (`f95ad16e-8b63-419e-b828-d749b6fdd8f1`), isolating Wayfinder's single-writer SQLite lock and quota metrics.
+  - Self-contained 16-table schema including core identity tables (`users`, `email_verifications`, `password_resets`) and 13 Wayfinder domain tables.
+- Relational Normalization of Itinerary Booking Metadata ([email-worker.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/email-worker.js), [import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js), [itinerary.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/itinerary.js), [accommodations.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/accommodations.js)):
+  - Promoted 16 structured booking attributes onto `wayfinder_itinerary_items`: `supplier`, `confirmation_number` (indexed via `idx_wf_items_confirmation`), `booking_reference`, `origin`, `destination`, `room_type`, `seat`, `guests`, `tickets`, `language`, `duration`, `pickup_window`, `bag_restriction`, `mobile_ticket_url`, `activity_details_url`, and `import_source` (`'email-forward'`, `'document-upload'`, `'manual'`).
+  - `handleInboundEmail` (`email-worker.js`) queries the indexed `confirmation_number` and `import_source` columns directly for idempotency checks and populates all normalized booking columns on insert.
+  - `handleImportJobs` (`import-jobs.js`) writes normalized booking columns on both `INSERT` and `UPDATE` during document approval (`action === 'approve'`) and reads `linkedItem.confirmation_number` directly during virtual field hydration.
+  - `sanitizeItem` (`itinerary.js`) and `handleAccommodations` (`accommodations.js`) expose all normalized columns directly to the client with backwards-compatible regex fallbacks on `notes`.
+- Normalized Audit Trail & Extraction Job Ownership ([documents.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/documents.js), [admin.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/admin.js), [deleteAccount.js](file:///e:/TechTrekGT/wayfinder/functions/utils/deleteAccount.js)):
+  - Added `target_user_id`, `target_email`, `previous_value`, `new_value`, and `metadata_summary` to `wayfinder_audit_events`.
+  - Added `user_id` (indexed via `idx_wf_jobs_user`) to `wayfinder_extraction_jobs` and `expense_id` / `split_id` to `wayfinder_expense_settlements`.
 
 
 

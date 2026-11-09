@@ -533,6 +533,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
       item.status === 'imported' || 
       item.status === 'confirmed' || 
       Boolean(item.source_document_id) || 
+      item.import_source === 'email-forward' ||
       (item.notes && item.notes.includes('email-forward'))
     )
   );
@@ -837,7 +838,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
               <FileText className="w-16 h-16 mb-4 text-wf-blue-lt opacity-70" />
               <h4 className="text-white font-semibold mb-1">{selectedDoc.safe_display_name || selectedDoc.filename}</h4>
               <p className="text-xs text-wf-muted max-w-md mb-4">
-                Document metadata and extraction job successfully registered in personal-budget-db D1 database.
+                Document metadata and extraction job successfully registered in wayfinder-db D1 database.
               </p>
               <button
                 onClick={() => openReviewModal(selectedDoc.id)}

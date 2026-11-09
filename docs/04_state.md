@@ -2,7 +2,7 @@
 
 ## 1. Shared Cloudflare D1 SQLite Schema Rules and Namespace Governance
 
-The TechTrekGT platform utilizes Cloudflare D1 SQLite databases: the shared `personal-budget-db` (ID: `10f220d4-1c10-49e9-b63e-5d4cb08d599f`), the dedicated Finance OS database `finance-os-db` (ID: `1746a2c8-2653-4136-8301-d217748621fa`), and the dedicated Outpost Tracker database `outpost-db` (ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`). All applications requiring relational persistence bind their database instance as `env.DB`.
+The TechTrekGT platform utilizes Cloudflare D1 SQLite databases: the shared `personal-budget-db` (ID: `10f220d4-1c10-49e9-b63e-5d4cb08d599f`), the dedicated Finance OS database `finance-os-db` (ID: `1746a2c8-2653-4136-8301-d217748621fa`), the dedicated Outpost Tracker database `outpost-db` (ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`), and the dedicated Wayfinder Guide database `wayfinder-db` (ID: `f95ad16e-8b63-419e-b828-d749b6fdd8f1`). All applications requiring relational persistence bind their database instance as `env.DB`.
 
 ### 1.1 Canonical Shared Users Schema
 
@@ -50,7 +50,7 @@ To prevent cross-app schema collisions and maintain developer velocity, each app
 - Finance OS (`finance/finance-schema.sql` and `finance/schema.sql` on dedicated `finance-os-db`, ID: `1746a2c8-2653-4136-8301-d217748621fa`): Manages 23 structured personal accounting and cash-flow tables (`users`, `password_resets`, `email_verifications`, `finance_ledgers`, `ledger_invites`, `ledger_shares`, `finance_ledger_settings`, `finance_accounts`, `finance_people`, `finance_bills`, `finance_transactions`, `finance_line_items`, `finance_funding_goals`, `finance_loans`, `finance_daily_matrix`, `finance_account_statement_rows`, `finance_bill_splits`, `finance_person_allocations`, `finance_account_splits`, `finance_dashboard_widgets`, `finance_categories`, `user_backups`, `user_backup_versions`).
 - Outpost Tracker (`outpost/auction-schema.sql` on dedicated `outpost-db`, ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`): Manages 24 commercial resale tables (`users`, `email_verifications`, `password_resets`, `auction_invoices`, `auction_items`, `auction_sales`, `auction_platforms`, `auction_comps`, `market_comps`, `auction_supplies`, `listing_traffic`, `auction_item_analytics`, `outpost_sync_settings`, `outpost_sync_history`, `api_integrations`, `ebay_oauth_tokens`, `ebay_webhook_events`, `ebay_fee_reconciliations`, `ebay_listings_cache`, `ebay_active_listings`, `auction_item_images`, `auction_item_specs`, `auction_item_platform_listings`, `ebay_reconciliation_fee_lines`).
 - VineScout (vinescout/vinescout-schema.sql): Manages Amazon Vine analytics tables (vine_items, vine_orders, vine_tax_settings, vine_asin_cache).
-- Wayfinder (wayfinder/schema-wayfinder.sql): Manages travel coordination tables (journeys, itinerary_items, documents, import_jobs, budgets, wayfinder_email_inboxes, wayfinder_packing_items, wayfinder_calendar_tokens, wayfinder_expenses, wayfinder_expense_splits, wayfinder_expense_settlements).
+- Wayfinder (`wayfinder/schema-wayfinder.sql` on dedicated `wayfinder-db`, ID: `f95ad16e-8b63-419e-b828-d749b6fdd8f1`): Manages 16 normalized identity and travel coordination tables (`users`, `email_verifications`, `password_resets`, `wayfinder_journeys`, `wayfinder_destinations`, `wayfinder_itinerary_items`, `wayfinder_documents`, `wayfinder_extraction_jobs`, `wayfinder_extracted_fields`, `wayfinder_expenses`, `wayfinder_expense_splits`, `wayfinder_expense_settlements`, `wayfinder_audit_events`, `wayfinder_email_inboxes`, `wayfinder_gmail_connections`, `wayfinder_packing_items`, `wayfinder_calendar_tokens`, `wayfinder_agenda_invites`, `wayfinder_agenda_shares`).
 - Bourbon Sommelier: Maintains zero tables in D1. Bourbon ingests catalog data via an external Google Sheet CSV feed with edge caching in Cloudflare Cache API (300-second TTL) and static JSON fallbacks.
 
 ### 1.4 Namespace Isolation and Indexing Conventions
@@ -210,7 +210,7 @@ The shared `users` table serves all TechTrekGT applications. Strict app-level is
 - Finance OS Cloud Vault Idempotency & Read-Only GET Enforcement (FIX-30): `POST /api/sync/backup` short-circuits with zero D1 writes when `data_byte_length` and `data` match the stored `user_backups` row on automated syncs (`manual !== true`). Client-side `LedgerDataContext` gates initial IndexedDB hydration (`isSeedHydratedRef`), skips auto-pushes when the FNV-1a payload fingerprint (`lastSyncedPayloadHashRef`) is unchanged, and clears `cf_pending_sync:${ledgerId}` on HTTP 409/4xx responses. `GET /api/admin/stats`, `GET /api/finance/ledgers`, and `resolveLedgerAccess` synthesize default personal ledger metadata in memory without executing `ensureLedgerTables` or `INSERT OR IGNORE INTO finance_ledgers` on GET requests.
 - Wayfinder Guide D1 Write Remediation & Read-Only GET Enforcement: `expenses.js`, `packing.js`, `calendar.js`, and `agendaAccess.js` guard DDL creation with isolate-scoped singleton promises, eliminate hot-path `ALTER TABLE` statements, and bypass DDL on `GET` requests unless `no such table` is encountered. `GET /api/wayfinder/import-jobs/:doc_id` returns virtual preview objects without inserting into `wayfinder_extraction_jobs` or `wayfinder_extracted_fields`, and `GET /api/wayfinder/calendar/feed/:token.ics` throttles `poll_count` updates to once per 6 hours. `packing.js` deduplicates `apply_preset` items by `(category, name)`, `expenses.js` diffs splits on `PUT` before rewriting `wayfinder_expense_splits`, `email-worker.js` deduplicates inbound emails by confirmation number or `(title, local_date)`, `PackingManager.jsx` debounces item `PUT` requests by 400ms, and `mutationQueue.js` caps offline retry attempts at 5.
 
-## 11. Dedicated Database & Relational Normalization State (`finance-os-db` and `outpost-db`)
+## 11. Dedicated Database & Relational Normalization State (`finance-os-db`, `outpost-db`, and `wayfinder-db`)
 
 - **Finance OS Dedicated Database (`finance-os-db`, ID: `1746a2c8-2653-4136-8301-d217748621fa`)**:
   - Bound via `env.DB` in `finance/wrangler.jsonc`.
@@ -223,6 +223,10 @@ The shared `users` table serves all TechTrekGT applications. Strict app-level is
   - Schema: 24 tables defined in `outpost/auction-schema.sql` and `outpost/migrations/0011_deep_normalization.sql`.
   - Decomposes item galleries (`auction_item_images`), specifications and features (`auction_item_specs`), platform listing links (`auction_item_platform_listings`), fee reconciliation lines (`ebay_reconciliation_fee_lines`), and active eBay listings (`ebay_active_listings`).
   - Coordinated via `functions/utils/normalizedItemStore.js` with strictly parameterized `?` bindings.
+- **Wayfinder Guide Dedicated Database (`wayfinder-db`, ID: `f95ad16e-8b63-419e-b828-d749b6fdd8f1`)**:
+  - Bound via `env.DB` in `wayfinder/wrangler.jsonc`.
+  - Schema: 16 tables defined in `wayfinder/schema-wayfinder.sql`.
+  - Promotes 16 structured booking metadata columns (`supplier`, `confirmation_number`, `booking_reference`, `origin`, `destination`, `room_type`, `seat`, `guests`, `tickets`, `language`, `duration`, `pickup_window`, `bag_restriction`, `mobile_ticket_url`, `activity_details_url`, `import_source`) onto `wayfinder_itinerary_items` and structured audit columns (`target_user_id`, `target_email`, `previous_value`, `new_value`, `metadata_summary`) onto `wayfinder_audit_events`.
 
 
 

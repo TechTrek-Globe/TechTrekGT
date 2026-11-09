@@ -36,26 +36,26 @@ The core travel guide data lives in the centralized data module [wayfinder/src/d
 
 ## 4. Persistent Relational Schema (Cloudflare D1)
 
-Private travel data persists in the shared Cloudflare D1 database (personal-budget-db) governed by [wayfinder/schema-wayfinder.sql](file:///e:/TechTrekGT/wayfinder/schema-wayfinder.sql):
+Private travel data persists in the dedicated Cloudflare D1 database (`wayfinder-db`, ID: `f95ad16e-8b63-419e-b828-d749b6fdd8f1`) governed by [wayfinder/schema-wayfinder.sql](file:///e:/TechTrekGT/wayfinder/schema-wayfinder.sql):
 
+- Tables `users`, `email_verifications`, and `password_resets`:
+  - Core identity, PBKDF2 password hashes, API key entitlements (`api_key_enabled`), 8-digit HMAC verification codes, and password recovery tokens.
 - Table wayfinder_journeys:
   - Stores journey containers (such as poland-christmas-2026) with ownership and visibility flags.
   - Fields: id, slug, title, tagline, description, hero_image_url, start_month, start_year, start_date, end_date, status, visibility, created_by, created_at, updated_at.
 - Table wayfinder_itinerary_items:
-  - Stores scheduled events and milestones within a journey.
-  - Fields: id, journey_id, user_id, destination_id, item_type (flight, hotel, rail, excursion, restaurant, other), title, provider, status, verification_status, local_date, local_time, end_date, end_time, timezone, location, location_address, notes, source_document_id, purchase_site, payment_method, visibility, has_conflict, conflict_notes, created_at, updated_at.
+  - Stores scheduled events and milestones within a journey with normalized booking columns.
+  - Fields: id, journey_id, user_id, destination_id, item_type (flight, hotel, rail, excursion, restaurant, other), title, provider, supplier, confirmation_number (indexed via `idx_wf_items_confirmation`), booking_reference, status, verification_status, local_date, local_time, end_date, end_time, timezone, location, location_address, origin, destination, room_type, seat, guests, tickets, language, duration, pickup_window, bag_restriction, mobile_ticket_url, activity_details_url, import_source, notes, source_document_id, purchase_site, payment_method, visibility, has_conflict, conflict_notes, created_at, updated_at.
 - Table wayfinder_documents:
   - Stores metadata and references for uploaded booking documents and inbound email attachments.
   - Fields: id, user_id, journey_id, original_filename, safe_display_name, mime_type, file_size_bytes, file_hash, storage_key, storage_status, upload_date, processing_status, detected_provider, detected_doc_type, security_scan_status, extraction_version, retention_status, deleted_at, deleted_by.
-- Table wayfinder_expenses & wayfinder_expense_splits:
-  - Tracks trip costs, receipt currencies, and 50/50 participant balance splits.
-  - Fields: id, journey_id, itinerary_item_id, user_id, paid_by_name, paid_by_user_id, category, description, amount_original, currency_original, amount_usd, purchase_site, payment_method, paid_status, verification_status, created_at.
-- Table wayfinder_import_jobs:
-  - Tracks asynchronous document field parsing and OCR extraction tasks.
-  - Fields: id, document_id, user_id, status (pending, processing, completed, failed), extracted_fields, error_message, created_at, updated_at.
-- Table wayfinder_budget_items:
-  - Manages financial ledger line items for trip planning and actual expense tracking.
-  - Fields: id, journey_id, user_id, category, description, estimated_pln, actual_pln, estimated_usd, actual_usd, is_paid, created_at.
+- Table wayfinder_expenses, wayfinder_expense_splits & wayfinder_expense_settlements:
+  - Tracks trip costs, receipt currencies, 50/50 participant balance splits, and debt settlements (`expense_id`, `split_id`).
+  - Fields: id, journey_id, itinerary_item_id, document_id, user_id, paid_by_name, paid_by_user_id, category, description, amount_original, currency_original, amount_usd, purchase_site, payment_method, paid_status, verification_status, created_at.
+- Table wayfinder_extraction_jobs & wayfinder_extracted_fields:
+  - Tracks document field parsing tasks (`id`, `document_id`, `user_id`, `status`, `reviewed_at`, `reviewed_by`, `review_decision`) and field-level extraction results.
+- Table wayfinder_audit_events:
+  - Immutable audit log with normalized context columns (`target_user_id`, `target_email`, `previous_value`, `new_value`, `metadata_summary`, `details`).
 - Table wayfinder_packing_items:
   - Stores personal and shared winter checklist items with bag allocations and weights.
   - Fields: id, journey_id, user_id, category, name, quantity, weight_grams, is_packed, is_shared, assigned_to, bag_type (checked, carryon, personal), notes, sort_order, created_at, updated_at.
@@ -575,6 +575,15 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
   - `PUT /api/wayfinder/expenses/:id` diffs incoming split allocations against existing `wayfinder_expense_splits` rows and omits `DELETE` + `INSERT` statements when unchanged.
   - `handleInboundEmail` (`email-worker.js`) deduplicates against `wayfinder_itinerary_items` by `confirmation_number` or `(title, local_date)` prior to executing the 16-row batch insert.
   - Client-side `PackingManager.jsx` debounces per-item `PUT` updates by 400ms, and `mutationQueue.js` drops failed offline mutations after 5 failed attempts (`nextAttempts >= 5`).
+
+### 16.17 Dedicated Database (`wayfinder-db`) & Relational Normalization Invariants
+
+- Database Isolation Invariant:
+  - Wayfinder binds `env.DB` exclusively to `wayfinder-db` (`f95ad16e-8b63-419e-b828-d749b6fdd8f1`) in `wayfinder/wrangler.jsonc`.
+  - All 16 tables (`users`, `email_verifications`, `password_resets`, `wayfinder_journeys`, `wayfinder_destinations`, `wayfinder_itinerary_items`, `wayfinder_documents`, `wayfinder_extraction_jobs`, `wayfinder_extracted_fields`, `wayfinder_expenses`, `wayfinder_expense_splits`, `wayfinder_expense_settlements`, `wayfinder_audit_events`, `wayfinder_email_inboxes`, `wayfinder_gmail_connections`, `wayfinder_packing_items`, `wayfinder_calendar_tokens`, `wayfinder_agenda_invites`, `wayfinder_agenda_shares`) reside in `wayfinder-db`.
+- Normalized Itinerary Columns Invariant:
+  - Structured booking attributes (`supplier`, `confirmation_number`, `booking_reference`, `origin`, `destination`, `room_type`, `seat`, `guests`, `tickets`, `language`, `duration`, `pickup_window`, `bag_restriction`, `mobile_ticket_url`, `activity_details_url`, `import_source`) are persisted as typed scalar columns on `wayfinder_itinerary_items` in addition to human-readable summary lines in `notes`.
+  - `sanitizeItem` (`itinerary.js`), `handleAccommodations` (`accommodations.js`), and `parseBookingMetadata` (`PrivateBookingCard.jsx`) read normalized scalar columns first before falling back to regex extraction on `notes`.
 
 
 

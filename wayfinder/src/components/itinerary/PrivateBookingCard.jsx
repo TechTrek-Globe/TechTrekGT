@@ -72,7 +72,7 @@ export function parseBookingMetadata(item) {
   const rawType = (item?.docType || item?.detected_doc_type || item?.item_type || '').toLowerCase();
   const isHotel = rawType === 'hotel' || rawType === 'accommodation' || rawType === 'lodging';
 
-  const confNumber = item?.confirmation_number || fields['confirmation'] || fields['booking reference'] || null;
+  const confNumber = item?.confirmation_number || fields['confirmation'] || fields['booking reference'] || item?.booking_reference || null;
   const supplier = isHotel ? null : (item?.supplier || fields['supplier'] || fields['operator'] || null);
   const pickupWindow = isHotel ? null : (item?.pickup_window || fields['pickup window'] || fields['pickup'] || null);
   
@@ -109,7 +109,7 @@ export function parseBookingMetadata(item) {
     activityDetailsUrl = item?.activity_details_url || fields['activity details'] || fields['activity detail'] || null;
 
     if (isGyg) {
-      const rawRef = fields['booking reference'] || (confNumber && !confNumber.startsWith('GYG') ? confNumber : null) || '6ICXW284P0LJK9OYS594M5NZKD52BTFT';
+      const rawRef = item?.booking_reference || fields['booking reference'] || (confNumber && !confNumber.startsWith('GYG') ? confNumber : null) || '6ICXW284P0LJK9OYS594M5NZKD52BTFT';
       const gygBookingRef = rawRef;
 
       if (mobileTicketUrl && mobileTicketUrl.includes('adj_fallback=')) {

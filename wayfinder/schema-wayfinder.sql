@@ -1,6 +1,64 @@
--- TechTrek Wayfinder - D1 Schema Extension
--- Extends the shared personal-budget-db with wayfinder-specific tables.
--- Existing tables (users, households, household_members) are inherited.
+-- TechTrek Wayfinder - Dedicated Cloudflare D1 Schema (wayfinder-db)
+-- Self-contained 16-table normalized schema for Wayfinder Guide.
+
+-- ============================================================
+-- 1. CORE IDENTITY & AUTHENTICATION TABLES
+-- ============================================================
+CREATE TABLE IF NOT EXISTS users (
+  id                    TEXT PRIMARY KEY,
+  email                 TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  password_hash         TEXT NOT NULL,
+  salt                  TEXT DEFAULT '',
+  iterations            INTEGER NOT NULL DEFAULT 100000,
+  name                  TEXT NOT NULL DEFAULT '',
+  security_question     TEXT,
+  security_answer_hash  TEXT,
+  role                  TEXT NOT NULL DEFAULT 'user',
+  token_version         INTEGER NOT NULL DEFAULT 1,
+  is_admin              INTEGER NOT NULL DEFAULT 0,
+  api_key_enabled       INTEGER NOT NULL DEFAULT 0,
+  status                TEXT NOT NULL DEFAULT 'Active' CHECK(status IN ('Active', 'Suspended')),
+  email_verified        INTEGER NOT NULL DEFAULT 0,
+  email_verified_at     TEXT,
+  pending_email         TEXT,
+  sign_in_count         INTEGER NOT NULL DEFAULT 0,
+  created_app           TEXT DEFAULT 'wayfinder',
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+
+CREATE TABLE IF NOT EXISTS email_verifications (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  email       TEXT NOT NULL COLLATE NOCASE,
+  token       TEXT NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  used        INTEGER NOT NULL DEFAULT 0,
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_verifications_user ON email_verifications(user_id, used);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications(email, used, created_at);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  email       TEXT NOT NULL COLLATE NOCASE,
+  token       TEXT NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  used        INTEGER NOT NULL DEFAULT 0,
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_resets_email_token ON password_resets(email, token);
+CREATE INDEX IF NOT EXISTS idx_password_resets_email_used ON password_resets(email, used, created_at);
 
 -- ============================================================
 -- JOURNEYS - Top-level trip containers
@@ -46,31 +104,47 @@ CREATE TABLE IF NOT EXISTS wayfinder_destinations (
 -- ITINERARY ITEMS - All trip events (flights, hotels, rail, etc.)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS wayfinder_itinerary_items (
-  id                  TEXT PRIMARY KEY,
-  journey_id          TEXT NOT NULL,
-  destination_id      TEXT,
-  user_id             TEXT NOT NULL,
-  item_type           TEXT NOT NULL,
-  title               TEXT NOT NULL,
-  provider            TEXT,
-  status              TEXT NOT NULL DEFAULT 'planned',
-  verification_status TEXT NOT NULL DEFAULT 'unverified',
-  local_date          TEXT,
-  local_time          TEXT,
-  end_date            TEXT,
-  end_time            TEXT,
-  timezone            TEXT,
-  location            TEXT,
-  location_address    TEXT,
-  notes               TEXT,
-  source_document_id  TEXT,
-  purchase_site       TEXT,
-  payment_method      TEXT,
-  visibility          TEXT NOT NULL DEFAULT 'private',
-  has_conflict        INTEGER NOT NULL DEFAULT 0,
-  conflict_notes      TEXT,
-  created_at          TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  id                   TEXT PRIMARY KEY,
+  journey_id           TEXT NOT NULL,
+  destination_id       TEXT,
+  user_id              TEXT NOT NULL,
+  item_type            TEXT NOT NULL,
+  title                TEXT NOT NULL,
+  provider             TEXT,
+  supplier             TEXT,
+  confirmation_number  TEXT,
+  booking_reference    TEXT,
+  status               TEXT NOT NULL DEFAULT 'planned',
+  verification_status  TEXT NOT NULL DEFAULT 'unverified',
+  local_date           TEXT,
+  local_time           TEXT,
+  end_date             TEXT,
+  end_time             TEXT,
+  timezone             TEXT,
+  location             TEXT,
+  location_address     TEXT,
+  origin               TEXT,
+  destination          TEXT,
+  room_type            TEXT,
+  seat                 TEXT,
+  guests               TEXT,
+  tickets              TEXT,
+  language             TEXT,
+  duration             TEXT,
+  pickup_window        TEXT,
+  bag_restriction      TEXT,
+  mobile_ticket_url    TEXT,
+  activity_details_url TEXT,
+  import_source        TEXT DEFAULT 'manual',
+  notes                TEXT,
+  source_document_id   TEXT,
+  purchase_site        TEXT,
+  payment_method       TEXT,
+  visibility           TEXT NOT NULL DEFAULT 'private',
+  has_conflict         INTEGER NOT NULL DEFAULT 0,
+  conflict_notes       TEXT,
+  created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (journey_id)      REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id)         REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (destination_id)  REFERENCES wayfinder_destinations(id)
@@ -109,6 +183,7 @@ CREATE TABLE IF NOT EXISTS wayfinder_documents (
 CREATE TABLE IF NOT EXISTS wayfinder_extraction_jobs (
   id              TEXT PRIMARY KEY,
   document_id     TEXT NOT NULL UNIQUE,
+  user_id         TEXT,
   status          TEXT NOT NULL DEFAULT 'pending',
   error_message   TEXT,
   raw_text        TEXT,
@@ -195,42 +270,50 @@ CREATE TABLE IF NOT EXISTS wayfinder_expense_splits (
   settle_method   TEXT,
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (expense_id) REFERENCES wayfinder_expenses(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (expense_id) REFERENCES wayfinder_expenses(id) ON DELETE CASCADE
 );
 
 -- ============================================================
 -- AUDIT EVENTS - Immutable audit trail
 -- ============================================================
 CREATE TABLE IF NOT EXISTS wayfinder_audit_events (
-  id          TEXT PRIMARY KEY,
-  user_id     TEXT NOT NULL,
-  journey_id  TEXT,
-  entity_type TEXT NOT NULL,
-  entity_id   TEXT NOT NULL,
-  action      TEXT NOT NULL,
-  details     TEXT,
-  ip_address  TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  id               TEXT PRIMARY KEY,
+  user_id          TEXT NOT NULL,
+  journey_id       TEXT,
+  entity_type      TEXT NOT NULL,
+  entity_id        TEXT NOT NULL,
+  action           TEXT NOT NULL,
+  target_user_id   TEXT,
+  target_email     TEXT,
+  previous_value   TEXT,
+  new_value        TEXT,
+  metadata_summary TEXT,
+  details          TEXT,
+  ip_address       TEXT,
+  created_at       TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- ============================================================
 -- INDEXES
 -- ============================================================
-CREATE INDEX IF NOT EXISTS idx_wf_journeys_slug    ON wayfinder_journeys(slug);
-CREATE INDEX IF NOT EXISTS idx_wf_journeys_creator ON wayfinder_journeys(created_by);
-CREATE INDEX IF NOT EXISTS idx_wf_dest_journey     ON wayfinder_destinations(journey_id);
-CREATE INDEX IF NOT EXISTS idx_wf_items_journey    ON wayfinder_itinerary_items(journey_id);
-CREATE INDEX IF NOT EXISTS idx_wf_items_user       ON wayfinder_itinerary_items(user_id);
-CREATE INDEX IF NOT EXISTS idx_wf_items_date       ON wayfinder_itinerary_items(local_date);
-CREATE INDEX IF NOT EXISTS idx_wf_docs_user        ON wayfinder_documents(user_id);
-CREATE INDEX IF NOT EXISTS idx_wf_docs_journey     ON wayfinder_documents(journey_id);
-CREATE INDEX IF NOT EXISTS idx_wf_docs_hash        ON wayfinder_documents(file_hash);
-CREATE INDEX IF NOT EXISTS idx_wf_fields_job       ON wayfinder_extracted_fields(extraction_job_id);
-CREATE INDEX IF NOT EXISTS idx_wf_expenses_journey ON wayfinder_expenses(journey_id);
-CREATE INDEX IF NOT EXISTS idx_wf_audit_user       ON wayfinder_audit_events(user_id);
-CREATE INDEX IF NOT EXISTS idx_wf_audit_entity     ON wayfinder_audit_events(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_wf_journeys_slug      ON wayfinder_journeys(slug);
+CREATE INDEX IF NOT EXISTS idx_wf_journeys_creator   ON wayfinder_journeys(created_by);
+CREATE INDEX IF NOT EXISTS idx_wf_dest_journey       ON wayfinder_destinations(journey_id);
+CREATE INDEX IF NOT EXISTS idx_wf_items_journey      ON wayfinder_itinerary_items(journey_id);
+CREATE INDEX IF NOT EXISTS idx_wf_items_user         ON wayfinder_itinerary_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_wf_items_date         ON wayfinder_itinerary_items(local_date);
+CREATE INDEX IF NOT EXISTS idx_wf_items_confirmation ON wayfinder_itinerary_items(confirmation_number);
+CREATE INDEX IF NOT EXISTS idx_wf_docs_user          ON wayfinder_documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_wf_docs_journey       ON wayfinder_documents(journey_id);
+CREATE INDEX IF NOT EXISTS idx_wf_docs_hash          ON wayfinder_documents(file_hash);
+CREATE INDEX IF NOT EXISTS idx_wf_jobs_user          ON wayfinder_extraction_jobs(user_id);
+CREATE INDEX IF NOT EXISTS idx_wf_fields_job         ON wayfinder_extracted_fields(extraction_job_id);
+CREATE INDEX IF NOT EXISTS idx_wf_expenses_journey   ON wayfinder_expenses(journey_id);
+CREATE INDEX IF NOT EXISTS idx_wf_splits_expense     ON wayfinder_expense_splits(expense_id);
+CREATE INDEX IF NOT EXISTS idx_wf_splits_user        ON wayfinder_expense_splits(user_id);
+CREATE INDEX IF NOT EXISTS idx_wf_audit_user         ON wayfinder_audit_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_wf_audit_entity       ON wayfinder_audit_events(entity_type, entity_id);
 
 -- ============================================================
 -- EMAIL INBOXES - Unique per-user/per-journey forwarding addresses
@@ -331,32 +414,13 @@ CREATE INDEX IF NOT EXISTS idx_wf_cal_token ON wayfinder_calendar_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_wf_cal_user  ON wayfinder_calendar_tokens(user_id);
 
 -- ============================================================
--- EXPENSE SPLITS - Individual Member Allocations
--- ============================================================
-CREATE TABLE IF NOT EXISTS wayfinder_expense_splits (
-  id              TEXT PRIMARY KEY,
-  expense_id      TEXT NOT NULL,
-  user_id         TEXT NOT NULL,
-  user_name       TEXT,
-  amount_owed     REAL NOT NULL,
-  percentage      REAL,
-  is_settled      INTEGER NOT NULL DEFAULT 0,
-  settled_at      TEXT,
-  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (expense_id) REFERENCES wayfinder_expenses(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_wf_splits_expense ON wayfinder_expense_splits(expense_id);
-CREATE INDEX IF NOT EXISTS idx_wf_splits_user    ON wayfinder_expense_splits(user_id);
-
--- ============================================================
 -- EXPENSE SETTLEMENTS - Log of Debt Settle-Up Payments
 -- ============================================================
 CREATE TABLE IF NOT EXISTS wayfinder_expense_settlements (
   id              TEXT PRIMARY KEY,
   journey_id      TEXT NOT NULL,
+  expense_id      TEXT,
+  split_id        TEXT,
   from_user_id    TEXT NOT NULL,
   from_user_name  TEXT NOT NULL,
   to_user_id      TEXT NOT NULL,
@@ -371,11 +435,6 @@ CREATE TABLE IF NOT EXISTS wayfinder_expense_settlements (
 );
 
 CREATE INDEX IF NOT EXISTS idx_wf_settle_journey ON wayfinder_expense_settlements(journey_id);
-
--- ============================================================
--- USERS TABLE EXTENSIONS (Shared Platform personal-budget-db)
--- ============================================================
--- ALTER TABLE users ADD COLUMN api_key_enabled INTEGER NOT NULL DEFAULT 0;
 
 -- ============================================================
 -- SHARED AGENDA COLLABORATION (invites + shares)

@@ -618,8 +618,8 @@ export async function handleInboundEmail(message, env) {
     if (fields.confirmation_number) {
       const existingByConf = await env.DB.prepare(
         `SELECT id FROM wayfinder_itinerary_items
-         WHERE journey_id = ? AND user_id = ? AND notes LIKE ?`
-      ).bind(inbox.journey_id, inbox.user_id, `%Confirmation: ${fields.confirmation_number}%`).first();
+         WHERE journey_id = ? AND user_id = ? AND (confirmation_number = ? OR notes LIKE ?)`
+      ).bind(inbox.journey_id, inbox.user_id, fields.confirmation_number, `%Confirmation: ${fields.confirmation_number}%`).first();
       if (existingByConf) {
         console.log(`[email-worker] duplicate confirmation ${fields.confirmation_number} ignored (${existingByConf.id})`);
         return;
@@ -627,7 +627,7 @@ export async function handleInboundEmail(message, env) {
     } else {
       const existingByTitle = await env.DB.prepare(
         `SELECT id FROM wayfinder_itinerary_items
-         WHERE journey_id = ? AND user_id = ? AND title = ? AND local_date = ? AND notes LIKE '%Source: email-forward%'`
+         WHERE journey_id = ? AND user_id = ? AND title = ? AND local_date = ? AND (import_source = 'email-forward' OR notes LIKE '%Source: email-forward%')`
       ).bind(inbox.journey_id, inbox.user_id, fields.title, resolvedDate).first();
       if (existingByTitle) {
         console.log(`[email-worker] duplicate email booking '${fields.title}' on ${resolvedDate} ignored (${existingByTitle.id})`);
@@ -667,9 +667,9 @@ export async function handleInboundEmail(message, env) {
         ),
         env.DB.prepare(
           `INSERT INTO wayfinder_extraction_jobs
-           (id, document_id, status, completed_at, reviewed_at, reviewed_by, review_decision, created_at)
-           VALUES (?, ?, 'approved', ?, ?, ?, 'approved', ?)`
-        ).bind(jobId, docId, nowIso, nowIso, inbox.user_id, nowIso)
+           (id, document_id, user_id, status, completed_at, reviewed_at, reviewed_by, review_decision, created_at)
+           VALUES (?, ?, ?, 'approved', ?, ?, ?, 'approved', ?)`
+        ).bind(jobId, docId, inbox.user_id, nowIso, nowIso, inbox.user_id, nowIso)
       );
 
       let purchaseSite = fields.purchase_site || null;
@@ -720,19 +720,30 @@ export async function handleInboundEmail(message, env) {
     batchStmts.push(
       env.DB.prepare(
         `INSERT INTO wayfinder_itinerary_items
-         (id, journey_id, user_id, item_type, title, provider,
-          local_date, local_time, end_date, end_time, location, source_document_id,
-          purchase_site, payment_method,
+         (id, journey_id, user_id, item_type, title, provider, supplier,
+          confirmation_number, booking_reference,
+          local_date, local_time, end_date, end_time, location,
+          tickets, language, duration, pickup_window, bag_restriction,
+          mobile_ticket_url, activity_details_url, import_source,
+          source_document_id, purchase_site, payment_method,
           notes, status, verification_status, visibility)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'imported','user_verified','private')`
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'email-forward',?,?,?,?,'imported','user_verified','private')`
       ).bind(
         itemId, inbox.journey_id, inbox.user_id,
-        fields.item_type, fields.title, fields.provider || null,
+        fields.item_type, fields.title, fields.provider || null, fields.supplier || null,
+        fields.confirmation_number || null, fields.booking_reference || null,
         fields.local_date || journey.start_date || '2026-12-03',
         fields.local_time || null,
         fields.end_date || null,
         fields.end_time || null,
         fields.location || null,
+        fields.tickets || null,
+        fields.language || null,
+        fields.duration || null,
+        fields.pickup_window || null,
+        fields.bag_restriction || null,
+        fields.mobile_ticket_url || null,
+        fields.activity_details_url || null,
         docId,
         fields.purchase_site || (from?.toLowerCase().includes('getyourguide') ? 'GetYourGuide' : null),
         fields.payment_method || null,
@@ -744,8 +755,9 @@ export async function handleInboundEmail(message, env) {
          WHERE id = ?`
       ).bind(new Date().toISOString(), inbox.id),
       env.DB.prepare(
-        'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, details) VALUES (?,?,?,?,?,?,?)'
+        'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_email, metadata_summary, details) VALUES (?,?,?,?,?,?,?,?,?)'
       ).bind(auditId, inbox.user_id, inbox.journey_id, 'itinerary_item', itemId, 'email_import',
+             from || null, `subject=${subject.slice(0, 120)}; item_type=${fields.item_type}`,
              JSON.stringify({ from, subject: subject.slice(0, 200), item_type: fields.item_type }))
     );
 

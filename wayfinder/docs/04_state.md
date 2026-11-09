@@ -584,6 +584,10 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
 - Normalized Itinerary Columns Invariant:
   - Structured booking attributes (`supplier`, `confirmation_number`, `booking_reference`, `origin`, `destination`, `room_type`, `seat`, `guests`, `tickets`, `language`, `duration`, `pickup_window`, `bag_restriction`, `mobile_ticket_url`, `activity_details_url`, `import_source`) are persisted as typed scalar columns on `wayfinder_itinerary_items` in addition to human-readable summary lines in `notes`.
   - `sanitizeItem` (`itinerary.js`), `handleAccommodations` (`accommodations.js`), and `parseBookingMetadata` (`PrivateBookingCard.jsx`) read normalized scalar columns first before falling back to regex extraction on `notes`.
+- Rail Timeline Deduplication Invariant:
+  - When a confirmed private rail booking (`item_type IN ('rail', 'train')`) exists on a day, `buildUnifiedDayTimeline` (`itineraryTimeline.js`) suppresses generic intercity rail placeholders (`isGenericRailPlaceholder`) and deduplicates private rail entries via `seenRailKeys`.
+  - In `PolandLanding.jsx`, inter-stop transit connector banners (`nextTransitTitle`) are hidden when `nextStopExpanded` is true so expanded day timelines do not stack redundant train banners above the timeline cards.
+
 
 
 

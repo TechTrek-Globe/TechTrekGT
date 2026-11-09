@@ -27,6 +27,14 @@ export function isGenericHotelPlaceholder(event) {
   );
 }
 
+export function isGenericRailPlaceholder(event) {
+  if (!event || event.itemType !== 'rail') return false;
+  const title = (event.title || '').toLowerCase();
+  // Keep airport commuter train (SKA1 on Day 1), suppress generic intercity rail placeholders when a confirmed train exists
+  if (title.includes('ska1') || title.includes('airport train')) return false;
+  return true;
+}
+
 export function isRedundantExcursionIdea(event, excursion) {
   if (!event || !excursion) return false;
   const evTitle = (event.title || '').toLowerCase();
@@ -99,6 +107,14 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
     return type === 'excursion' || type === 'tour' || type === 'activity' || title.includes('tour') || title.includes('excursion');
   });
 
+  // 1c. Detect if any confirmed private rail booking exists for this day
+  const hasConfirmedRail = effectivePrivate.some((p) => {
+    const type = (p.item_type || p.docType || p.detected_doc_type || '').toLowerCase();
+    const title = (p.title || '').toLowerCase();
+    if (title.endsWith('.pdf') || title.endsWith('.png')) return false;
+    return type === 'rail' || type === 'train';
+  });
+
   // 2. Filter and adapt public schedule:
   // - If authenticated, upgrade flight arrival/departure to confirmed flight details
   // - If unauthenticated, ensure no private confirmed details, passenger names, or confirmation codes are shown
@@ -135,6 +151,9 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
     if (hasConfirmedHotel && isGenericHotelPlaceholder(event)) {
       return false;
     }
+    if (hasConfirmedRail && isGenericRailPlaceholder(event)) {
+      return false;
+    }
     if (excursions.some((exc) => isRedundantExcursionIdea(event, exc))) {
       return false;
     }
@@ -152,8 +171,9 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
   // Filter private D1 bookings:
   // - Ignore raw PDF attachments (title ending in .pdf or .png)
   // - Suppress redundant private flight items if confirmed flight arrival milestone is already present on this day
-  // - Deduplicate redundant hotel bookings in private items
+  // - Deduplicate redundant hotel and rail bookings in private items
   const seenHotelKeys = new Set();
+  const seenRailKeys = new Set();
   const filteredPrivate = effectivePrivate.filter((priv) => {
     const title = (priv.title || '').trim().toLowerCase();
     if (title.endsWith('.pdf') || title.endsWith('.png')) {
@@ -161,6 +181,7 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
     }
     const type = (priv.item_type || priv.docType || priv.detected_doc_type || '').toLowerCase();
     const isHotel = type === 'hotel' || type === 'accommodation' || type === 'lodging';
+    const isRail = type === 'rail' || type === 'train';
     if (hasPublicFlightArrival && (type === 'flight' || title.includes('flight: atl to krk') || title.includes('dl9208'))) {
       return false;
     }
@@ -171,6 +192,15 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
         return false;
       }
       seenHotelKeys.add(hotelKey);
+    }
+    if (isRail) {
+      const conf = (priv.confirmation_number || '').trim().toLowerCase();
+      const docId = priv.source_document_id || '';
+      const railKey = conf ? `rail:conf:${conf}` : (docId ? `rail:doc:${docId}` : `rail:${title}:${priv.local_date}`);
+      if (seenRailKeys.has(railKey)) {
+        return false;
+      }
+      seenRailKeys.add(railKey);
     }
     return true;
   });

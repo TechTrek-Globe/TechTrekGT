@@ -745,6 +745,11 @@ Decouples Wayfinder Guide from the shared `personal-budget-db` instance onto its
 - Normalized Audit Trail & Extraction Job Ownership ([documents.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/documents.js), [admin.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/admin.js), [deleteAccount.js](file:///e:/TechTrekGT/wayfinder/functions/utils/deleteAccount.js)):
   - Added `target_user_id`, `target_email`, `previous_value`, `new_value`, and `metadata_summary` to `wayfinder_audit_events`.
   - Added `user_id` (indexed via `idx_wf_jobs_user`) to `wayfinder_extraction_jobs` and `expense_id` / `split_id` to `wayfinder_expense_settlements`.
+- Rail Timeline Deduplication & Transit Connector Streamlining ([itineraryTimeline.js](file:///e:/TechTrekGT/wayfinder/src/utils/itineraryTimeline.js), [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx)):
+  - `buildUnifiedDayTimeline` detects confirmed private rail bookings (`hasConfirmedRail`) and automatically suppresses generic intercity rail placeholders (`isGenericRailPlaceholder`) on the same day while preserving the Day 1 SKA1 airport commuter train.
+  - Private rail items are deduplicated via `seenRailKeys` (`confirmation_number` or `source_document_id`) to prevent duplicate train cards.
+  - In `PolandLanding.jsx` (`JourneyStopSchedule`), inter-stop transit connector banners (`nextTransitTitle`) automatically collapse when the receiving stop's schedule is expanded (`!nextStopExpanded`), and stop arrival badges use concise destination descriptors instead of repeating train labels.
+
 
 
 

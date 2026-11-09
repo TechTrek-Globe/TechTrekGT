@@ -17,6 +17,10 @@ import {
 import {
   addMinutesWithDate
 } from '../functions/api/wayfinder/calendar.js';
+import {
+  buildUnifiedDayTimeline,
+  isGenericRailPlaceholder
+} from '../src/utils/itineraryTimeline.js';
 
 let passedCount = 0;
 let queue = Promise.resolve();
@@ -396,6 +400,67 @@ test('parseBookingDocument checks DB api_key_enabled flag when provided', async 
   assert.equal(res.success, true);
   assert.equal(res.usedMethod, 'heuristic');
   assert.equal(res.docType, 'hotel');
+});
+
+console.log('--- 10. Rail Timeline Deduplication Tests ---');
+
+test('isGenericRailPlaceholder identifies intercity rail placeholders while preserving SKA1 airport train', () => {
+  assert.equal(
+    isGenericRailPlaceholder({ itemType: 'rail', title: 'Direct IC Train: Kraków Główny to Wrocław Główny' }),
+    true
+  );
+  assert.equal(
+    isGenericRailPlaceholder({ itemType: 'rail', title: 'SKA1 Airport Train to Kraków Główny' }),
+    false
+  );
+});
+
+test('buildUnifiedDayTimeline suppresses generic public train placeholder and deduplicates private rail items when confirmed train exists', () => {
+  const day4 = {
+    day: 4,
+    date: '2026-12-07',
+    schedule: [
+      { time: '10:30', itemType: 'hotel', title: 'Morning Base Check-out & Transfer to Kraków Główny', badge: 'Departure' },
+      { time: '11:30', itemType: 'rail', title: 'Direct IC Train: Kraków Główny to Wrocław Główny', badge: '1st Class Rail' },
+      { time: '16:30', itemType: 'market', title: 'Dusk Market: Wrocław Christmas Market', badge: 'Market Anchor' }
+    ]
+  };
+  const privateRailBookings = [
+    {
+      id: 'rail-1',
+      item_type: 'rail',
+      local_date: '2026-12-07',
+      local_time: '11:50',
+      title: 'IC 58 Galicja: Kraków Gł. - Wrocław Gł.',
+      confirmation_number: 'WN 71563945'
+    },
+    {
+      id: 'rail-2-dup',
+      item_type: 'rail',
+      local_date: '2026-12-07',
+      local_time: '11:50',
+      title: 'IC 58 Galicja: Kraków Gł. - Wrocław Gł.',
+      confirmation_number: 'WN 71563945'
+    }
+  ];
+
+  // Authenticated: should show 1 private train card and suppress the generic 11:30 public train placeholder
+  const timelineAuth = buildUnifiedDayTimeline(day4, privateRailBookings, [], true);
+  const railCardsAuth = timelineAuth.filter(
+    item => item.data.itemType === 'rail' || item.data.item_type === 'rail'
+  );
+  assert.equal(railCardsAuth.length, 1, 'Authenticated timeline must render exactly 1 rail card');
+  assert.equal(railCardsAuth[0].type, 'private');
+  assert.equal(railCardsAuth[0].data.title, 'IC 58 Galicja: Kraków Gł. - Wrocław Gł.');
+
+  // Unauthenticated: should still show the generic 11:30 public train placeholder and no private cards
+  const timelineUnauth = buildUnifiedDayTimeline(day4, privateRailBookings, [], false);
+  const railCardsUnauth = timelineUnauth.filter(
+    item => item.data.itemType === 'rail' || item.data.item_type === 'rail'
+  );
+  assert.equal(railCardsUnauth.length, 1, 'Unauthenticated timeline must render public rail suggestion');
+  assert.equal(railCardsUnauth[0].type, 'public');
+  assert.equal(railCardsUnauth[0].data.title, 'Direct IC Train: Kraków Główny to Wrocław Główny');
 });
 
 await queue;

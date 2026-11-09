@@ -27,33 +27,33 @@ const stopTransitInfo = {
   krakow: {
     arrivalBadge: '✈️ Air Arrival: Kraków Airport (KRK)',
     arrivalSub: 'Afternoon flight arrival into Kraków John Paul II International Airport (KRK). Direct 17-minute SKA1 commuter rail into Kraków Główny arrives ~14:45-15:15 CET, synchronizing with standard 15:00 hotel check-in.',
-    nextTransitTitle: 'PKP Intercity IC Train: Kraków Główny ➔ Wrocław Główny',
-    nextTransitDetails: 'Departs Kraków Główny 11:30 • Arrives Wrocław Główny 14:15 • ~2h 45m in 1st Class',
+    nextTransitTitle: 'PKP Intercity IC 58 Galicja: Kraków Główny ➔ Wrocław Główny',
+    nextTransitDetails: 'Departs Kraków Główny 11:50 • Arrives Wrocław Główny 14:50 • 3h 00m in 1st Class',
     nextTransitNotes: '1st-class carriages with dedicated luggage racks • Scenic Lower Silesian winter route'
   },
   wroclaw: {
-    arrivalBadge: '🚆 Direct PKP Intercity IC from Kraków Główny',
-    arrivalSub: 'Arrives Wrocław Główny at 14:15. Settle into lodging base near Market Square or Ostrów Tumski.',
+    arrivalBadge: '🚆 Lower Silesian Capital & Fairytale Rynek',
+    arrivalSub: 'Arrives Wrocław Główny at 14:50. Settle into lodging base near Market Square or Ostrów Tumski.',
     nextTransitTitle: 'PKP Intercity IC Train: Wrocław Główny ➔ Poznań Główny',
     nextTransitDetails: 'Departs Wrocław Główny 10:35 • Arrives Poznań Główny 12:15 • ~1h 40m in 1st Class',
     nextTransitNotes: 'Northbound rail transition into Greater Poland (Wielkopolska)'
   },
   poznan: {
-    arrivalBadge: '🚆 Direct PKP Intercity IC from Wrocław Główny',
+    arrivalBadge: '🚆 Greater Poland Capital & Stary Rynek',
     arrivalSub: 'Arrives Poznań Główny at 12:15. Check into central base near Stary Rynek & Plac Wolności.',
     nextTransitTitle: 'PKP Morning Rail: Poznań Główny ➔ Toruń Główny (Day Stop)',
     nextTransitDetails: 'Departs Poznań Główny 08:30 • Arrives Toruń Główny 10:15 • ~1h 45m',
     nextTransitNotes: 'Store luggage in Toruń Główny station lockers • Short bus across Vistula River'
   },
   torun: {
-    arrivalBadge: '🚆 Morning Rail from Poznań for 4-6hr UNESCO Day Stop',
+    arrivalBadge: '🚆 UNESCO Gothic Old Town & Gingerbread Capital',
     arrivalSub: 'Luggage in station lockers. Explore Gothic Old Town, Copernicus House & Living Gingerbread Museum.',
     nextTransitTitle: 'PKP Coastal Rail: Toruń Główny ➔ Gdańsk Główny',
     nextTransitDetails: 'Departs Toruń Główny 15:45 • Arrives Gdańsk Główny 17:30 • ~1h 45m',
     nextTransitNotes: 'Collect luggage from lockers • Direct scenic rail north to the Baltic Coast'
   },
   gdansk: {
-    arrivalBadge: '🚆 Coastal Rail Arrival from Toruń onto the Baltic Coast',
+    arrivalBadge: '🚆 Historic Hanseatic Port & Baltic Amber Coast',
     arrivalSub: 'Arrives Gdańsk Główny at 17:30. Check into waterfront or Granary Island base for 3-night holiday finale.',
     nextTransitTitle: '✈️ Return Flight: Gdańsk Lech Wałęsa (GDN) ➔ Home',
     nextTransitDetails: 'Early airport transfer (04:30) for DL9528 departure at 06:45',
@@ -135,6 +135,7 @@ function JourneyStopSchedule({
   accommodations,
   pushRoute,
   isExpanded,
+  nextStopExpanded,
   onToggleExpand,
   transitInfo,
   onOpenDocViewer,
@@ -580,8 +581,8 @@ function JourneyStopSchedule({
         )}
       </div>
 
-      {/* Transit Connector to Next Stop */}
-      {idx < totalCount - 1 && transitInfo?.nextTransitTitle && (
+      {/* Transit Connector to Next Stop (shown when next stop schedule is collapsed to avoid duplicating the train card inside the timeline) */}
+      {idx < totalCount - 1 && transitInfo?.nextTransitTitle && !nextStopExpanded && (
         <div className="my-2 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
           <div className="flex items-center space-x-3">
             <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 border border-amber-500/30">
@@ -1022,6 +1023,7 @@ export function PolandLanding() {
             <div className="space-y-6 animate-fade-in">
               {filteredRoute.map((city) => {
                 const globalIdx = polandJourney.route.findIndex(r => r.id === city.id);
+                const nextCity = polandJourney.route[globalIdx + 1];
                 const cityDays = getDaysForCity(city.id);
                 return (
                   <JourneyStopSchedule
@@ -1034,6 +1036,7 @@ export function PolandLanding() {
                     accommodations={accommodations}
                     pushRoute={pushRoute}
                     isExpanded={!!expandedStops[city.id]}
+                    nextStopExpanded={nextCity ? !!expandedStops[nextCity.id] : false}
                     onToggleExpand={() => toggleStopExpand(city.id)}
                     transitInfo={stopTransitInfo[city.id]}
                     onOpenDocViewer={city.id === 'krakow' ? () => setIsDocViewerOpen(true) : null}

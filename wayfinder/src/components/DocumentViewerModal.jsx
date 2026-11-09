@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Download, ExternalLink, FileText, Plane, Upload, AlertTriangle, 
-  CheckCircle2, Loader2, Sparkles, Clock, ShieldCheck, Ticket, MapPin, BedDouble 
+  CheckCircle2, Loader2, Sparkles, Clock, ShieldCheck, Ticket, MapPin, BedDouble, Train 
 } from 'lucide-react';
 import { getLocalDocumentFile, saveLocalDocumentFile } from '../utils/documentStorage';
 import { useAuth } from '../context/AuthContext';
@@ -44,9 +44,19 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
     filename.toLowerCase().includes('lodging') ||
     Boolean(activeDoc.details?.hotelName || activeDoc.details?.checkIn)
   ));
+  const isRail = (!isExcursion && !isFlight && !isHotel && (
+    activeDoc.detected_doc_type === 'rail' ||
+    activeDoc.item_type === 'rail' ||
+    filename.toLowerCase().includes('train') ||
+    filename.toLowerCase().includes('rail') ||
+    filename.toLowerCase().includes('bilet') ||
+    filename.toLowerCase().includes('pkp') ||
+    filename.toLowerCase().includes('galicja') ||
+    Boolean(activeDoc.details?.trainNumber)
+  ));
 
   useEffect(() => {
-    if (!isOpen || !isAuthenticated) {
+    if (!isOpen) {
       setFileUrl(null);
       setEmbedError(false);
       setIsLoading(false);
@@ -133,7 +143,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
     }
   };
 
-  if (!isOpen || !isAuthenticated) return null;
+  if (!isOpen) return null;
 
   return (
     <div 
@@ -147,11 +157,19 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
         {/* Header Bar */}
         <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-wf-navy shrink-0 gap-3">
           <div className="flex items-center space-x-3 min-w-0">
-            <div className="p-2.5 bg-sky-500/20 text-sky-300 border border-sky-400/30 rounded-2xl shrink-0">
+            <div className={`p-2.5 rounded-2xl shrink-0 ${
+              isRail 
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30' 
+                : isHotel 
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' 
+                : 'bg-sky-500/20 text-sky-300 border border-sky-400/30'
+            }`}>
               {filename.toLowerCase().includes('flight') || filename.toLowerCase().includes('delta') ? (
                 <Plane className="w-5 h-5 text-sky-400" />
               ) : isHotel ? (
                 <BedDouble className="w-5 h-5 text-emerald-400" />
+              ) : isRail ? (
+                <Train className="w-5 h-5 text-amber-400" />
               ) : (
                 <FileText className="w-5 h-5 text-sky-400" />
               )}
@@ -161,7 +179,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
                 {activeDoc.safe_display_name || activeDoc.filename || 'Travel Document Preview'}
               </h3>
               <p className="text-[11px] text-slate-400 flex items-center space-x-1.5">
-                <span>Verified Trip Attachment</span>
+                <span>{isRail ? 'PKP Rail Travel Document' : isFlight ? 'Flight Document' : isHotel ? 'Hotel Booking' : 'Verified Trip Attachment'}</span>
                 <span>:</span>
                 <span className="font-mono text-sky-300">{filename}</span>
               </p>

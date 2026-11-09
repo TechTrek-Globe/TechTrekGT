@@ -41,11 +41,20 @@ export async function deleteUserAccount(db, targetUserId, actorUserId) {
   };
 
   // --- Core Finance Tables ---
-  addIfTable('ledger_shares', 'DELETE FROM ledger_shares WHERE user_id = ?', targetUserId);
+  addIfTable('finance_daily_matrix', 'DELETE FROM finance_daily_matrix WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_transactions', 'DELETE FROM finance_transactions WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_line_items', 'DELETE FROM finance_line_items WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_funding_goals', 'DELETE FROM finance_funding_goals WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_loans', 'DELETE FROM finance_loans WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_bills', 'DELETE FROM finance_bills WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_people', 'DELETE FROM finance_people WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_accounts', 'DELETE FROM finance_accounts WHERE ledger_id = ?', targetUserId);
+  addIfTable('finance_ledger_settings', 'DELETE FROM finance_ledger_settings WHERE ledger_id = ?', targetUserId);
+  addIfTable('ledger_shares', 'DELETE FROM ledger_shares WHERE user_id = ? OR ledger_id = ?', targetUserId, targetUserId);
   addIfTable(
     'ledger_invites',
-    'DELETE FROM ledger_invites WHERE (invited_email = ? COLLATE NOCASE) OR (accepted_by = ?) OR (invited_by = ?)',
-    email, targetUserId, targetUserId
+    'DELETE FROM ledger_invites WHERE (invited_email = ? COLLATE NOCASE) OR (accepted_by = ?) OR (invited_by = ?) OR (ledger_id = ?)',
+    email, targetUserId, targetUserId, targetUserId
   );
   addIfTable('user_backups', 'DELETE FROM user_backups WHERE id = ?', targetUserId);
   addIfTable('user_backup_versions', 'DELETE FROM user_backup_versions WHERE user_id = ?', targetUserId);

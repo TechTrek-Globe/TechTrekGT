@@ -1,4 +1,4 @@
--- Cloudflare D1 Database Schema for Personal Budget OS
+-- Cloudflare D1 Database Schema for Finance OS (finance-os-db)
 
 CREATE TABLE IF NOT EXISTS users (
   id                   TEXT PRIMARY KEY,
@@ -224,4 +224,166 @@ CREATE TABLE IF NOT EXISTS ledger_shares (
 );
 CREATE INDEX IF NOT EXISTS idx_ledger_shares_user   ON ledger_shares(user_id);
 CREATE INDEX IF NOT EXISTS idx_ledger_shares_ledger ON ledger_shares(ledger_id);
+
+-- ------------------------------------------------------------------
+-- Structured Finance OS Domain Tables (Keyed by ledger_id)
+-- ------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS finance_ledger_settings (
+  ledger_id               TEXT PRIMARY KEY,
+  version                 INTEGER NOT NULL DEFAULT 1,
+  theme                   TEXT NOT NULL DEFAULT 'dark',
+  hide_dashboard_header   INTEGER NOT NULL DEFAULT 0,
+  dashboard_widgets_json  TEXT NOT NULL DEFAULT '[]',
+  custom_categories_json  TEXT NOT NULL DEFAULT '[]',
+  saved_filter_views_json TEXT NOT NULL DEFAULT '[]',
+  spending_limits_json    TEXT NOT NULL DEFAULT '{}',
+  savings_targets_json    TEXT NOT NULL DEFAULT '{}',
+  archived_years_json     TEXT NOT NULL DEFAULT '{}',
+  audit_log_json          TEXT NOT NULL DEFAULT '[]',
+  extra_meta_json         TEXT NOT NULL DEFAULT '{}',
+  data_byte_length        INTEGER NOT NULL DEFAULT 0,
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at_ms           INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS finance_accounts (
+  ledger_id               TEXT NOT NULL,
+  id                      TEXT NOT NULL,
+  name                    TEXT NOT NULL,
+  type                    TEXT NOT NULL DEFAULT 'checking',
+  save_extra_monthly      REAL NOT NULL DEFAULT 0.0,
+  enable_extra_savings    INTEGER NOT NULL DEFAULT 1,
+  color                   TEXT NOT NULL DEFAULT 'blue',
+  notes                   TEXT DEFAULT '',
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  extra_json              TEXT DEFAULT '{}',
+  PRIMARY KEY (ledger_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_finance_accounts_ledger ON finance_accounts(ledger_id, sort_order);
+
+CREATE TABLE IF NOT EXISTS finance_people (
+  ledger_id               TEXT NOT NULL,
+  id                      TEXT NOT NULL,
+  name                    TEXT NOT NULL,
+  role                    TEXT NOT NULL DEFAULT 'Primary',
+  pay_frequency           TEXT NOT NULL DEFAULT 'semi-monthly',
+  pay_day1                TEXT NOT NULL DEFAULT '15',
+  pay_day2                TEXT DEFAULT 'last',
+  pay_offset_days         INTEGER NOT NULL DEFAULT 0,
+  account_allocations     TEXT NOT NULL DEFAULT '{}',
+  gross_per_pay           REAL NOT NULL DEFAULT 0.0,
+  net_per_pay             REAL NOT NULL DEFAULT 0.0,
+  color                   TEXT NOT NULL DEFAULT 'purple',
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  extra_json              TEXT DEFAULT '{}',
+  PRIMARY KEY (ledger_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_finance_people_ledger ON finance_people(ledger_id, sort_order);
+
+CREATE TABLE IF NOT EXISTS finance_bills (
+  ledger_id               TEXT NOT NULL,
+  id                      TEXT NOT NULL,
+  account_id              TEXT NOT NULL,
+  name                    TEXT NOT NULL,
+  amount                  REAL NOT NULL DEFAULT 0.0,
+  period                  TEXT NOT NULL DEFAULT 'Monthly',
+  due_day                 INTEGER NOT NULL DEFAULT 1,
+  due_months              TEXT NOT NULL DEFAULT '[1,2,3,4,5,6,7,8,9,10,11,12]',
+  payment_source          TEXT NOT NULL DEFAULT 'Auto Pay',
+  category                TEXT DEFAULT 'Uncategorized',
+  splits_json             TEXT NOT NULL DEFAULT '{}',
+  notes                   TEXT DEFAULT '',
+  matching_key            TEXT DEFAULT '',
+  is_archived             INTEGER NOT NULL DEFAULT 0,
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  extra_json              TEXT DEFAULT '{}',
+  PRIMARY KEY (ledger_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_finance_bills_ledger ON finance_bills(ledger_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_finance_bills_account ON finance_bills(ledger_id, account_id);
+
+CREATE TABLE IF NOT EXISTS finance_transactions (
+  ledger_id               TEXT NOT NULL,
+  id                      TEXT NOT NULL,
+  account_id              TEXT NOT NULL DEFAULT '',
+  date                    TEXT NOT NULL DEFAULT '',
+  description             TEXT NOT NULL DEFAULT '',
+  amount                  REAL NOT NULL DEFAULT 0.0,
+  type                    TEXT NOT NULL DEFAULT 'expense',
+  category                TEXT DEFAULT 'Uncategorized',
+  status                  TEXT DEFAULT 'cleared',
+  matched_bill_id         TEXT,
+  notes                   TEXT DEFAULT '',
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  extra_json              TEXT DEFAULT '{}',
+  PRIMARY KEY (ledger_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_finance_tx_ledger_date ON finance_transactions(ledger_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_finance_tx_account ON finance_transactions(ledger_id, account_id);
+
+CREATE TABLE IF NOT EXISTS finance_line_items (
+  ledger_id               TEXT NOT NULL,
+  id                      TEXT NOT NULL,
+  bill_id                 TEXT NOT NULL DEFAULT '',
+  month_key               TEXT NOT NULL DEFAULT '',
+  actual_amount           REAL,
+  is_paid                 INTEGER NOT NULL DEFAULT 0,
+  paid_date               TEXT,
+  notes                   TEXT DEFAULT '',
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  extra_json              TEXT DEFAULT '{}',
+  PRIMARY KEY (ledger_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_finance_line_items_ledger ON finance_line_items(ledger_id, month_key);
+
+CREATE TABLE IF NOT EXISTS finance_funding_goals (
+  ledger_id               TEXT NOT NULL,
+  id                      TEXT NOT NULL,
+  account_id              TEXT DEFAULT '',
+  name                    TEXT NOT NULL DEFAULT '',
+  target_amount           REAL NOT NULL DEFAULT 0.0,
+  current_amount          REAL NOT NULL DEFAULT 0.0,
+  monthly_contribution    REAL NOT NULL DEFAULT 0.0,
+  target_date             TEXT,
+  color                   TEXT DEFAULT 'emerald',
+  icon                    TEXT DEFAULT 'Target',
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  extra_json              TEXT DEFAULT '{}',
+  PRIMARY KEY (ledger_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_finance_goals_ledger ON finance_funding_goals(ledger_id, sort_order);
+
+CREATE TABLE IF NOT EXISTS finance_loans (
+  ledger_id               TEXT NOT NULL,
+  id                      TEXT NOT NULL,
+  name                    TEXT NOT NULL DEFAULT 'New Loan',
+  description             TEXT DEFAULT '',
+  principal               REAL NOT NULL DEFAULT 0.0,
+  annual_interest_rate    REAL NOT NULL DEFAULT 0.0,
+  term_months             INTEGER NOT NULL DEFAULT 0,
+  monthly_payment         REAL NOT NULL DEFAULT 0.0,
+  extra_payment           REAL NOT NULL DEFAULT 0.0,
+  start_date              TEXT NOT NULL DEFAULT '',
+  is_archived             INTEGER NOT NULL DEFAULT 0,
+  interest_compounding    TEXT NOT NULL DEFAULT 'monthly',
+  payment_frequency       TEXT NOT NULL DEFAULT 'monthly',
+  payment_type            TEXT NOT NULL DEFAULT 'amortizing',
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  extra_json              TEXT DEFAULT '{}',
+  PRIMARY KEY (ledger_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_finance_loans_ledger ON finance_loans(ledger_id, sort_order);
+
+CREATE TABLE IF NOT EXISTS finance_daily_matrix (
+  ledger_id               TEXT NOT NULL,
+  account_id              TEXT NOT NULL,
+  month_key               TEXT NOT NULL,
+  day_num                 INTEGER NOT NULL,
+  field_key               TEXT NOT NULL,
+  num_value               REAL,
+  str_value               TEXT,
+  PRIMARY KEY (ledger_id, account_id, month_key, day_num, field_key)
+);
+CREATE INDEX IF NOT EXISTS idx_finance_matrix_lookup ON finance_daily_matrix(ledger_id, account_id, month_key);
 

@@ -2,10 +2,10 @@
 -- Run BEFORE deploying the hardened worker.
 --
 -- Local only (Stage 2):
---   npx wrangler d1 migrations apply personal-budget-db --local
+--   npx wrangler d1 migrations apply finance-os-db --local
 --
 -- Production (manual, after Stage 6 sign-off):
---   npx wrangler d1 migrations apply personal-budget-db --remote
+--   npx wrangler d1 migrations apply finance-os-db --remote
 --
 -- BEFORE running remotely, uncomment step 5 and set the real admin email.
 

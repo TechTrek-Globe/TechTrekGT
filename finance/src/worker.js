@@ -19,6 +19,11 @@ import { handleLedgerMembership } from '../functions/api/admin/ledger-membership
 import { resolveLedgerAccess, canEdit, canRead, canManageShares } from '../functions/utils/ledgerAccess.js';
 import { handleLedgerShares } from '../functions/api/finance/ledger-shares.js';
 import {
+  ensureStructuredFinanceTables,
+  buildStructuredWriteStatements,
+  readStructuredBudget
+} from '../functions/utils/structuredBudgetStore.js';
+import {
   authenticate,
   readJson,
   json,
@@ -672,6 +677,8 @@ async function handleSyncBackup(context) {
     const isManual = body.manual === true;
     versionId = isManual ? crypto.randomUUID() : null;
 
+    await ensureStructuredFinanceTables(env.DB);
+
     const queries = [];
 
     // Only create a snapshot in user_backup_versions if this is a manual backup
@@ -717,10 +724,17 @@ async function handleSyncBackup(context) {
          WHERE (? = 1 OR user_backups.updated_at_ms IS NULL OR user_backups.updated_at_ms <= ?)`
       ).bind(targetLedgerId, dataStr, dataByteLength, now, force ? 1 : 0, hasBaseVersion ? baseVersion : 0)
     );
+    const userBackupsIdx = queries.length - 1;
+
+    // Atomically write structured relational tables when CAS condition passes (or force = true)
+    const canWriteStructured = force || !row || !hasBaseVersion || storedVersion <= baseVersion;
+    if (canWriteStructured) {
+      queries.push(...buildStructuredWriteStatements(env.DB, targetLedgerId, payload, dataByteLength, now));
+    }
 
     const batchResults = await env.DB.batch(queries);
 
-    const backupResult = batchResults && batchResults[batchResults.length - 1];
+    const backupResult = batchResults && batchResults[userBackupsIdx];
     const changes = backupResult?.meta?.changes ?? backupResult?.changes ?? 0;
 
     if (changes === 0 && !force) {
@@ -807,10 +821,8 @@ async function handleSyncRestore(context) {
       });
     }
 
-    let parsed;
-    try {
-      parsed = JSON.parse(row.data);
-    } catch {
+    const structured = await readStructuredBudget(env.DB, targetLedgerId, row.data);
+    if (!structured.ok) {
       console.error('[sync/restore] stored backup is not valid JSON for ledger', targetLedgerId);
       return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Stored backup could not be read.', context.requestId);
     }
@@ -820,7 +832,7 @@ async function handleSyncRestore(context) {
     emitMetric('sync.restore.success', context.requestId);
     return json({
       success: true,
-      budget: parsed && parsed.budget !== undefined ? parsed.budget : parsed,
+      budget: structured.budget,
       updatedAt: updatedAtIso,
       version: version
     }, 200, {
@@ -928,19 +940,26 @@ async function handleSyncRestoreVersion(context) {
 
     const now = Date.now();
     const versionByteLength = new TextEncoder().encode(versionRow.data).length;
-    await env.DB.prepare(
-      `INSERT INTO user_backups (id, data, data_byte_length, updated_at, updated_at_ms)
-       VALUES (?, ?, ?, datetime('now'), ?)
-       ON CONFLICT(id) DO UPDATE SET
-         data = excluded.data,
-         data_byte_length = excluded.data_byte_length,
-         updated_at = excluded.updated_at,
-         updated_at_ms = excluded.updated_at_ms`
-    ).bind(targetLedgerId, versionRow.data, versionByteLength, now).run();
+    const restoredBudget = parsed && parsed.budget !== undefined ? parsed.budget : parsed;
+
+    await ensureStructuredFinanceTables(env.DB);
+    const restoreQueries = [
+      env.DB.prepare(
+        `INSERT INTO user_backups (id, data, data_byte_length, updated_at, updated_at_ms)
+         VALUES (?, ?, ?, datetime('now'), ?)
+         ON CONFLICT(id) DO UPDATE SET
+           data = excluded.data,
+           data_byte_length = excluded.data_byte_length,
+           updated_at = excluded.updated_at,
+           updated_at_ms = excluded.updated_at_ms`
+      ).bind(targetLedgerId, versionRow.data, versionByteLength, now),
+      ...buildStructuredWriteStatements(env.DB, targetLedgerId, restoredBudget, versionByteLength, now)
+    ];
+    await env.DB.batch(restoreQueries);
 
     return json({
       success: true,
-      budget: parsed && parsed.budget !== undefined ? parsed.budget : parsed,
+      budget: restoredBudget,
       version: now,
       updatedAt: new Date(now).toISOString()
     });

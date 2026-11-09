@@ -94,7 +94,9 @@ test('[AI-001] eBay Listing HTML Generator with AI Middle Section', async (t) =>
 
     assert.ok(copy.insertHtml.includes('<div class="ai-custom-card">Custom AI Output</div>'));
     assert.ok(copy.htmlBody.includes('<div class="ai-custom-card">Custom AI Output</div>'));
-    assert.ok(copy.htmlBody.includes('<!-- =======================================================\n       ADD Lising INFO HERE'));
+    assert.ok(copy.htmlBody.includes('<!-- =======================================================\n       ADD LISTING INFO HERE'));
+    assert.ok(copy.htmlBody.includes('https://i.ebayimg.com/images/g/fe4AAeSwSO1q8G1~/s-l1600.webp'), 'Contains updated header banner image');
+    assert.ok(copy.htmlBody.includes('Browse All Listings'), 'Contains compact dark footer strip with link');
   });
 
   await t.test('Route registration in src/worker.js resolves POST /api/ai/generate-ebay-details', () => {

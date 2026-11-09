@@ -199,76 +199,44 @@ export function generateEbayCopy(item, options = {}) {
     aiGeneratedMiddleSection: options.aiGeneratedMiddleSection || item.aiGeneratedMiddleSection || ''
   });
 
-  // Full HTML Preview (includes header banner, delimiters, middle insertHtml, and footer)
-  const htmlBody = `<div style="width:100%;font-family:Arial,Helvetica,sans-serif;background-color:#0b0f19;padding:20px 0;">
+  // Full HTML Preview (includes header banner, delimiters, middle insertHtml, and compact footer)
+  const htmlBody = `<div style="max-width: 900px; margin: 0 auto; font-family: Arial, Helvetica, sans-serif; color: #222222; box-sizing: border-box; line-height: 1.5;">
 
-  <div style="max-width:900px;margin:0 auto 20px;border-bottom:1px solid rgb(51,51,51);box-sizing:border-box;">
-    <img src="https://i.ebayimg.com/images/g/sZwAAeSwMwFqexk1/s-l1600.webp" alt="TechTrek Outpost" width="800" height="200" style="max-width:100%;height:auto;display:block;margin:0 auto;border-radius:6px;">
+  <!-- Header Banner -->
+  <div style="width: 100%; margin-bottom: 20px; border-bottom: 2px solid #e5e5e5; padding-bottom: 12px; box-sizing: border-box;">
+    <img src="https://i.ebayimg.com/images/g/fe4AAeSwSO1q8G1~/s-l1600.webp" alt="TechTrek Outpost" width="950" height="100" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;">
   </div>
 
+  <!-- Content Container -->
+  <div style="font-size: 15px; color: #333333; margin-bottom: 20px; box-sizing: border-box;">
+
 <!-- =======================================================
-       ADD Lising INFO HERE
+       ADD LISTING INFO HERE
 ======================================================= -->
 
 ${insertHtml}
 
 <!-- =======================================================
-       END Lising INFO HERE
+       END LISTING INFO HERE
 ======================================================= -->
 
-  <div style="max-width:900px;margin:20px auto 15px;padding:18px;background-color:rgb(17,17,17);color:rgb(255,255,255);border:1px solid rgb(51,51,51);border-radius:6px;box-sizing:border-box;">
-    <h3 style="margin:0px 0px 12px;color:rgb(241,193,91);font-size:20px;line-height:1.4;text-align:center;">
-      Why Buy From TechTrek Outpost?
-    </h3>
-    <p style="margin:0px 0px 14px;color:#e0e0e0;font-size:15px;line-height:1.6;text-align:center;">
-      We focus on clear item details, accurate condition information, helpful photographs, and careful packing.
-    </p>
-    <table role="presentation" style="width:100%;border-collapse:collapse;background-color:rgb(17,17,17);color:#e0e0e0;font-size:14px;">
-      <tbody>
-        <tr>
-          <td style="width:50%;padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
-            &#10003; Clear item descriptions
-          </td>
-          <td style="width:50%;padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
-            &#10003; Relevant product details provided
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
-            &#10003; Condition information clearly stated
-          </td>
-          <td style="padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
-            &#10003; Included contents identified
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
-            &#10003; Exact-item photos when applicable
-          </td>
-          <td style="padding:8px;background-color:rgb(17,17,17);color:#e0e0e0;vertical-align:top;">
-            &#10003; Items carefully packed for shipment
-          </td>
-        </tr>
-      </tbody>
-    </table>
   </div>
 
-  <div style="max-width:900px;margin:0 auto 15px;padding:20px;text-align:center;background-color:rgb(17,17,17);color:#e0e0e0;border:1px solid rgb(214,181,109);border-radius:6px;box-sizing:border-box;">
-    <h3 style="margin:0px 0px 8px;color:rgb(241,193,91);font-size:18px;line-height:1.4;">
-      Explore More from TechTrek Outpost
-    </h3>
-    <p style="margin:0px 0px 14px;color:#b0b0b0;font-size:14px;line-height:1.5;">
-      Browse our other available items.
-    </p>
-    <a href="https://www.ebay.com/usr/tt_globetrotter" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:10px 20px;background-color:rgb(179,122,22);color:rgb(255,255,255);text-decoration:none;font-size:15px;font-weight:bold;border-radius:4px;border:1px solid rgb(214,181,109);">
-      View Our Other Listings
-    </a>
-  </div>
-
-  <div style="max-width:900px;margin:0 auto;padding:14px 20px;text-align:center;background-color:rgb(17,17,17);border:1px solid rgb(51,51,51);border-radius:6px;color:rgb(255,255,255);font-size:13px;line-height:1.5;box-sizing:border-box;">
-    <strong style="color:rgb(241,193,91);">TechTrek Outpost</strong>
-    <span style="color:#b0b0b0;"> | Clear Item Details | Exact-Item Photos | Carefully Packed</span>
-  </div>
+  <!-- Compact Dark Footer Strip -->
+  <table role="presentation" style="width: 100%; background-color: #111111; border-radius: 6px; padding: 12px 16px; margin-top: 24px; border-collapse: collapse; box-sizing: border-box;">
+    <tbody>
+      <tr>
+        <td style="color: #ffffff; font-size: 13px; font-family: Arial, Helvetica, sans-serif; text-align: left; vertical-align: middle;">
+          <strong style="color: #f1c15b;">TechTrek Outpost</strong> &nbsp;|&nbsp; Clear Item Details &nbsp;•&nbsp; Exact Photos &nbsp;•&nbsp; Carefully Packed
+        </td>
+        <td style="text-align: right; vertical-align: middle;">
+          <a href="https://www.ebay.com/usr/tt_globetrotter" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 7px 15px; background-color: #b37a16; color: #ffffff !important; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 4px; white-space: nowrap; font-family: Arial, Helvetica, sans-serif;">
+            Browse All Listings
+          </a>
+        </td>
+      </tr>
+    </tbody>
+  </table>
 
 </div>`.trim();
 

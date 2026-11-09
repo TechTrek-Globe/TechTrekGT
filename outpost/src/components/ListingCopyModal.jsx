@@ -890,22 +890,44 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
                   </button>
                 </div>
 
-                <button
-                  onClick={() => copyToClipboard(format === 'text' ? curEbay.textBody : (curEbay.insertHtml || curEbay.htmlBody), 'ebay_desc')}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 transition-all flex items-center gap-1 shadow-md shadow-amber-500/10"
-                >
-                  {copiedField === 'ebay_desc' ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-slate-950" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy {format === 'text' ? 'Text' : 'HTML Insert'}</span>
-                    </>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => copyToClipboard(format === 'text' ? curEbay.textBody : curEbay.htmlBody, 'ebay_desc')}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 transition-all flex items-center gap-1 shadow-md shadow-amber-500/10"
+                  >
+                    {copiedField === 'ebay_desc' ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-slate-950" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy {format === 'text' ? 'Text' : 'Full HTML'}</span>
+                      </>
+                    )}
+                  </button>
+                  {format !== 'text' && (
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(curEbay.insertHtml || curEbay.htmlBody, 'ebay_insert')}
+                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all flex items-center gap-1"
+                      title="Copy only the inner listing content cards without the outer banner and footer strip"
+                    >
+                      {copiedField === 'ebay_insert' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-400">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Insert Only</span>
+                        </>
+                      )}
+                    </button>
                   )}
-                </button>
+                </div>
               </div>
 
               {/* Description Body Display */}
@@ -924,7 +946,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
 
               {format === 'html_code' && (
                 <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-amber-300/80 whitespace-pre-wrap select-all max-h-80 overflow-y-auto">
-                  {curEbay.insertHtml || curEbay.htmlBody}
+                  {curEbay.htmlBody}
                 </div>
               )}
             </div>

@@ -213,22 +213,14 @@ export async function handleDocuments(context, url, method) {
       const now = new Date().toISOString();
       const auditId = generateId();
 
-      // Find any linked expenses
-      const linkedExpenses = await env.DB.prepare(
-        'SELECT id FROM wayfinder_expenses WHERE document_id = ?'
-      ).bind(docId).all();
-      const expenseIds = (linkedExpenses.results || []).map(e => e.id);
-
       const batchStmts = [];
 
-      // 1. Delete linked expense splits
-      if (expenseIds.length > 0) {
-        for (const expId of expenseIds) {
-          batchStmts.push(
-            env.DB.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(expId)
-          );
-        }
-      }
+      // 1. Delete linked expense splits via subquery
+      batchStmts.push(
+        env.DB.prepare(
+          'DELETE FROM wayfinder_expense_splits WHERE expense_id IN (SELECT id FROM wayfinder_expenses WHERE document_id = ?)'
+        ).bind(docId)
+      );
 
       // 2. Delete linked expenses
       batchStmts.push(
@@ -267,21 +259,22 @@ export async function handleDocuments(context, url, method) {
           docId, 
           'delete_cascade',
           doc.safe_display_name || doc.original_filename || null,
-          `filename=${doc.original_filename}; purged_expenses=${expenseIds.length}`,
+          `filename=${doc.original_filename}; purged_doc_id=${docId}`,
           JSON.stringify({
             filename: doc.original_filename,
             safe_name: doc.safe_display_name,
-            purged_expenses: expenseIds.length
+            document_id: docId
           })
         )
       );
 
-      await env.DB.batch(batchStmts);
+      const batchResults = await env.DB.batch(batchStmts);
+      const purgedExpenses = batchResults[1]?.meta?.changes || 0;
 
       return json({ 
         success: true, 
         deleted_document_id: docId,
-        purged_expenses: expenseIds.length,
+        purged_expenses: purgedExpenses,
         message: 'Document and linked bookings removed. Ready for re-import.'
       });
     }
@@ -317,17 +310,6 @@ function safeDoc(doc) {
 function sanitizeFilename(name) {
   // Remove path traversal, control chars; keep alphanumeric, dash, underscore, dot
   return name.replace(/[^a-zA-Z0-9._\- ]/g, '_').substring(0, 200);
-}
-
-async function auditEvent(env, userId, journeyId, entityType, entityId, action) {
-  try {
-    const id = generateId();
-    await env.DB.prepare(
-      'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
-    ).bind(id, userId, journeyId || null, entityType, entityId, action).run();
-  } catch (e) {
-    console.error('[audit] failed:', e);
-  }
 }
 
 function json(data, status = 200) {

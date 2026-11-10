@@ -179,17 +179,6 @@ function sanitizeItem(item) {
   };
 }
 
-async function auditEvent(env, userId, journeyId, entityType, entityId, action) {
-  try {
-    const id = generateId();
-    await env.DB.prepare(
-      'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
-    ).bind(id, userId, journeyId, entityType, entityId, action).run();
-  } catch (e) {
-    console.error('[audit] failed to write event:', e);
-  }
-}
-
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,

@@ -21,40 +21,55 @@ export async function handleBudget(context, url, method) {
       return json({ error: 'Forbidden' }, 403);
     }
 
-    const expenses = await env.DB.prepare(
-      `SELECT * FROM wayfinder_expenses
-       WHERE (journey_id = ? OR journey_id = ?)
-       ORDER BY category, created_at`
-    ).bind(journey.id, journeyId).all();
+    const [expenses, categoryStats, totals] = await Promise.all([
+      env.DB.prepare(
+        `SELECT * FROM wayfinder_expenses
+         WHERE (journey_id = ? OR journey_id = ?)
+         ORDER BY category, created_at`
+      ).bind(journey.id, journeyId).all(),
+      env.DB.prepare(
+        `SELECT category,
+                COUNT(*) as count,
+                ROUND(COALESCE(SUM(amount_usd), 0), 2) as total_usd
+         FROM wayfinder_expenses
+         WHERE (journey_id = ? OR journey_id = ?)
+         GROUP BY category`
+      ).bind(journey.id, journeyId).all(),
+      env.DB.prepare(
+        `SELECT 
+           COUNT(*) as expense_count,
+           ROUND(COALESCE(SUM(amount_usd), 0), 2) as total_usd_known,
+           SUM(CASE WHEN amount_usd IS NULL THEN 1 ELSE 0 END) as items_no_cost
+         FROM wayfinder_expenses
+         WHERE (journey_id = ? OR journey_id = ?)`
+      ).bind(journey.id, journeyId).first()
+    ]);
 
-    // Aggregate by category
-    const byCategory = {};
-    let totalKnown = 0;
-    let totalUnknown = 0;
+    const byCategoryMap = {};
+    for (const stat of (categoryStats.results || [])) {
+      const cat = stat.category || 'other';
+      byCategoryMap[cat] = {
+        category: cat,
+        count: stat.count,
+        total_original: {},
+        total_usd: stat.total_usd
+      };
+    }
 
     for (const e of expenses.results) {
       const cat = e.category || 'other';
-      if (!byCategory[cat]) byCategory[cat] = { category: cat, count: 0, total_original: {}, total_usd: 0 };
-      byCategory[cat].count++;
-
-      if (e.amount_original && e.currency_original) {
+      if (byCategoryMap[cat] && e.amount_original && e.currency_original) {
         const key = e.currency_original;
-        byCategory[cat].total_original[key] = (byCategory[cat].total_original[key] || 0) + e.amount_original;
-      }
-      if (e.amount_usd) {
-        byCategory[cat].total_usd += e.amount_usd;
-        totalKnown += e.amount_usd;
-      } else {
-        totalUnknown++;
+        byCategoryMap[cat].total_original[key] = (byCategoryMap[cat].total_original[key] || 0) + e.amount_original;
       }
     }
 
     return json({
       journey_id:       journeyId,
-      total_usd_known:  Math.round(totalKnown * 100) / 100,
-      items_no_cost:    totalUnknown,
-      expense_count:    expenses.results.length,
-      by_category:      Object.values(byCategory),
+      total_usd_known:  totals?.total_usd_known || 0,
+      items_no_cost:    totals?.items_no_cost || 0,
+      expense_count:    totals?.expense_count || expenses.results.length,
+      by_category:      Object.values(byCategoryMap),
       currency_note:    'Converted amounts are estimates. Original amounts and currencies are preserved per expense.',
       expenses:         expenses.results.map(safeExpense),
     });

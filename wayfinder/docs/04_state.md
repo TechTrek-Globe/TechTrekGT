@@ -591,6 +591,20 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
   - When a confirmed private rail booking (`item_type IN ('rail', 'train')`) exists on a day, `buildUnifiedDayTimeline` (`itineraryTimeline.js`) suppresses generic intercity rail placeholders (`isGenericRailPlaceholder`) and deduplicates private rail entries via `seenRailKeys`.
   - In `PolandLanding.jsx`, inter-stop transit connector banners (`nextTransitTitle`) are hidden when `nextStopExpanded` is true so expanded day timelines do not stack redundant train banners above the timeline cards.
 
+### 16.18 D1 Covering Indexing & Query Concurrency Invariants
+
+- Covering Index Governance:
+  - `wayfinder_extracted_fields` maintains index `idx_wf_fields_doc` on `(document_id)` to prevent table scans on field reads, updates, and deletes.
+  - `wayfinder_expenses` maintains index `idx_wf_expenses_doc` on `(document_id)` for sub-millisecond document link checks.
+  - `wayfinder_itinerary_items` maintains composite index `idx_wf_items_journey_type` on `(journey_id, item_type)` for accommodation filtering and index `idx_wf_items_source_doc` on `(source_document_id)` for document joins.
+  - `wayfinder_documents` maintains composite index `idx_wf_docs_user_deleted` on `(user_id, deleted_at)` to accelerate user document listings.
+- Read Concurrency Invariant:
+  - Independent read queries within API handlers (`expenses.js`, `import-jobs.js`, `budget.js`) MUST be coalesced via `Promise.all` rather than executed sequentially.
+- Write Atomic Batching Invariant:
+  - Mutation endpoints performing both a primary table write and an audit log insertion (`admin.js`, `documents.js`) MUST bundle all statements into a single `env.DB.batch()` transaction.
+- Single-Item Synthesis Invariant:
+  - Single-row mutation endpoints (`POST` and `PUT` in `packing.js`) MUST synthesize returned item objects from confirmed input parameters and avoid redundant post-write `SELECT` round-trips.
+
 
 
 

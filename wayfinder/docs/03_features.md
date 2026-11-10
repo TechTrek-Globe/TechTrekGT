@@ -755,6 +755,31 @@ Decouples Wayfinder Guide from the shared `personal-budget-db` instance onto its
   - Private rail items are deduplicated via `seenRailKeys` (`confirmation_number` or `source_document_id`) to prevent duplicate train cards.
   - In `PolandLanding.jsx` (`JourneyStopSchedule`), inter-stop transit connector banners (`nextTransitTitle`) automatically collapse when the receiving stop's schedule is expanded (`!nextStopExpanded`), and stop arrival badges use concise destination descriptors instead of repeating train labels.
 
+## 38. D1 Read/Write Query Optimization, Covering Indexes & Parallelization
+
+Eliminates full table scans, serial query latency, and unbatched writes across core Wayfinder edge endpoints:
+
+- 5 Composite & Covering D1 Indexes ([schema-wayfinder.sql](file:///e:/TechTrekGT/wayfinder/schema-wayfinder.sql)):
+  - `idx_wf_fields_doc` on `wayfinder_extracted_fields(document_id)`: Accelerates extraction job field retrieval, field saving, and cascade deletion paths.
+  - `idx_wf_expenses_doc` on `wayfinder_expenses(document_id)`: Accelerates document approval re-sync and cascading document purge queries.
+  - `idx_wf_items_source_doc` on `wayfinder_itinerary_items(source_document_id)`: Accelerates accommodation joins and document approval checks.
+  - `idx_wf_items_journey_type` on `wayfinder_itinerary_items(journey_id, item_type)`: Eliminates table scans during accommodation and lodging lookups.
+  - `idx_wf_docs_user_deleted` on `wayfinder_documents(user_id, deleted_at)`: Accelerates document vault listing for authenticated travelers.
+- Concurrent Query Parallelization ([expenses.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/expenses.js), [import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js), [budget.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/budget.js)):
+  - In `expenses.js`, `GET /api/wayfinder/expenses` runs the primary expenses query and debt settlements query concurrently via `Promise.all`, dropping edge latency by eliminating serial round-trips.
+  - In `import-jobs.js`, document approval (`action === 'approve'`) executes pre-flight checks for `allFields`, `existingItem`, and `existingExpense` in parallel via `Promise.all` before building the atomic transaction batch.
+  - In `budget.js`, individual expense retrieval, category grouping, and total aggregations execute in parallel via `Promise.all`.
+- SQL-Native Aggregation Pushdown ([budget.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/budget.js)):
+  - `GET /api/wayfinder/budget` pushes `COUNT(*)`, `SUM(amount_usd)`, and category groupings into SQL queries, eliminating manual JavaScript accumulators and avoiding payload bloat.
+- Cascading Document Purge Subquery Optimization ([documents.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/documents.js)):
+  - `DELETE /api/wayfinder/documents/:id` replaces the sequential pre-fetch and per-expense ID loop with a single SQL subquery in `env.DB.batch`: `DELETE FROM wayfinder_expense_splits WHERE expense_id IN (SELECT id FROM wayfinder_expenses WHERE document_id = ?)`.
+- Single-Item Packing Response Synthesis ([packing.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/packing.js)):
+  - Single-item `POST` (create) and `PUT` (edit/toggle) endpoints construct the returned item payload directly from known input parameters rather than executing an extra post-write `SELECT` round-trip.
+- Atomic Admin Membership & Audit Batching ([admin.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/admin.js)):
+  - Unaffiliate, role assignment, and share disconnect mutations combine the target table write and `wayfinder_audit_events` insert into a unified `env.DB.batch` call.
+- Orphaned Code Cleanup:
+  - Removed 3 dead `auditEvent` utility functions across `documents.js`, `import-jobs.js`, and `itinerary.js`.
+
 
 
 

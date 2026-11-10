@@ -126,11 +126,18 @@ export async function handleExpenses(context, url, method) {
 
     // 1. GET /api/wayfinder/expenses - Fetch all expenses, splits, and settlements
     if (method === 'GET') {
-      const expensesQuery = await db.prepare(`
-        SELECT * FROM wayfinder_expenses
-        WHERE journey_id = ? OR journey_id = ?
-        ORDER BY created_at DESC
-      `).bind(journeyId, journey.id).all();
+      const [expensesQuery, settlementsQuery] = await Promise.all([
+        db.prepare(`
+          SELECT * FROM wayfinder_expenses
+          WHERE journey_id = ? OR journey_id = ?
+          ORDER BY created_at DESC
+        `).bind(journeyId, journey.id).all(),
+        db.prepare(`
+          SELECT * FROM wayfinder_expense_settlements
+          WHERE journey_id = ? OR journey_id = ?
+          ORDER BY settled_date DESC, created_at DESC
+        `).bind(journeyId, journey.id).all()
+      ]);
 
       const expenses = expensesQuery.results || [];
 
@@ -155,13 +162,6 @@ export async function handleExpenses(context, url, method) {
         ...e,
         splits: splitsMap[e.id] || []
       }));
-
-      // Fetch recorded settlements
-      const settlementsQuery = await db.prepare(`
-        SELECT * FROM wayfinder_expense_settlements
-        WHERE journey_id = ? OR journey_id = ?
-        ORDER BY settled_date DESC, created_at DESC
-      `).bind(journeyId, journey.id).all();
 
       return json({
         journey_id: journeyId,

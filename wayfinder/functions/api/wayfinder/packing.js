@@ -375,8 +375,27 @@ export async function handlePacking(context, url, method) {
          VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 999)`
       ).bind(id, journeyId, user.userId, category, name, quantity, weightGrams, isShared, assignedTo, bagType, notes).run();
 
-      const created = await env.DB.prepare('SELECT * FROM wayfinder_packing_items WHERE id = ?').bind(id).first();
-      return json({ success: true, item: safeItem(created) }, 201);
+      const nowIso = new Date().toISOString();
+      return json({
+        success: true,
+        item: {
+          id,
+          journey_id: journeyId,
+          user_id: user.userId,
+          category,
+          name,
+          quantity,
+          weight_grams: weightGrams,
+          is_packed: false,
+          is_shared: isShared === 1,
+          assigned_to: assignedTo,
+          bag_type: bagType,
+          notes,
+          sort_order: 999,
+          created_at: nowIso,
+          updated_at: nowIso
+        }
+      }, 201);
     }
 
     // --- PUT /api/wayfinder/packing/:id ---
@@ -408,8 +427,26 @@ export async function handlePacking(context, url, method) {
          WHERE id = ?`
       ).bind(name, category, quantity, weightGrams, isPacked, isShared, assignedTo, bagType, notes, sortOrder, pathId).run();
 
-      const updated = await env.DB.prepare('SELECT * FROM wayfinder_packing_items WHERE id = ?').bind(pathId).first();
-      return json({ success: true, item: safeItem(updated) });
+      return json({
+        success: true,
+        item: {
+          id: pathId,
+          journey_id: existing.journey_id,
+          user_id: existing.user_id,
+          category,
+          name,
+          quantity,
+          weight_grams: weightGrams,
+          is_packed: isPacked === 1,
+          is_shared: isShared === 1,
+          assigned_to: assignedTo,
+          bag_type: bagType,
+          notes,
+          sort_order: sortOrder,
+          created_at: existing.created_at,
+          updated_at: new Date().toISOString()
+        }
+      });
     }
 
     // --- DELETE /api/wayfinder/packing/:id ---

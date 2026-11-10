@@ -315,10 +315,18 @@ export async function handleImportJobs(context, url, method) {
         }, 422);
       }
 
-      // Build itinerary item from fields
-      const allFields = await env.DB.prepare(
-        'SELECT * FROM wayfinder_extracted_fields WHERE document_id = ?'
-      ).bind(docId).all();
+      // Pre-flight reads in parallel: extracted fields, existing itinerary item, existing expense
+      const [allFields, existingItem, existingExpense] = await Promise.all([
+        env.DB.prepare(
+          'SELECT * FROM wayfinder_extracted_fields WHERE document_id = ?'
+        ).bind(docId).all(),
+        env.DB.prepare(
+          'SELECT id FROM wayfinder_itinerary_items WHERE source_document_id = ?'
+        ).bind(docId).first(),
+        env.DB.prepare(
+          'SELECT id FROM wayfinder_expenses WHERE document_id = ?'
+        ).bind(docId).first(),
+      ]);
 
       const fieldMap = {};
       for (const f of allFields.results) {
@@ -332,10 +340,6 @@ export async function handleImportJobs(context, url, method) {
       const auditId1 = generateId();
       const auditId2 = generateId();
       const nowIso = new Date().toISOString();
-
-      const existingItem = await env.DB.prepare(
-        'SELECT id FROM wayfinder_itinerary_items WHERE source_document_id = ?'
-      ).bind(docId).first();
 
       const itemId = generateId();
       const targetItemId = existingItem ? existingItem.id : itemId;
@@ -462,10 +466,6 @@ export async function handleImportJobs(context, url, method) {
       ];
 
       if (parsedCost && parsedCost.amount > 0) {
-        const existingExpense = await env.DB.prepare(
-          'SELECT id FROM wayfinder_expenses WHERE document_id = ?'
-        ).bind(docId).first();
-
         let amountUsd = parsedCost.amount;
         if (parsedCost.currency === 'PLN') {
           amountUsd = Math.round((parsedCost.amount / 4.0) * 100) / 100;
@@ -727,17 +727,6 @@ function buildTitle(docType, fields, fallback) {
   if (fields.activity_title) return fields.activity_title;
   if (fields.experience_title) return fields.experience_title;
   return fallback || 'Imported booking';
-}
-
-async function auditEvent(env, userId, journeyId, entityType, entityId, action) {
-  try {
-    const id = generateId();
-    await env.DB.prepare(
-      'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
-    ).bind(id, userId, journeyId || null, entityType, entityId, action).run();
-  } catch (e) {
-    console.error('[audit] failed:', e);
-  }
 }
 
 function json(data, status = 200) {

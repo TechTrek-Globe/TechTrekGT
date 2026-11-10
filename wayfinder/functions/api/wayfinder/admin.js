@@ -321,15 +321,16 @@ export async function handleAdmin(context, url, method) {
       }
 
       if (role === 'none' || role === 'unaffiliated') {
-        await env.DB.prepare(
-          'DELETE FROM wayfinder_agenda_shares WHERE agenda_id = ? AND user_id = ?'
-        ).bind(journey.id, userId).run();
-
         const auditId = crypto.randomUUID();
-        await env.DB.prepare(`
-          INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, new_value, metadata_summary, details)
-          VALUES (?, ?, ?, 'share', ?, 'admin_unaffiliate_trip_user', ?, ?, 'none', ?, ?)
-        `).bind(auditId, user.userId, journey.id, userId, userId, targetUser.email, `unaffiliatedEmail=${targetUser.email}`, JSON.stringify({ unaffiliatedEmail: targetUser.email })).run().catch(() => {});
+        await env.DB.batch([
+          env.DB.prepare(
+            'DELETE FROM wayfinder_agenda_shares WHERE agenda_id = ? AND user_id = ?'
+          ).bind(journey.id, userId),
+          env.DB.prepare(`
+            INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, new_value, metadata_summary, details)
+            VALUES (?, ?, ?, 'share', ?, 'admin_unaffiliate_trip_user', ?, ?, 'none', ?, ?)
+          `).bind(auditId, user.userId, journey.id, userId, userId, targetUser.email, `unaffiliatedEmail=${targetUser.email}`, JSON.stringify({ unaffiliatedEmail: targetUser.email }))
+        ]);
 
         return json({
           success: true,
@@ -341,17 +342,18 @@ export async function handleAdmin(context, url, method) {
       }
 
       const shareId = crypto.randomUUID();
-      await env.DB.prepare(`
-        INSERT INTO wayfinder_agenda_shares (id, agenda_id, user_id, role, created_at)
-        VALUES (?, ?, ?, ?, datetime('now'))
-        ON CONFLICT(agenda_id, user_id) DO UPDATE SET role = excluded.role
-      `).bind(shareId, journey.id, userId, role).run();
-
       const auditId = crypto.randomUUID();
-      await env.DB.prepare(`
-        INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, new_value, metadata_summary, details)
-        VALUES (?, ?, ?, 'share', ?, 'admin_assign_trip_role', ?, ?, ?, ?, ?)
-      `).bind(auditId, user.userId, journey.id, userId, userId, targetUser.email, role, `assignedRole=${role}; targetEmail=${targetUser.email}`, JSON.stringify({ assignedRole: role, targetEmail: targetUser.email })).run().catch(() => {});
+      await env.DB.batch([
+        env.DB.prepare(`
+          INSERT INTO wayfinder_agenda_shares (id, agenda_id, user_id, role, created_at)
+          VALUES (?, ?, ?, ?, datetime('now'))
+          ON CONFLICT(agenda_id, user_id) DO UPDATE SET role = excluded.role
+        `).bind(shareId, journey.id, userId, role),
+        env.DB.prepare(`
+          INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, new_value, metadata_summary, details)
+          VALUES (?, ?, ?, 'share', ?, 'admin_assign_trip_role', ?, ?, ?, ?, ?)
+        `).bind(auditId, user.userId, journey.id, userId, userId, targetUser.email, role, `assignedRole=${role}; targetEmail=${targetUser.email}`, JSON.stringify({ assignedRole: role, targetEmail: targetUser.email }))
+      ]);
 
       return json({
         success: true,
@@ -393,15 +395,16 @@ export async function handleAdmin(context, url, method) {
 
       const targetUser = await env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first();
 
-      await env.DB.prepare(
-        'DELETE FROM wayfinder_agenda_shares WHERE agenda_id = ? AND user_id = ?'
-      ).bind(journey.id, userId).run();
-
       const auditId = crypto.randomUUID();
-      await env.DB.prepare(`
-        INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, new_value, metadata_summary, details)
-        VALUES (?, ?, ?, 'share', ?, 'admin_remove_trip_share', ?, ?, 'removed', ?, ?)
-      `).bind(auditId, user.userId, journey.id, userId, userId, targetUser?.email || null, `removedEmail=${targetUser?.email || userId}`, JSON.stringify({ removedEmail: targetUser?.email })).run().catch(() => {});
+      await env.DB.batch([
+        env.DB.prepare(
+          'DELETE FROM wayfinder_agenda_shares WHERE agenda_id = ? AND user_id = ?'
+        ).bind(journey.id, userId),
+        env.DB.prepare(`
+          INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, new_value, metadata_summary, details)
+          VALUES (?, ?, ?, 'share', ?, 'admin_remove_trip_share', ?, ?, 'removed', ?, ?)
+        `).bind(auditId, user.userId, journey.id, userId, userId, targetUser?.email || null, `removedEmail=${targetUser?.email || userId}`, JSON.stringify({ removedEmail: targetUser?.email }))
+      ]);
 
       return json({
         success: true,

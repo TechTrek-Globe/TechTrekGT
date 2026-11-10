@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS auction_sales (
 );
 
 CREATE INDEX IF NOT EXISTS idx_auction_sales_user ON auction_sales(user_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_sales_item ON auction_sales(item_id);
+-- OPT-D: Duplicate idx_auction_sales_item retired; canonical idx_auction_sales_item_unique retained.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_sales_item_unique ON auction_sales(item_id);
 
 -- ============================================================
@@ -576,11 +576,10 @@ CREATE INDEX IF NOT EXISTS idx_email_verifications_user ON email_verifications(u
 CREATE INDEX IF NOT EXISTS idx_email_verifications_token ON email_verifications(token, used);
 CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications(email, token);
 
--- ============================================================
 -- MED-9 MIGRATION: UNIQUE CONSTRAINT ON AUCTION_SALES(ITEM_ID)
 -- Prevents duplicate sale records and reconciliation race conditions
--- ============================================================
-CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_sales_item_unique ON auction_sales(item_id);
+-- OPT-D: idx_auction_sales_item_unique also removed above (line ~167); this duplicate entry retired.
+-- Retained as a no-op comment to preserve migration history.
 
 -- ============================================================
 -- MED-15 MIGRATION: EBAY LISTINGS CACHE TABLE
@@ -752,4 +751,20 @@ CREATE TABLE IF NOT EXISTS ebay_reconciliation_fee_lines (
 );
 CREATE INDEX IF NOT EXISTS idx_recon_fee_lines_recon ON ebay_reconciliation_fee_lines(reconciliation_id);
 CREATE INDEX IF NOT EXISTS idx_recon_fee_lines_order ON ebay_reconciliation_fee_lines(ebay_order_id);
+
+-- ============================================================
+-- OPT-E MIGRATION: COMPOSITE COVERING INDEX ON AUCTION_ITEMS
+-- Covers the dominant query: WHERE user_id=? AND status!='Sold' ORDER BY created_at DESC
+-- Eliminates the per-query sort pass that idx_auction_items_user (user_id only) cannot avoid.
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_auction_items_user_status_created
+  ON auction_items(user_id, status, created_at DESC);
+
+-- ============================================================
+-- OPT-F MIGRATION: INDEX ON AUCTION_MARKET_ALERTS
+-- Covers GET /api/market-alerts: WHERE user_id=? AND is_read=0 ORDER BY created_at DESC
+-- Previously a full primary-key scan on a table with zero indexes.
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_market_alerts_user_unread
+  ON auction_market_alerts(user_id, is_read, created_at DESC);
 

@@ -124,9 +124,6 @@ export async function onRequestGet(context) {
 
     const whereClause = conditions.join(' AND ');
 
-    const countSql = 'SELECT COUNT(*) AS total FROM auction_items i WHERE ' + whereClause;
-    const countRow = await env.DB.prepare(countSql).bind(...bindings).first();
-
     // Dynamic status counts breakdown across active inventory (matching non-status filters)
     const statusConditions = ['i.user_id = ?', "i.status != 'Sold'"];
     const statusBindings = [payload.userId];
@@ -153,11 +150,6 @@ export async function onRequestGet(context) {
     }
 
     const statusCountsSql = 'SELECT i.status, COUNT(*) AS count FROM auction_items i WHERE ' + statusConditions.join(' AND ') + ' GROUP BY i.status';
-    const statusCountsRows = await env.DB.prepare(statusCountsSql).bind(...statusBindings).all();
-    const statusCounts = {};
-    (statusCountsRows.results || []).forEach(r => {
-      if (r.status) statusCounts[r.status] = r.count;
-    });
 
     const rowsSql = 'SELECT '
       + 'i.*, '
@@ -201,7 +193,89 @@ export async function onRequestGet(context) {
       + 'WHERE ' + whereClause + ' '
       + orderByClause + ' '
       + 'LIMIT ? OFFSET ?';
-    const rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
+
+    // OPT-A: Batch D1 queries into a single round trip.
+    // If includeSold or explicit 'Sold' filter is requested, query count explicitly.
+    // Otherwise, derive total directly from status_counts, eliminating countSql completely.
+    const needsExplicitCount = includeSold || status === 'Sold';
+    const countSql = 'SELECT COUNT(*) AS total FROM auction_items i WHERE ' + whereClause;
+
+    let total = 0;
+    const statusCounts = {};
+    let rows = { results: [] };
+
+    if (typeof env.DB.batch === 'function') {
+      const batchStmts = [
+        env.DB.prepare(statusCountsSql).bind(...statusBindings),
+        env.DB.prepare(rowsSql).bind(...bindings, limit, offset)
+      ];
+      if (needsExplicitCount) {
+        batchStmts.unshift(env.DB.prepare(countSql).bind(...bindings));
+      }
+
+      const batchResults = await env.DB.batch(batchStmts);
+
+      if (batchResults && batchResults[0] && Array.isArray(batchResults[0].results)) {
+        if (needsExplicitCount) {
+          total = Number(batchResults[0].results[0]?.total || 0);
+          (batchResults[1].results || []).forEach(r => {
+            if (r.status) statusCounts[r.status] = r.count;
+          });
+          rows = batchResults[2] || { results: [] };
+        } else {
+          (batchResults[0].results || []).forEach(r => {
+            if (r.status) statusCounts[r.status] = r.count;
+          });
+          rows = batchResults[1] || { results: [] };
+          if (status === 'active') {
+            total = (statusCounts['Available'] || 0) + (statusCounts['Listed'] || 0);
+          } else if (status) {
+            total = statusCounts[status] || 0;
+          } else {
+            total = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+          }
+        }
+      } else {
+        // Fallback when batch execution does not return row sets (e.g. test harness mockDb)
+        if (needsExplicitCount) {
+          const countRow = await env.DB.prepare(countSql).bind(...bindings).first();
+          total = Number(countRow?.total || 0);
+        }
+        const statusCountsRows = await env.DB.prepare(statusCountsSql).bind(...statusBindings).all();
+        (statusCountsRows.results || []).forEach(r => {
+          if (r.status) statusCounts[r.status] = r.count;
+        });
+        if (!needsExplicitCount) {
+          if (status === 'active') {
+            total = (statusCounts['Available'] || 0) + (statusCounts['Listed'] || 0);
+          } else if (status) {
+            total = statusCounts[status] || 0;
+          } else {
+            total = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+          }
+        }
+        rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
+      }
+    } else {
+      if (needsExplicitCount) {
+        const countRow = await env.DB.prepare(countSql).bind(...bindings).first();
+        total = Number(countRow?.total || 0);
+      }
+      const statusCountsRows = await env.DB.prepare(statusCountsSql).bind(...statusBindings).all();
+      (statusCountsRows.results || []).forEach(r => {
+        if (r.status) statusCounts[r.status] = r.count;
+      });
+      if (!needsExplicitCount) {
+        if (status === 'active') {
+          total = (statusCounts['Available'] || 0) + (statusCounts['Listed'] || 0);
+        } else if (status) {
+          total = statusCounts[status] || 0;
+        } else {
+          total = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+        }
+      }
+      rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
+    }
 
     const enrichedItems = (rows.results || []).map(row => {
       const isAmazon = typeof row.invoice_ref === 'string' && row.invoice_ref.startsWith('AMAZON-');
@@ -285,10 +359,10 @@ export async function onRequestGet(context) {
     return ok({
       items: enrichedItems,
       pagination: {
-        total: countRow?.total || 0,
+        total,
         page,
         limit,
-        pages: Math.ceil((countRow?.total || 0) / limit)
+        pages: Math.ceil(total / limit)
       },
       status_counts: statusCounts
     });

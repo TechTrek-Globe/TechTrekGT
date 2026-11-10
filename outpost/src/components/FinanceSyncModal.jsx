@@ -51,7 +51,9 @@ export function FinanceSyncModal({ isOpen, onClose }) {
         accountName: 'TechTrek Outpost Proceeds'
       });
 
-      if (res && res.success) {
+      if (res && res.bridge_unavailable) {
+        setSuccess(`Finance bridge not yet configured. Live Outpost net profit: ${fmtCurrency(res.synced_net_profit)}. Configure a shared Worker service binding to enable cross-portal sync.`);
+      } else if (res && res.success) {
         setSuccess(`Successfully synchronized ${fmtCurrency(res.synced_net_profit)} to your TechTrek Finance account!`);
         // Refresh metrics
         await fetchMetrics();
@@ -115,8 +117,11 @@ export function FinanceSyncModal({ isOpen, onClose }) {
               )}
 
               {success && (
-                <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/40 text-emerald-400 text-xs flex gap-2 items-center">
-                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                <div className={`p-3.5 rounded-xl text-xs flex gap-2 items-start ${data?.bridge_status === 'unavailable' ? 'bg-amber-950/40 border border-amber-700/40 text-amber-300' : 'bg-emerald-950/40 border border-emerald-800/40 text-emerald-400 items-center'}`}>
+                  {data?.bridge_status === 'unavailable'
+                    ? <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-400" />
+                    : <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  }
                   <span>{success}</span>
                 </div>
               )}
@@ -156,22 +161,30 @@ export function FinanceSyncModal({ isOpen, onClose }) {
                   )}
                 </div>
 
-                <select
-                  value={selectedAccountId}
-                  onChange={e => setSelectedAccountId(e.target.value)}
-                  className="input-field py-2 text-xs w-full"
-                >
-                  <option value="">-- Auto-Create / Update "TechTrek Outpost Proceeds" --</option>
-                  {accounts.map(acc => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} ({acc.type}) - Current: {fmtCurrency(acc.starting_balance)}
-                    </option>
-                  ))}
-                </select>
+                {data?.bridge_status === 'unavailable' ? (
+                  <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-700/30 text-amber-300 text-[11px] leading-relaxed">
+                    <strong className="text-amber-400">Bridge not configured.</strong> Cross-portal Finance sync requires a shared Worker service binding between Outpost and Finance. Contact your administrator to enable this feature.
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      value={selectedAccountId}
+                      onChange={e => setSelectedAccountId(e.target.value)}
+                      className="input-field py-2 text-xs w-full"
+                    >
+                      <option value="">-- Auto-Create / Update "TechTrek Outpost Proceeds" --</option>
+                      {accounts.map(acc => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name} ({acc.type}) - Current: {fmtCurrency(acc.starting_balance)}
+                        </option>
+                      ))}
+                    </select>
 
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Syncing updates the starting balance of the selected TechTrek Finance account to match your cumulative realized net profit (${metrics.total_realized_profit?.toFixed(2) || '0.00'}).
-                </p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Syncing updates the starting balance of the selected TechTrek Finance account to match your cumulative realized net profit (${metrics.total_realized_profit?.toFixed(2) || '0.00'}).
+                    </p>
+                  </>
+                )}
               </div>
 
               {/* Quick Actions & Links */}

@@ -635,6 +635,37 @@ Eliminated remaining high-volume JSON text blobs across Outpost inventory items 
 6. **Zero-Downtime Migration (Migration 0011)**:
    - Executed `outpost/migrations/0011_deep_normalization.sql` across both local and remote `outpost-db` instances, expanding the schema to 24 fully normalized relational tables.
 
+## Architecture Hardening & Read/Write Optimization Engine [ACTION ID: PERF-005 / AUDIT-004]
+
+Comprehensive architectural hardening addressing write amplification, constraint mismatches, cross-database bridge honesty, query round trips, and polling timer churn across Outpost Tracker.
+
+### Hardening & Optimization Capabilities
+
+1. **Batch Import Upsert Alignment (`POST /api/import/batch`)**:
+   - Corrected conflict targets in `functions/api/import/batch.js` from `ON CONFLICT(id)` to `ON CONFLICT(item_id)` for `auction_sales` and `auction_comps` inserts, matching the tables' unique constraints.
+   - Expanded `DO UPDATE SET` clauses to fully synchronize all imported columns (`gross_sale_price`, `buyer_shipping_paid`, `actual_shipping_cost`, `platform_fees_amt`, `net_proceeds`, `net_profit`, `roi_pct`, `days_to_sell`, `comp_1`, `comp_2`, `comp_3`, `manual_avg`, `recommended_list_price`).
+   - Eliminates batch rollbacks triggered by `UNIQUE constraint failed: auction_sales.item_id` when re-importing items.
+2. **Honest Finance Bridge Contract (`/api/sync/finance` & `FinanceSyncModal`)**:
+   - Removed orphaned cross-database queries against non-existent `households` and `accounts` tables in `outpost-db`.
+   - `onRequestGet` returns live Outpost realized profit and capital metrics alongside `bridge_status: 'unavailable'` and honest status notice.
+   - `onRequestPost` returns `bridge_unavailable: true` without attempting dummy writes.
+   - `FinanceSyncModal.jsx` displays an amber informational banner and explains the Worker service binding requirement rather than displaying a false green success toast.
+3. **D1 Read Query Round-Trip Reduction**:
+   - `functions/api/items/enriched.js`: Batches `statusCountsSql` and `rowsSql` in a single `db.batch()` call, deriving active item counts in memory and eliminating the separate `countSql` round trip for non-sold views.
+   - `functions/api/sales/index.js`: Batches summary statistics aggregation (`aggSql`) and paginated row fetching (`rowsSql`) in a single `db.batch()` network round trip.
+4. **IRS Schedule C In-Engine SQL Aggregation (`functions/api/reports/tax.js`)**:
+   - Replaced the unindexed `SELECT * FROM auction_items` heap load and JavaScript date-loop with direct SQL conditional aggregations (`SUM(CASE WHEN ... THEN true_total_cost ELSE 0 END)`) executed inside SQLite, eliminating Worker memory overhead on tax reports.
+5. **Chunked D1 Batch Ingestion (`listingsCache.js` & `sync-all.js`)**:
+   - Enforced `CHUNK_SIZE = 50` statement batching in `functions/api/ebay/listingsCache.js` to prevent D1 limit breaches.
+   - In `functions/api/ebay/sync-all.js`, decoupled dirty item updates from the concurrency loop into a `dirtyItemUpdates` array flushed in 50-item batches, slashing 30+ separate D1 batch transactions into single flushes.
+6. **Polling Timer Churn Stabilization (`src/context/InventoryContext.jsx`)**:
+   - Wrapped sync handlers (`handleSyncEbay`, `handleSyncVScout`) with stable `useRef` callbacks.
+   - Decoupled the 30-minute and 60-minute background auto-polling `useEffect` from search keystrokes and filter state, preventing timer reset churn on every keystroke.
+7. **Database Index Optimization (`outpost-db`)**:
+   - Added composite covering index `idx_auction_items_user_status_created` on `auction_items(user_id, status, created_at DESC)` to eliminate sort passes on inventory loads.
+   - Added composite index `idx_market_alerts_user_unread` on `auction_market_alerts(user_id, is_read, created_at DESC)`.
+   - Dropped redundant duplicate index `idx_auction_sales_item` while retaining canonical `idx_auction_sales_item_unique`.
+
 
 
 

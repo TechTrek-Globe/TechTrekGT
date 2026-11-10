@@ -4,7 +4,7 @@
  * re-fetches (Trading API + REST Inventory API + per-SKU offers).
  */
 
-import { LISTINGS_CACHE_TTL_MINUTES } from '../../utils/constants.js';
+import { LISTINGS_CACHE_TTL_MINUTES, CHUNK_SIZE } from '../../utils/constants.js';
 
 // T-10 item 2: one cache TTL definition. Re-exported here so existing importers
 // of this module keep working.
@@ -175,7 +175,9 @@ export async function setCachedEbayListings(db, userId, listings) {
 
     if (stmts.length > 0) {
       if (typeof db.batch === 'function') {
-        await db.batch(stmts);
+        for (let i = 0; i < stmts.length; i += CHUNK_SIZE) {
+          await db.batch(stmts.slice(i, i + CHUNK_SIZE));
+        }
       } else {
         for (const s of stmts) {
           await s.run();

@@ -1,5 +1,10 @@
 // Normalized Relational Storage Utility for Outpost Tracker (outpost-db)
 // Security Mandate: All database operations MUST use strict positional '?' bindings (FIN-AUDIT-001).
+//
+// @deprecated - Zero callers across application. JSON-blob strategy on auction_items.attributes
+// is canonical. These normalized child tables (auction_item_images, auction_item_specs,
+// auction_item_platform_listings, ebay_reconciliation_fee_lines) remain empty in production.
+// Retained as dormant stub for future relational migrations; do not remove or call on hot path.
 
 /**
  * Builds D1 prepared statements to decompose attributes (images, specs, features)

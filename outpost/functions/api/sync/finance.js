@@ -1,8 +1,9 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 
 /**
- * GET /api/sync/finance - returns realized profit metrics and household accounts
- * POST /api/sync/finance - synchronizes auction sales profit to TechTrek Finance account
+ * GET /api/sync/finance - returns realized profit metrics.
+ *   Cross-portal Finance bridge is not yet configured; returns bridge_status: 'unavailable'.
+ * POST /api/sync/finance - returns honest bridge-unavailable notice with live Outpost metrics.
  */
 
 export async function onRequestGet(context) {
@@ -31,31 +32,6 @@ export async function onRequestGet(context) {
       WHERE user_id = ? AND status IN ('Available', 'Listed')
     `).bind(userId).first();
 
-    // 3. Find user's households and accounts in TechTrek Finance
-    let households = [];
-    let accounts = [];
-    try {
-      const hhRows = await env.DB.prepare(`
-        SELECT h.id, h.name
-        FROM households h
-        JOIN household_members hm ON hm.household_id = h.id
-        WHERE hm.user_id = ?
-      `).bind(userId).all();
-      households = hhRows.results || [];
-
-      if (households.length > 0) {
-        const hhId = households[0].id;
-        const accRows = await env.DB.prepare(`
-          SELECT id, name, type, starting_balance, color
-          FROM accounts
-          WHERE household_id = ?
-        `).bind(hhId).all();
-        accounts = accRows.results || [];
-      }
-    } catch {
-      // Table might not exist or user has no household yet
-    }
-
     return ok({
       metrics: {
         total_sales_count: Number(salesSummary?.total_sales_count || 0),
@@ -65,8 +41,10 @@ export async function onRequestGet(context) {
         active_item_count: Number(inventorySummary?.active_item_count || 0),
         capital_tied_up: Number(inventorySummary?.capital_tied_up || 0)
       },
-      households,
-      accounts
+      households: [],
+      accounts: [],
+      bridge_status: 'unavailable',
+      bridge_message: 'Cross-portal Finance bridge requires a shared Worker service binding - not yet configured.'
     });
   });
 }
@@ -77,67 +55,21 @@ export async function onRequestPost(context) {
     const { userId } = await requireAuth(request, env);
     if (!env.DB) return err('Database binding unavailable', 500);
 
-    const body = await request.json().catch(() => ({}));
-    const { accountId, householdId, accountName = 'TechTrek Outpost Proceeds' } = body;
-
-    // Compute realized net proceeds
+    // Compute realized net profit for display purposes only - no cross-DB writes
     const salesSummary = await env.DB.prepare(`
-      SELECT
-        COALESCE(SUM(net_profit), 0) AS total_realized_profit,
-        COALESCE(SUM(net_proceeds), 0) AS total_net_proceeds
+      SELECT COALESCE(SUM(net_profit), 0) AS total_realized_profit
       FROM auction_sales
       WHERE user_id = ?
     `).bind(userId).first();
 
     const netProfit = Number(salesSummary?.total_realized_profit || 0);
 
-    let targetAccountId = accountId;
-
-    // If no account specified, find or create "TechTrek Outpost Proceeds" in user's household
-    if (!targetAccountId) {
-      let hhId = householdId;
-      if (!hhId) {
-        const member = await env.DB.prepare(`
-          SELECT household_id FROM household_members WHERE user_id = ? LIMIT 1
-        `).bind(userId).first();
-        hhId = member?.household_id;
-      }
-
-      if (hhId) {
-        // Check if Outpost account already exists
-        const existing = await env.DB.prepare(`
-          SELECT id FROM accounts WHERE household_id = ? AND name LIKE '%Outpost%' LIMIT 1
-        `).bind(hhId).first();
-
-        if (existing) {
-          targetAccountId = existing.id;
-        } else {
-          targetAccountId = `acc-${crypto.randomUUID()}`;
-          await env.DB.prepare(`
-            INSERT INTO accounts (id, household_id, name, type, starting_balance, color, notes)
-            VALUES (?, ?, ?, 'checking', ?, 'amber', 'Synchronized from TechTrek Outpost auction sales')
-          `).bind(targetAccountId, hhId, accountName, netProfit).run();
-        }
-      }
-    }
-
-    if (targetAccountId) {
-      await env.DB.prepare(`
-        UPDATE accounts
-        SET starting_balance = ?, notes = ?
-        WHERE id = ?
-      `).bind(
-        netProfit,
-        `Synchronized from TechTrek Outpost on ${new Date().toISOString().slice(0, 10)}. Total Net Profit: $${netProfit.toFixed(2)}`,
-        targetAccountId
-      ).run();
-    }
-
     return ok({
-      success: true,
+      success: false,
+      bridge_unavailable: true,
       synced_net_profit: netProfit,
-      account_id: targetAccountId,
-      synced_at: new Date().toISOString()
+      message: 'Finance account sync is unavailable: the cross-portal database bridge has not been configured. Your metrics above reflect live data from Outpost.'
     });
   });
 }
+

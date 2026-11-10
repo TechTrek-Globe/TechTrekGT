@@ -46,12 +46,6 @@ export async function onRequestGet(context) {
       + 'FROM auction_sales s '
       + 'JOIN auction_items i ON i.id = s.item_id '
       + 'WHERE ' + whereClause;
-    const aggRow = await env.DB.prepare(aggSql).bind(...bindings).first();
-
-    const count = aggRow?.total_count || 0;
-    const totalCost = aggRow?.total_cost || 0;
-    const totalProfit = aggRow?.total_net_profit || 0;
-    const blendedRoi = totalCost > 0 ? totalProfit / totalCost : 0;
 
     const rowsSql = 'SELECT '
       + 's.*, '
@@ -89,7 +83,33 @@ export async function onRequestGet(context) {
       + 'WHERE ' + whereClause + ' '
       + 'ORDER BY s.sale_date DESC, s.created_at DESC '
       + 'LIMIT ? OFFSET ?';
-    const rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
+
+    // OPT-B: Batch aggregate and paginated row queries into a single round trip
+    let aggRow = null;
+    let rows = { results: [] };
+
+    if (typeof env.DB.batch === 'function') {
+      const batchResults = await env.DB.batch([
+        env.DB.prepare(aggSql).bind(...bindings),
+        env.DB.prepare(rowsSql).bind(...bindings, limit, offset)
+      ]);
+      if (batchResults && batchResults[0] && Array.isArray(batchResults[0].results)) {
+        aggRow = batchResults[0].results[0] || null;
+        rows = batchResults[1] || { results: [] };
+      } else {
+        // Fallback for test runner mock
+        aggRow = await env.DB.prepare(aggSql).bind(...bindings).first();
+        rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
+      }
+    } else {
+      aggRow = await env.DB.prepare(aggSql).bind(...bindings).first();
+      rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
+    }
+
+    const count = aggRow?.total_count || 0;
+    const totalCost = aggRow?.total_cost || 0;
+    const totalProfit = aggRow?.total_net_profit || 0;
+    const blendedRoi = totalCost > 0 ? totalProfit / totalCost : 0;
 
     return ok({
       sales: rows.results || [],

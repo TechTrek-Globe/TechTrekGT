@@ -79,7 +79,6 @@ Outpost manages over 50 serverless endpoints organized into modular handler file
 
 ### 4.3 Items & Inventory Handlers
 - GET /api/items: Paginated list of inventory items with filtering and search.
-- POST /api/items: Creates standalone inventory items.
 - GET /api/items/:id: Retrieves full item record and historical audit log.
 - PUT /api/items/:id: Updates item status, pricing, condition, or SKU.
 - DELETE /api/items/:id: Removes item record and clears platform associations.

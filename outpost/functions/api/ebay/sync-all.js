@@ -11,7 +11,7 @@ import {
   normalizeHttps
 } from './tokenHelper.js';
 import { computePricingFloors } from '../../utils/auction.js';
-import { DEFAULT_TARGET_MARGIN_PCT, MAX_SINGLE_ENRICH, ANALYTICS_CACHE_TTL_HOURS } from '../../utils/constants.js';
+import { DEFAULT_TARGET_MARGIN_PCT, MAX_SINGLE_ENRICH, ANALYTICS_CACHE_TTL_HOURS, CHUNK_SIZE } from '../../utils/constants.js';
 import { setCachedEbayListings } from './listingsCache.js';
 import { recordSyncRun } from '../../utils/syncLogger.js';
 import { ingestListingTraffic } from './analytics.js';
@@ -199,6 +199,7 @@ export async function onRequestPost(context) {
     const CONCURRENCY_LIMIT = 3;
     let activePromises = [];
     const DELAY_MS = 100;
+    const dirtyItemUpdates = [];
 
     for (const item of items) {
       const p = (async () => {
@@ -381,7 +382,7 @@ export async function onRequestPost(context) {
             );
 
             if (isDirty) {
-              await env.DB.prepare(`
+              dirtyItemUpdates.push(env.DB.prepare(`
                 UPDATE auction_items SET
                   current_list_price = ?,
                   status = ?,
@@ -409,7 +410,7 @@ export async function onRequestPost(context) {
                 serializedAttrs,
                 item.id,
                 payload.userId
-              ).run();
+              ));
             }
 
             updatedCount++;
@@ -510,6 +511,19 @@ export async function onRequestPost(context) {
 
     if (activePromises.length > 0) {
       await Promise.all(activePromises);
+    }
+
+    // OPT-G: Flush dirty item updates in batched chunks
+    if (dirtyItemUpdates.length > 0) {
+      if (typeof env.DB.batch === 'function') {
+        for (let i = 0; i < dirtyItemUpdates.length; i += CHUNK_SIZE) {
+          await env.DB.batch(dirtyItemUpdates.slice(i, i + CHUNK_SIZE));
+        }
+      } else {
+        for (const stmt of dirtyItemUpdates) {
+          await stmt.run();
+        }
+      }
     }
 
     // Ingest 30-day traffic analytics for active store listings ONLY if TTL has expired or force_analytics is requested

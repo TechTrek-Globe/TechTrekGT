@@ -291,6 +291,13 @@ export function InventoryProvider({ children }) {
     }
   }, [vscoutSyncing]);
 
+  // Keep stable refs to sync handlers so search/filter typing does not reset the auto-sync interval
+  const handleSyncEbayRef = useRef(handleSyncEbay);
+  handleSyncEbayRef.current = handleSyncEbay;
+
+  const handleSyncVScoutRef = useRef(handleSyncVScout);
+  handleSyncVScoutRef.current = handleSyncVScout;
+
   // Auto-polling loop - runs app-wide while InventoryProvider is mounted
   const syncIntervalRef = useRef([]);
   useEffect(() => {
@@ -304,14 +311,14 @@ export function InventoryProvider({ children }) {
       const ms = (syncSettings.ebay_sync_interval_m || 30) * 60 * 1000;
       syncIntervalRef.current.push(setInterval(() => {
         if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-        handleSyncEbay({ manual: false }).catch(() => {});
+        handleSyncEbayRef.current({ manual: false }).catch(() => {});
       }, ms));
     }
     if (syncSettings.vscout_auto_sync) {
       const ms = (syncSettings.vscout_sync_interval_m || 60) * 60 * 1000;
       syncIntervalRef.current.push(setInterval(() => {
         if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-        handleSyncVScout();
+        handleSyncVScoutRef.current();
       }, ms));
     }
 
@@ -320,8 +327,7 @@ export function InventoryProvider({ children }) {
       syncIntervalRef.current = [];
     };
   }, [syncSettings?.ebay_auto_sync, syncSettings?.ebay_sync_interval_m,
-      syncSettings?.vscout_auto_sync, syncSettings?.vscout_sync_interval_m,
-      handleSyncEbay, handleSyncVScout]);
+      syncSettings?.vscout_auto_sync, syncSettings?.vscout_sync_interval_m]);
 
   // --- Optimistic Local Updates ---
   const updateItemLocal = useCallback((id, patch) => {

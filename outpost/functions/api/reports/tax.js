@@ -73,50 +73,36 @@ export async function onRequestGet(context) {
     }
 
     // 3. Inventory Asset Valuation (Beginning vs Ending Inventory)
-    // Beginning Inventory (Jan 1 of requested year)
+    // OPT-C: Executed via direct SQL aggregation on D1 instead of loading all items into JS memory
     let beginningInventoryValue = 0;
     let endingInventoryValue = 0;
     let currentActiveInventoryValue = 0;
 
-    const allItemsResult = await env.DB.prepare(
-      `SELECT id, item_name, true_total_cost, status, date_acquired, date_sold
+    const curActiveRow = await env.DB.prepare(
+      `SELECT COALESCE(SUM(true_total_cost), 0) AS val
        FROM auction_items
-       WHERE user_id = ?`
-    ).bind(userId).all();
-    const allItems = allItemsResult.results || [];
+       WHERE user_id = ? AND status != 'Sold'`
+    ).bind(userId).first();
+    currentActiveInventoryValue = Number(curActiveRow?.val || 0);
 
-    const yearInt = parseInt(requestedYear, 10);
-    const startOfYearDate = `${yearInt}-01-01`;
-    const endOfYearDate = `${yearInt}-12-31`;
+    if (!isAllYears) {
+      const yearInt = parseInt(requestedYear, 10);
+      const startOfYearDate = `${yearInt}-01-01`;
+      const endOfYearDate = `${yearInt}-12-31`;
 
-    for (const it of allItems) {
-      const acquiredDate = it.date_acquired || '1970-01-01';
-      const cost = it.true_total_cost || 0;
-      const soldDate = it.date_sold;
+      const valuationRow = await env.DB.prepare(
+        `SELECT
+           COALESCE(SUM(CASE WHEN COALESCE(date_acquired, '1970-01-01') < ? AND (date_sold IS NULL OR date_sold >= ?) THEN true_total_cost ELSE 0 END), 0) AS beg_val,
+           COALESCE(SUM(CASE WHEN COALESCE(date_acquired, '1970-01-01') <= ? AND (date_sold IS NULL OR date_sold > ?) THEN true_total_cost ELSE 0 END), 0) AS end_val
+         FROM auction_items
+         WHERE user_id = ?`
+      ).bind(startOfYearDate, startOfYearDate, endOfYearDate, endOfYearDate, userId).first();
 
-      // Currently active unsold
-      if (it.status !== 'Sold') {
-        currentActiveInventoryValue += cost;
-      }
-
-      if (!isAllYears) {
-        // Was it in inventory before Jan 1 of this year?
-        if (acquiredDate < startOfYearDate) {
-          if (!soldDate || soldDate >= startOfYearDate) {
-            beginningInventoryValue += cost;
-          }
-        }
-
-        // Was it in inventory as of Dec 31 of this year?
-        if (acquiredDate <= endOfYearDate) {
-          if (!soldDate || soldDate > endOfYearDate) {
-            endingInventoryValue += cost;
-          }
-        }
-      } else {
-        beginningInventoryValue = 0;
-        endingInventoryValue = currentActiveInventoryValue;
-      }
+      beginningInventoryValue = Number(valuationRow?.beg_val || 0);
+      endingInventoryValue = Number(valuationRow?.end_val || 0);
+    } else {
+      beginningInventoryValue = 0;
+      endingInventoryValue = currentActiveInventoryValue;
     }
 
     // Schedule C Line Calculations

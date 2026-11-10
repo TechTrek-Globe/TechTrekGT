@@ -255,7 +255,14 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - `auction_item_specs`: Relational specifications and bullet features table replacing opaque `specs` and `features` JSON blobs. Indexed via `idx_item_specs_item` on `(item_id, spec_type, display_order)`.
     - `auction_item_platform_listings`: Relational multi-platform mapping table with compound unique index `idx_item_platform_listings_unique` on `(item_id, platform_id)`.
     - `ebay_reconciliation_fee_lines`: Discrete fee line item breakdown table replacing JSON arrays in `ebay_fee_reconciliations`, indexed via `idx_fee_lines_recon`.
-    - Normalized Store Engine: `functions/utils/normalizedItemStore.js` provides atomic positional parameter queries (`FIN-AUDIT-001`) for decomposing and reconstructing item relations on all read/write paths.
+    - Normalized Store Engine: `functions/utils/normalizedItemStore.js` provides atomic positional parameter queries (`FIN-AUDIT-001`) for decomposing and reconstructing item relations on all read/write paths. Annotated as dormant stub with canonical data residing on `auction_items.attributes`.
+  - **Read/Write Optimization & Schema Consistency State [ACTION ID: PERF-005 / AUDIT-004]**:
+    - `functions/api/import/batch.js`: Repaired `ON CONFLICT(item_id)` conflict targets for `auction_sales` and `auction_comps` inserts, aligning batch upsert queries with schema unique keys.
+    - `functions/api/sync/finance.js` & `FinanceSyncModal.jsx`: Removed dropped Finance table references (`households`, `accounts`) from `outpost-db`. Exposes live Outpost metrics with `bridge_status: 'unavailable'` and amber notification state.
+    - Query Round-Trip Reductions: `functions/api/items/enriched.js` batches status group counts and rows, calculating active totals in-memory. `functions/api/sales/index.js` batches aggregate summaries and rows.
+    - In-Engine SQL Aggregations: `functions/api/reports/tax.js` calculates IRS Schedule C beginning/ending inventory values via conditional `SUM()` queries directly on SQLite.
+    - Chunked Ingestions & Decoupled Polling: `functions/api/ebay/listingsCache.js` and `functions/api/ebay/sync-all.js` apply 50-statement chunking. `src/context/InventoryContext.jsx` stabilizes sync callbacks with `useRef` to eliminate interval churn.
+    - Indexes: Added `idx_auction_items_user_status_created` on `(user_id, status, created_at DESC)` and `idx_market_alerts_user_unread` on `(user_id, is_read, created_at DESC)`. Dropped redundant duplicate index `idx_auction_sales_item`.
 
 
 

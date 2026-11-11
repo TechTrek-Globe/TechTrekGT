@@ -605,6 +605,20 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
 - Single-Item Synthesis Invariant:
   - Single-row mutation endpoints (`POST` and `PUT` in `packing.js`) MUST synthesize returned item objects from confirmed input parameters and avoid redundant post-write `SELECT` round-trips.
 
+### 16.19 Mobile WebKit Document Persistence & Safe Viewport Invariants
+
+- WebKit IndexedDB ArrayBuffer Invariant:
+  - Browser-side file storage in `documentStorage.js` MUST NOT attempt to store native `File` objects directly in IndexedDB.
+  - Files and Blobs are read into transferable `ArrayBuffer` payloads (`{ buffer, type, name, size, lastModified }`), ensuring structured cloning compliance on iOS Safari and mobile WebKit runtimes.
+- MIME Normalization & Extension Fallback Invariant:
+  - Document registration (`POST /api/wayfinder/documents`) MUST normalize missing or `application/octet-stream` MIME types by inspecting the filename extension (`.pdf`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`) before evaluating `ALLOWED_MIME`.
+- Explicit User Approval Invariant:
+  - User-initiated approval in `import-jobs.js` (`POST /api/wayfinder/import-jobs/:doc_id/approve`) is an explicit verification intent. The server MUST update all remaining unverified fields on the document to `verification_status = 'user_verified'` and MUST NOT reject the user's approval with HTTP 422.
+- Mobile Modal Z-Index & Gesture Clearance Invariant:
+  - All dialog overlays in `DocumentCenter.jsx` MUST specify `z-[100]` to strictly supersede the fixed mobile bottom navigation bar (`BottomTabBar.jsx`, `z-50`).
+  - Action footers inside modals MUST include `pb-safe` or equivalent touch padding to prevent button occlusion by native iOS home indicator bars.
+
+
 
 
 

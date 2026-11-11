@@ -163,8 +163,8 @@ export function WayfinderProvider({ children }) {
       action: 'Approve import job to itinerary'
     });
     if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || errorData.message || 'Failed to approve import job');
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `Failed to approve import job (${res.status})`);
     }
     const data = await res.json();
     await fetchItinerary(journeyId);

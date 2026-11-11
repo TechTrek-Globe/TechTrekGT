@@ -780,6 +780,26 @@ Eliminates full table scans, serial query latency, and unbatched writes across c
 - Orphaned Code Cleanup:
   - Removed 3 dead `auditEvent` utility functions across `documents.js`, `import-jobs.js`, and `itinerary.js`.
 
+## 39. iOS WebKit Document Persistence, Mobile Approval & Viewport Safety
+
+Resolves mobile and iOS WebKit document ingestion, storage cloning, and modal approval blockers across client and edge workers:
+
+- Structured ArrayBuffer IndexedDB Persistence ([documentStorage.js](file:///e:/TechTrekGT/wayfinder/src/utils/documentStorage.js)):
+  - Replaces raw `File` / `Blob` cloning with structured `ArrayBuffer` conversion in `saveLocalDocumentFile`, circumventing WebKit's native `File` descriptor cloning restriction (`DataCloneError`) on iOS Safari.
+  - Automatically serializes File/Blob into `{ buffer, type, name, size, lastModified }` and deserializes into a valid typed `Blob` during `getLocalDocumentFile`.
+  - Multi-key cache indexing saves documents under `id`, `filename`, and `safe_display_name` (and their lowercase counterparts) for resilient offline retrieval and reloads across mobile sessions.
+- Mobile MIME Ingestion Normalization ([documents.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/documents.js)):
+  - Expands `ALLOWED_MIME` to accept mobile-specific types (`application/x-pdf`, `application/acrobat`, `image/heic`, `image/heif`).
+  - Infers MIME types from filename extensions when mobile Safari submits generic `application/octet-stream` or empty MIME strings.
+- Explicit User Approval Gating Resolution ([import-jobs.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/import-jobs.js)):
+  - Eliminates the blocking HTTP 422 `Unconfirmed critical fields` gate during user-initiated document approvals (`action === 'approve'`). Explicit approval automatically marks all document fields as `user_verified`.
+  - Broadens permission checks to permit journey owners, administrators, editors, and the uploader (`doc.user_id === user.userId`) to approve extractions directly into the itinerary.
+- Modal Stacking & Mobile Viewport Protection ([DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx)):
+  - Upgrades all modal stacking contexts (`Review & Approve`, `Document Viewer`, `PDF Preview`, `Synced Booking`, `Rename`, `Delete Confirmation`) to `z-[100]`, preventing the fixed `BottomTabBar` (`z-50`) from intercepting touch events on iOS mobile devices.
+  - Adds in-modal error surfacing (`modalError`) directly inside the Review dialog so network or validation issues are immediately visible to the traveler without modal closure.
+  - Reorganizes the Review modal action footer into a mobile-first responsive layout (`flex-col-reverse sm:flex-row`) with `pb-safe` padding for iPhone gesture bar clearance.
+
+
 
 
 

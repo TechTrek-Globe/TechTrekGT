@@ -195,6 +195,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
   const [fieldOverrides, setFieldOverrides] = useState({});
   const [isProcessingJob, setIsProcessingJob] = useState(false);
   const [actionSuccessMessage, setActionSuccessMessage] = useState(null);
+  const [modalError, setModalError] = useState(null);
   const [pdfPreviewDoc, setPdfPreviewDoc] = useState(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
   const [iframeError, setIframeError] = useState(false);
@@ -347,6 +348,12 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
         localDocBlobs.current.set(docId, blobUrl);
         await saveLocalDocumentFile(docId, file);
       }
+      if (uploadRes.safe_display_name) {
+        localDocBlobs.current.set(uploadRes.safe_display_name, blobUrl);
+        localDocBlobs.current.set(uploadRes.safe_display_name.toLowerCase(), blobUrl);
+        await saveLocalDocumentFile(uploadRes.safe_display_name, file);
+        await saveLocalDocumentFile(uploadRes.safe_display_name.toLowerCase(), file);
+      }
       
       // 2. Perform intelligent serverless Gemini 2.5 Flash / 3.8 Flash extraction
       let extractionDone = false;
@@ -405,6 +412,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
   const openReviewModal = async (docId) => {
     setIsProcessingJob(true);
     setUploadError(null);
+    setModalError(null);
     try {
       const jobData = await getJobFields(docId);
       setReviewingJob({ docId, ...jobData.job });
@@ -416,6 +424,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
       setFieldOverrides(initialOverrides);
     } catch (err) {
       setUploadError('Failed to load extraction details: ' + err.message);
+      setModalError('Failed to load extraction details: ' + err.message);
     } finally {
       setIsProcessingJob(false);
     }
@@ -425,13 +434,16 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
     if (!reviewingJob?.docId) return;
     setIsProcessingJob(true);
     setUploadError(null);
+    setModalError(null);
     try {
       await approveImportJob(reviewingJob.docId, 'poland-christmas-2026', fieldOverrides);
       setActionSuccessMessage('Document approved! Booking item has been attached to your itinerary timeline.');
       setReviewingJob(null);
       setReviewFields([]);
     } catch (err) {
-      setUploadError(err.message || 'Failed to approve document extraction.');
+      const msg = err.message || 'Failed to approve document extraction.';
+      setUploadError(msg);
+      setModalError(msg);
     } finally {
       setIsProcessingJob(false);
     }
@@ -441,13 +453,16 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
     if (!reviewingJob?.docId) return;
     setIsProcessingJob(true);
     setUploadError(null);
+    setModalError(null);
     try {
       await rejectImportJob(reviewingJob.docId);
       setActionSuccessMessage('Document extraction rejected.');
       setReviewingJob(null);
       setReviewFields([]);
     } catch (err) {
-      setUploadError(err.message || 'Failed to reject extraction.');
+      const msg = err.message || 'Failed to reject extraction.';
+      setUploadError(msg);
+      setModalError(msg);
     } finally {
       setIsProcessingJob(false);
     }
@@ -714,28 +729,34 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
 
       {/* Review & Approve Modal */}
       {reviewingJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-wf-navy/95 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-2xl bg-wf-navy-mid border border-white/15 rounded-3xl shadow-2xl overflow-hidden glass-card flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-wf-navy">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-wf-navy/95 backdrop-blur-md animate-fade-in overflow-y-auto">
+          <div className="w-full max-w-2xl bg-wf-navy-mid border border-white/15 rounded-3xl shadow-2xl overflow-hidden glass-card flex flex-col max-h-[90vh] my-auto">
+            <div className="p-5 sm:p-6 border-b border-white/10 flex items-center justify-between bg-wf-navy shrink-0">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-wf-blue/20 rounded-xl text-wf-blue-lt">
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Review Extracted Booking Fields</h3>
+                  <h3 className="text-base sm:text-lg font-bold text-white">Review Extracted Booking Fields</h3>
                   <p className="text-xs text-wf-muted">Verify or edit extracted booking metadata before attaching to your itinerary.</p>
                 </div>
               </div>
               <button 
-                onClick={() => setReviewingJob(null)}
-                className="p-1.5 text-wf-muted hover:text-white rounded-lg transition-colors"
+                onClick={() => { setReviewingJob(null); setModalError(null); }}
+                className="p-1.5 text-wf-muted hover:text-white rounded-lg transition-colors cursor-pointer"
                 title="Close"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+              {modalError && (
+                <div className="p-3 bg-red-950/70 border border-red-800 rounded-xl text-red-300 text-xs flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                  <span>{modalError}</span>
+                </div>
+              )}
               {reviewFields.length === 0 ? (
                 <div className="text-center py-8 text-wf-muted">No fields extracted.</div>
               ) : (
@@ -760,25 +781,25 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
               )}
             </div>
 
-            <div className="p-4 border-t border-white/10 bg-wf-navy flex items-center justify-between">
+            <div className="p-4 border-t border-white/10 bg-wf-navy shrink-0 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pb-safe">
               <button
                 onClick={handleReject}
                 disabled={isProcessingJob}
-                className="px-4 py-2 bg-white/5 hover:bg-wf-cranberry/20 text-wf-muted hover:text-wf-cranberry text-xs font-medium rounded-xl border border-white/10 transition-colors"
+                className="w-full sm:w-auto px-4 py-2.5 bg-white/5 hover:bg-wf-cranberry/20 text-wf-muted hover:text-wf-cranberry text-xs font-medium rounded-xl border border-white/10 transition-colors cursor-pointer text-center"
               >
                 Reject Extraction
               </button>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 w-full sm:w-auto justify-end">
                 <button
-                  onClick={() => setReviewingJob(null)}
-                  className="px-4 py-2 text-xs font-medium text-wf-muted hover:text-white transition-colors"
+                  onClick={() => { setReviewingJob(null); setModalError(null); }}
+                  className="flex-1 sm:flex-none px-4 py-2.5 text-xs font-medium text-wf-muted hover:text-white transition-colors cursor-pointer text-center"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleApprove}
                   disabled={isProcessingJob}
-                  className="px-5 py-2.5 bg-gradient-to-r from-wf-blue to-wf-blue-lt hover:opacity-90 text-white text-xs font-semibold rounded-xl shadow-lg flex items-center space-x-2 transition-all cursor-pointer"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-gradient-to-r from-wf-blue to-wf-blue-lt hover:opacity-90 text-white text-xs font-semibold rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isProcessingJob ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                   <span>Approve & Add to Itinerary</span>
@@ -791,7 +812,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
 
       {/* Document Viewer Modal */}
       {selectedDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 bg-wf-navy/95 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 bg-wf-navy/95 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-5xl h-full max-h-[90vh] bg-wf-navy-mid border border-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden glass-card">
             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-wf-navy">
               <div className="flex items-center space-x-3">
@@ -859,7 +880,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
       {/* PDF Preview Modal */}
       {pdfPreviewDoc && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in"
           onClick={(e) => { if (e.target === e.currentTarget) closePdfPreview(); }}
         >
           <div className="w-full max-w-5xl bg-wf-navy-mid border border-white/15 rounded-3xl shadow-2xl flex flex-col overflow-hidden glass-card" style={{ height: 'min(90vh, 900px)' }}>
@@ -1017,7 +1038,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
 
       {/* Synced Booking Detail Modal */}
       {selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
           <div className="relative w-full max-w-xl bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
@@ -1381,7 +1402,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
         {/* Rename Document Modal */}
         {docToRename && (
           <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in"
             onClick={(e) => { if (e.target === e.currentTarget) setDocToRename(null); }}
           >
             <div className="relative w-full max-w-lg bg-slate-900 border border-amber-500/30 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5">
@@ -1489,7 +1510,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
 
         {/* Delete Confirmation Modal */}
         {docToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
             <div className="glass-panel w-full max-w-md p-6 rounded-3xl border border-red-500/40 bg-slate-900 shadow-2xl space-y-4">
               <div className="flex items-center space-x-3 text-red-400 border-b border-white/10 pb-3">
                 <div className="p-2.5 rounded-2xl bg-red-500/10 border border-red-500/30">

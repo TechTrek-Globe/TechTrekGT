@@ -45,18 +45,65 @@ export function openDocumentDB() {
  * @param {Blob|File} file
  */
 export async function saveLocalDocumentFile(key, file) {
-  if (!key || !file) return;
+  if (!key || !file) return false;
   try {
     const db = await openDocumentDB();
+    let recordToSave = file;
+
+    // Convert File or Blob to structured ArrayBuffer payload for iOS Safari / WebKit compatibility
+    if (file instanceof Blob || (typeof file === 'object' && typeof file.arrayBuffer === 'function')) {
+      try {
+        const buffer = await file.arrayBuffer();
+        recordToSave = {
+          buffer,
+          type: file.type || 'application/pdf',
+          name: file.name || key,
+          size: file.size ?? buffer.byteLength,
+          lastModified: file.lastModified || Date.now(),
+        };
+      } catch (bufErr) {
+        console.warn('[DocumentStorage] arrayBuffer conversion failed, falling back to raw file:', bufErr);
+      }
+    } else if (file instanceof ArrayBuffer) {
+      recordToSave = {
+        buffer: file,
+        type: 'application/pdf',
+        name: key,
+        size: file.byteLength,
+        lastModified: Date.now(),
+      };
+    } else if (typeof file === 'string' && file.startsWith('data:')) {
+      try {
+        const mime = file.split(';')[0].split(':')[1] || 'application/pdf';
+        const base64Data = file.split(',')[1];
+        const binaryStr = atob(base64Data);
+        const len = binaryStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        recordToSave = {
+          buffer: bytes.buffer,
+          type: mime,
+          name: key,
+          size: bytes.buffer.byteLength,
+          lastModified: Date.now(),
+        };
+      } catch (strErr) {
+        console.warn('[DocumentStorage] Base64 parse failed:', strErr);
+      }
+    }
+
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      const req = store.put(file, key.toLowerCase());
+      const req = store.put(recordToSave, key.toLowerCase());
       req.onsuccess = () => resolve(true);
       req.onerror = (e) => reject(e.target.error);
     });
   } catch (err) {
     console.warn('[DocumentStorage] Failed to save document to IndexedDB:', err);
+    return false;
   }
 }
 
@@ -73,7 +120,34 @@ export async function getLocalDocumentFile(key) {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const req = store.get(key.toLowerCase());
-      req.onsuccess = () => resolve(req.result || null);
+      req.onsuccess = () => {
+        const result = req.result;
+        if (!result) {
+          resolve(null);
+          return;
+        }
+
+        // If stored as structured ArrayBuffer record (iOS WebKit compatible)
+        if (result && result.buffer) {
+          try {
+            const arrayBuf = result.buffer instanceof ArrayBuffer
+              ? result.buffer
+              : (result.buffer.buffer instanceof ArrayBuffer ? result.buffer.buffer : null);
+            if (arrayBuf) {
+              const blob = new Blob([arrayBuf], { type: result.type || 'application/pdf' });
+              blob.name = result.name || key;
+              blob.lastModified = result.lastModified || Date.now();
+              resolve(blob);
+              return;
+            }
+          } catch (blobErr) {
+            console.warn('[DocumentStorage] Failed to create Blob from buffer:', blobErr);
+          }
+        }
+
+        // Legacy raw File or Blob directly stored
+        resolve(result);
+      };
       req.onerror = (e) => reject(e.target.error);
     });
   } catch (err) {

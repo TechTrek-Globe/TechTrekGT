@@ -282,13 +282,13 @@ export async function handleImportJobs(context, url, method) {
 
       if (!journey_id) return json({ error: 'journey_id required' }, 400);
 
-      // Verify owner, share admin or platform admin on the target journey
+      // Verify owner, share admin, platform admin, editor, or document uploader
       const jAccess = await resolveAgendaAccess(env, journey_id, user);
       if (!jAccess.journey) return json({ error: 'Journey not found' }, 404);
-      if (!canManage(jAccess.role)) return json({ error: 'Forbidden' }, 403);
+      if (!canManage(jAccess.role) && doc.user_id !== user.userId && !canEdit(jAccess.role)) return json({ error: 'Forbidden' }, 403);
       const finalJourneyId = jAccess.journey.id;
 
-      // Apply user overrides first - marks fields as user_verified before the gate check
+      // Apply user overrides first - marks fields as user_verified
       const overrideStmts = Object.entries(field_overrides).map(([fieldName, value]) => {
         return env.DB.prepare(
           `UPDATE wayfinder_extracted_fields
@@ -301,19 +301,12 @@ export async function handleImportJobs(context, url, method) {
         await env.DB.batch(overrideStmts);
       }
 
-      // Verify no low-confidence critical fields are still unconfirmed
-      const unconfirmed = await env.DB.prepare(
-        `SELECT field_name FROM wayfinder_extracted_fields
-         WHERE document_id = ? AND requires_confirm = 1 AND verification_status = 'unverified'`
-      ).bind(docId).all();
-
-      if (unconfirmed.results.length > 0) {
-        return json({
-          error: 'Unconfirmed critical fields',
-          fields: unconfirmed.results.map(f => f.field_name),
-          message: 'Please review and confirm low-confidence critical fields before approving.',
-        }, 422);
-      }
+      // Explicit user approval verifies all remaining unverified fields for this document
+      await env.DB.prepare(
+        `UPDATE wayfinder_extracted_fields
+         SET verification_status = 'user_verified'
+         WHERE document_id = ? AND verification_status = 'unverified'`
+      ).bind(docId).run();
 
       // Pre-flight reads in parallel: extracted fields, existing itinerary item, existing expense
       const [allFields, existingItem, existingExpense] = await Promise.all([

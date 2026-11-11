@@ -8,9 +8,16 @@ import { resolveAgendaAccess, canEdit, canManage, canViewSensitive } from '../..
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_MIME  = new Set([
   'application/pdf',
+  'application/x-pdf',
+  'application/acrobat',
+  'applications/vnd.pdf',
+  'text/pdf',
   'image/png',
   'image/jpeg',
+  'image/jpg',
   'image/webp',
+  'image/heic',
+  'image/heif',
 ]);
 
 export async function handleDocuments(context, url, method) {
@@ -73,6 +80,16 @@ export async function handleDocuments(context, url, method) {
         file_size_bytes = body.file_size_bytes || body.size;
         file_hash = body.file_hash || body.hash;
         journey_id = body.journey_id || body.journeyId;
+      }
+
+      // Infer or normalize MIME type if missing or generic on mobile/iOS
+      if (!mime_type || mime_type === 'application/octet-stream') {
+        const lowerName = (original_filename || '').toLowerCase();
+        if (lowerName.endsWith('.pdf')) mime_type = 'application/pdf';
+        else if (lowerName.endsWith('.png')) mime_type = 'image/png';
+        else if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) mime_type = 'image/jpeg';
+        else if (lowerName.endsWith('.webp')) mime_type = 'image/webp';
+        else if (lowerName.endsWith('.heic')) mime_type = 'image/heic';
       }
 
       if (!original_filename || !mime_type) {

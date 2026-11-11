@@ -157,12 +157,13 @@ function simulateExtraction(file) {
   };
 }
 
-export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole = null }) {
+export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole = null, initialDocId = null }) {
   const isViewer = agendaRole === 'viewer';
   const { 
     itinerary = [],
     documents, 
     jobs, 
+    isLoading: isWayfinderLoading,
     uploadDocument, 
     deleteDocument,
     renameDocument,
@@ -199,10 +200,12 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
   const [pdfPreviewDoc, setPdfPreviewDoc] = useState(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
   const [iframeError, setIframeError] = useState(false);
+  const [missingDocNotice, setMissingDocNotice] = useState(null);
 
   const fileInputRef = useRef(null);
   const reattachInputRef = useRef(null);
   const localDocBlobs = useRef(new Map());
+  const handledDocIdRef = useRef(null);
 
   const handleConfirmDeleteDoc = async () => {
     if (!docToDelete) return;
@@ -301,15 +304,54 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
     }
   };
 
-  // Check URL query for selected doc
+  // Check URL query or route parameter for selected doc
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    if (id && documents.length > 0) {
-      const doc = documents.find(d => d.id === id);
-      if (doc) setSelectedDoc(doc);
+    const idFromQuery = params.get('id');
+    const targetDocId = initialDocId || idFromQuery;
+
+    if (!targetDocId) {
+      setMissingDocNotice(null);
+      handledDocIdRef.current = null;
+      return;
     }
-  }, [documents]);
+
+    const lowerTarget = targetDocId.toLowerCase();
+    const docMatch = (documents || []).find(d =>
+      d.id === targetDocId ||
+      (d.original_filename || '').toLowerCase() === lowerTarget ||
+      (d.filename || '').toLowerCase() === lowerTarget
+    );
+
+    if (docMatch) {
+      setMissingDocNotice(null);
+      if (handledDocIdRef.current !== docMatch.id) {
+        handledDocIdRef.current = docMatch.id;
+        if (idFromQuery && !initialDocId) {
+          setSelectedDoc(docMatch);
+        } else {
+          openPdfPreview(docMatch);
+        }
+      }
+      return;
+    }
+
+    const bookingMatch = (itinerary || []).find(item =>
+      item.id === targetDocId || item.source_document_id === targetDocId
+    );
+    if (bookingMatch) {
+      setMissingDocNotice(null);
+      if (handledDocIdRef.current !== targetDocId) {
+        handledDocIdRef.current = targetDocId;
+        setSelectedBooking(bookingMatch);
+      }
+      return;
+    }
+
+    if (!isWayfinderLoading) {
+      setMissingDocNotice(`Document "${targetDocId}" was not found in your vault or is not shared with this account.`);
+    }
+  }, [initialDocId, documents, itinerary, isWayfinderLoading]);
 
   // ESC key closes PDF preview modal
   useEffect(() => {
@@ -512,8 +554,8 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
     const lower = fname.toLowerCase();
 
     // Strict matching for pre-bundled static PDFs - NEVER fall back to Altus Palace for other hotels!
-    const isDelta = lower.includes('delta') || lower.includes('flight') || lower.includes('dl9208');
-    const isGyg = lower.includes('getyourguide') || lower.includes('gyg') || lower.includes('auschwitz') || lower.includes('wieliczka') || lower.includes('salt');
+    const isDelta = lower.includes('delta') || lower.includes('dl9208') || lower.includes('dl9528') || lower.includes('dl9227') || lower.includes('gudi3j');
+    const isGyg = lower.includes('getyourguide') || lower.includes('gyg7vkk692wy') || lower.includes('auschwitz') || lower.includes('wieliczka');
     const isAltus = lower.includes('altus') || lower.includes('imiwhdh') || lower.includes('profitroom'); // Matches Altus Palace or its Profitroom confirmation code
 
     let staticFallback = null;
@@ -525,8 +567,26 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
       staticFallback = `${normalizedBase}Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`;
     }
 
-    const url = cachedBlob || doc.file_url || staticFallback || null;
-    setPdfPreviewUrl(url);
+    const candidateUrl = cachedBlob || doc.file_url || staticFallback || null;
+    if (candidateUrl && !candidateUrl.startsWith('blob:') && !candidateUrl.startsWith('data:')) {
+      try {
+        const res = await fetch(candidateUrl, { method: 'HEAD', credentials: 'include' });
+        const ct = (res.headers.get('content-type') || '').toLowerCase();
+        if (!res.ok || ct.includes('text/html')) {
+          setPdfPreviewUrl(null);
+          setIframeError(true);
+          setPdfPreviewDoc(doc);
+          return;
+        }
+      } catch (_) {
+        setPdfPreviewUrl(null);
+        setIframeError(true);
+        setPdfPreviewDoc(doc);
+        return;
+      }
+    }
+
+    setPdfPreviewUrl(candidateUrl);
     setPdfPreviewDoc(doc);
   };
 
@@ -578,6 +638,22 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
 
   return (
     <div className="space-y-8">
+      {missingDocNotice && (
+        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center space-x-2.5">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+            <span>{missingDocNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMissingDocNotice(null)}
+            className="text-amber-300 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+            aria-label="Dismiss notice"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       {isViewer && (
         <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs flex items-center space-x-2.5 shadow-sm">
           <ShieldCheck className="w-4 h-4 shrink-0 text-sky-400" />
@@ -1105,15 +1181,23 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                         onClick={() => {
                           const docId = selectedBooking.source_document_id;
                           const baseUrl = (import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '');
-                          const isAltus = (selectedBooking.title || '').toLowerCase().includes('altus');
-                          const isDelta = (selectedBooking.title || '').toLowerCase().includes('delta') || selectedBooking.item_type === 'flight';
-                          const defaultPdf = isAltus ? 'Hotel_Altus_Palace_Wroclaw_Confirmation.pdf' : isDelta ? 'Poland_Delta.pdf' : 'GetYourGuide_Ticket_GYG7VKK692WY.pdf';
+                          const titleLower = (selectedBooking.title || '').toLowerCase();
+                          const isAltus = titleLower.includes('altus');
+                          const isDelta = titleLower.includes('delta') || (selectedBooking.confirmation_number || '').toUpperCase() === 'GUDI3J' || titleLower.includes('dl9208') || titleLower.includes('dl9528') || titleLower.includes('dl9227');
+                          const isGyg = (selectedBooking.confirmation_number || '').toUpperCase() === 'GYG7VKK692WY' || titleLower.includes('auschwitz');
+                          const defaultPdf = isAltus
+                            ? 'Hotel_Altus_Palace_Wroclaw_Confirmation.pdf'
+                            : isDelta
+                            ? 'Poland_Delta.pdf'
+                            : isGyg
+                            ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf'
+                            : null;
                           const foundDoc = documents.find(d => d.id === docId) || {
                             id: docId,
-                            filename: defaultPdf,
+                            filename: defaultPdf || selectedBooking.title || 'Booking Confirmation',
                             safe_display_name: selectedBooking.title || (isAltus ? 'Hotel Altus Palace Wrocław Confirmation.pdf' : 'Booking Confirmation'),
                             mime_type: 'application/pdf',
-                            file_url: `${baseUrl}/Poland-2026/docs/${defaultPdf}`
+                            file_url: defaultPdf ? `${baseUrl}/Poland-2026/docs/${defaultPdf}` : null
                           };
                           setSelectedBooking(null);
                           openPdfPreview(foundDoc);

@@ -104,7 +104,7 @@ function StatCard({ icon: Icon, label, value, color, bgGlow }) {
 }
 
 export function AdminView() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, setIsAuthModalOpen } = useAuth();
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -313,11 +313,55 @@ export function AdminView() {
     }
   };
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
   const isAdmin = Boolean(user?.isAdmin || user?.role === 'admin');
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && isAdmin) {
+      fetchStats();
+    }
+  }, [authLoading, isAuthenticated, isAdmin]);
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 sm:p-12 text-center min-h-[60vh] max-w-lg mx-auto">
+        <RefreshCw className="w-8 h-8 text-sky-400 animate-spin mb-3" />
+        <p className="text-slate-400 text-sm">Verifying administrator session...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 sm:p-12 text-center min-h-[60vh] max-w-lg mx-auto">
+        <div className="w-16 h-16 mx-auto rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 mb-4 shadow-lg">
+          <Lock className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-2">Administrator Sign In Required</h2>
+        <p className="text-slate-400 text-sm mb-6">
+          Sign in with an administrator account to access system diagnostics, user management, and API key entitlements.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsAuthModalOpen(true)}
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-wf-blue to-wf-blue-lt hover:opacity-90 text-white font-semibold text-sm transition-all shadow-lg cursor-pointer"
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              window.history.pushState({}, '', '/wayfinder/poland-christmas-2026');
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            }}
+            className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-medium text-sm transition-all border border-slate-700/60 cursor-pointer"
+          >
+            Return to Poland Guide
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (

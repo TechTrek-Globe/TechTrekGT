@@ -6,6 +6,12 @@ import {
 import { getLocalDocumentFile, saveLocalDocumentFile } from '../utils/documentStorage';
 import { useAuth } from '../context/AuthContext';
 
+const BUNDLED_STATIC_PDFS = new Set([
+  'Poland_Delta.pdf',
+  'GetYourGuide_Ticket_GYG7VKK692WY.pdf',
+  'Hotel_Altus_Palace_Wroclaw_Confirmation.pdf'
+]);
+
 export function DocumentViewerModal({ isOpen, onClose, doc }) {
   const { isAuthenticated } = useAuth();
   const [fileUrl, setFileUrl] = useState(null);
@@ -32,31 +38,60 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
   };
 
   const filename = activeDoc.filename || activeDoc.safe_display_name || activeDoc.original_filename || 'Poland_Delta.pdf';
+  const lowerFilename = filename.toLowerCase();
   const isImage = (activeDoc.mime_type || '').startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(filename);
-  const isExcursion = (activeDoc.detected_doc_type === 'excursion' || filename.toLowerCase().includes('getyourguide') || filename.toLowerCase().includes('gyg') || filename.toLowerCase().includes('auschwitz') || filename.toLowerCase().includes('wieliczka'));
-  const isFlight = (filename.toLowerCase().includes('delta') || filename.toLowerCase().includes('flight') || (!isExcursion && activeDoc.details?.flightLeg));
+  const isExcursion = (activeDoc.detected_doc_type === 'excursion' || activeDoc.item_type === 'excursion' || lowerFilename.includes('getyourguide') || lowerFilename.includes('gyg') || lowerFilename.includes('auschwitz') || lowerFilename.includes('wieliczka'));
+  const isFlight = (activeDoc.detected_doc_type === 'flight' || activeDoc.item_type === 'flight' || lowerFilename.includes('delta') || lowerFilename.includes('flight') || (!isExcursion && Boolean(activeDoc.details?.flightLeg)));
+  const isAuschwitzGyg = isExcursion && (
+    lowerFilename.includes('gyg7vkk692wy') ||
+    lowerFilename.includes('auschwitz') ||
+    lowerFilename.includes('getyourguide_ticket_gyg') ||
+    activeDoc.id === 'doc-gyg-7vkk692wy' ||
+    (activeDoc.details?.confirmation || '').toUpperCase() === 'GYG7VKK692WY'
+  );
+  const isDeltaFlight = isFlight && (
+    lowerFilename.includes('delta') ||
+    lowerFilename.includes('poland_delta') ||
+    lowerFilename.includes('dl9208') ||
+    lowerFilename.includes('dl9528') ||
+    lowerFilename.includes('dl9227') ||
+    activeDoc.id === 'delta-poland-2026' ||
+    String(activeDoc.id || '').startsWith('delta-') ||
+    (activeDoc.details?.confirmation || '').toUpperCase() === 'GUDI3J'
+  );
+  const isInboundDelta = activeDoc.id === 'delta-poland-2026' || String(activeDoc.details?.flightLeg || '').includes('DL9208');
   const isHotel = (!isExcursion && !isFlight && (
     activeDoc.detected_doc_type === 'hotel' ||
     activeDoc.item_type === 'hotel' ||
-    filename.toLowerCase().includes('hotel') ||
-    filename.toLowerCase().includes('altus') ||
-    filename.toLowerCase().includes('experior') ||
-    filename.toLowerCase().includes('lodging') ||
+    lowerFilename.includes('hotel') ||
+    lowerFilename.includes('altus') ||
+    lowerFilename.includes('experior') ||
+    lowerFilename.includes('lodging') ||
     Boolean(activeDoc.details?.hotelName || activeDoc.details?.checkIn)
   ));
   const isRail = (!isExcursion && !isFlight && !isHotel && (
     activeDoc.detected_doc_type === 'rail' ||
     activeDoc.item_type === 'rail' ||
-    filename.toLowerCase().includes('train') ||
-    filename.toLowerCase().includes('rail') ||
-    filename.toLowerCase().includes('bilet') ||
-    filename.toLowerCase().includes('pkp') ||
-    filename.toLowerCase().includes('galicja') ||
-    Boolean(activeDoc.details?.trainNumber)
+    lowerFilename.includes('train') ||
+    lowerFilename.includes('rail') ||
+    lowerFilename.includes('bilet') ||
+    lowerFilename.includes('pkp') ||
+    lowerFilename.includes('galicja') ||
+    Boolean(activeDoc.details?.trainNumber || activeDoc.details?.route)
   ));
 
+  const targetCityLabel = activeDoc.details?.targetCity || (() => {
+    const haystack = `${activeDoc.safe_display_name || ''} ${activeDoc.details?.route || ''} ${activeDoc.details?.location || ''} ${activeDoc.details?.flightLeg || ''}`.toLowerCase();
+    if (haystack.includes('gdansk') || haystack.includes('gdańsk') || haystack.includes('gdn')) return 'Target Stop: Gdańsk | Poland Christmas 2026';
+    if (haystack.includes('torun') || haystack.includes('toruń')) return 'Target Stop: Toruń | Poland Christmas 2026';
+    if (haystack.includes('poznan') || haystack.includes('poznań')) return 'Target Stop: Poznań | Poland Christmas 2026';
+    if (haystack.includes('wroclaw') || haystack.includes('wrocław')) return 'Target Stop: Wrocław | Poland Christmas 2026';
+    if (haystack.includes('krakow') || haystack.includes('kraków') || haystack.includes('krk') || haystack.includes('auschwitz') || haystack.includes('wieliczka')) return 'Target City: Kraków (Stop 01) | Poland Christmas 2026';
+    return 'Poland Christmas 2026 Expedition';
+  })();
+
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || !isAuthenticated) {
       setFileUrl(null);
       setEmbedError(false);
       setIsLoading(false);
@@ -65,6 +100,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
     }
 
     let isMounted = true;
+    const abortController = new AbortController();
     setIsLoading(true);
     setEmbedError(false);
 
@@ -83,7 +119,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
         const dbFile = (activeDoc.id ? await getLocalDocumentFile(activeDoc.id) : null) ||
                        (await getLocalDocumentFile(filename)) ||
                        (await getLocalDocumentFile(filename.toLowerCase())) ||
-                       (isFlight ? await getLocalDocumentFile('Poland_Delta.pdf') : null);
+                       (isDeltaFlight ? await getLocalDocumentFile('Poland_Delta.pdf') : null);
         if (dbFile && isMounted) {
           const blobUrl = URL.createObjectURL(dbFile);
           setFileUrl(blobUrl);
@@ -94,19 +130,59 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
         console.warn('[DocumentViewerModal] IndexedDB lookup error:', err);
       }
 
-      // 3. Bundled static asset fallback via Vite base URL
+      // 3. Bundled static asset fallback via strict allowlist + content verification
       const baseUrl = import.meta.env.BASE_URL || '/wayfinder/';
       const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-      const staticDocPath = isExcursion
-        ? `${normalizedBase}Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`
-        : isFlight
-        ? `${normalizedBase}Poland-2026/docs/Poland_Delta.pdf`
-        : ((filename.toLowerCase().includes('altus') || (activeDoc.details?.hotelName || '').toLowerCase().includes('altus'))
-        ? `${normalizedBase}Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`
-        : `${normalizedBase}Poland-2026/docs/${filename}`);
+      let staticDocPath = null;
+      if (isAuschwitzGyg) {
+        staticDocPath = `${normalizedBase}Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`;
+      } else if (isDeltaFlight) {
+        staticDocPath = `${normalizedBase}Poland-2026/docs/Poland_Delta.pdf`;
+      } else if (lowerFilename.includes('altus') || (activeDoc.details?.hotelName || '').toLowerCase().includes('altus')) {
+        staticDocPath = `${normalizedBase}Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`;
+      } else if (BUNDLED_STATIC_PDFS.has(filename)) {
+        staticDocPath = `${normalizedBase}Poland-2026/docs/${filename}`;
+      }
+
+      const candidateUrl = activeDoc.file_url || staticDocPath;
+      if (!candidateUrl) {
+        if (isMounted) {
+          setFileUrl(null);
+          setEmbedError(true);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      if (!candidateUrl.startsWith('blob:') && !candidateUrl.startsWith('data:')) {
+        try {
+          const res = await fetch(candidateUrl, {
+            method: 'HEAD',
+            credentials: 'include',
+            signal: abortController.signal
+          });
+          const ct = (res.headers.get('content-type') || '').toLowerCase();
+          if (!res.ok || ct.includes('text/html')) {
+            if (isMounted) {
+              setFileUrl(null);
+              setEmbedError(true);
+              setIsLoading(false);
+            }
+            return;
+          }
+        } catch (err) {
+          if (err?.name === 'AbortError') return;
+          if (isMounted) {
+            setFileUrl(null);
+            setEmbedError(true);
+            setIsLoading(false);
+          }
+          return;
+        }
+      }
 
       if (isMounted) {
-        setFileUrl(activeDoc.file_url || staticDocPath);
+        setFileUrl(candidateUrl);
         setIsLoading(false);
       }
     };
@@ -120,9 +196,10 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
 
     return () => {
       isMounted = false;
+      abortController.abort();
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, activeDoc, filename, onClose]);
+  }, [isOpen, isAuthenticated, activeDoc, filename, lowerFilename, isAuschwitzGyg, isDeltaFlight, onClose]);
 
   const handleReattach = async (e) => {
     const file = e.target.files?.[0];
@@ -143,7 +220,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !isAuthenticated) return null;
 
   return (
     <div 
@@ -244,48 +321,69 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-300">
               <span className="flex items-center space-x-1.5">
                 <Ticket className="w-3.5 h-3.5 text-emerald-400" />
-                <strong className="text-white">Auschwitz & Wieliczka Tour</strong>
-                <span className="text-slate-400">(Mr.Shuttle)</span>
+                <strong className="text-white">{activeDoc.safe_display_name || (isAuschwitzGyg ? 'Auschwitz & Wieliczka Tour' : 'Guided Excursion')}</strong>
+                {(activeDoc.details?.supplier || isAuschwitzGyg) && (
+                  <span className="text-slate-400">({activeDoc.details?.supplier || 'Mr.Shuttle'})</span>
+                )}
               </span>
-              <span>:</span>
-              <span className="flex items-center space-x-1.5">
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Pickup:</span>
-                <strong className="text-amber-300">05:30 - 07:30 (Dec 6)</strong>
-                <span className="text-slate-400">(Hotel Pickup)</span>
-              </span>
-              <span>:</span>
-              <span>Conf: <strong className="font-mono text-emerald-300">{activeDoc.details?.confirmation || 'GYG7VKK692WY'}</strong></span>
+              {(activeDoc.details?.pickupWindow || isAuschwitzGyg) && (
+                <>
+                  <span>:</span>
+                  <span className="flex items-center space-x-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Pickup:</span>
+                    <strong className="text-amber-300">{activeDoc.details?.pickupWindow || '05:30 - 07:30 (Dec 6)'}</strong>
+                  </span>
+                </>
+              )}
+              {(activeDoc.details?.confirmation || isAuschwitzGyg) && (
+                <>
+                  <span>:</span>
+                  <span>Conf: <strong className="font-mono text-emerald-300">{activeDoc.details?.confirmation || 'GYG7VKK692WY'}</strong></span>
+                </>
+              )}
             </div>
 
-            <div className="text-[11px] text-amber-300/90 flex items-center space-x-1.5">
-              <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
-              <span>Museum Grounds Bag Limit: 30x20x10 cm max (larger bags stay on bus)</span>
-            </div>
+            {(activeDoc.details?.bagRestriction || isAuschwitzGyg) && (
+              <div className="text-[11px] text-amber-300/90 flex items-center space-x-1.5">
+                <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                <span>{activeDoc.details?.bagRestriction || 'Museum Grounds Bag Limit: 30x20x10 cm max (larger bags stay on bus)'}</span>
+              </div>
+            )}
           </div>
         ) : isFlight ? (
           <div className="bg-gradient-to-r from-sky-950/70 via-slate-900 to-sky-950/70 border-b border-sky-500/20 p-3 px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-300">
               <span className="flex items-center space-x-1.5">
                 <Plane className="w-3.5 h-3.5 text-sky-400" />
-                <strong className="text-white">DL9208</strong>
-                <span className="text-slate-400">(AMS ➔ KRK)</span>
+                <strong className="text-white">{activeDoc.details?.flightLeg || (isInboundDelta ? 'DL9208 (AMS ➔ KRK)' : (activeDoc.safe_display_name || 'Confirmed Flight'))}</strong>
               </span>
-              <span>:</span>
-              <span className="flex items-center space-x-1.5">
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Touchdown:</span>
-                <strong className="text-amber-300">Dec 4, 2026 @ 13:30 CET</strong>
-                <span className="text-slate-400">(Local Poland Time)</span>
-              </span>
-              <span>:</span>
-              <span>Conf: <strong className="font-mono text-emerald-300">GUDI3J</strong></span>
+              {(activeDoc.details?.touchdown || activeDoc.details?.departureTime || isInboundDelta) && (
+                <>
+                  <span>:</span>
+                  <span className="flex items-center space-x-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{activeDoc.details?.departureTime && !activeDoc.details?.touchdown ? 'Departure:' : 'Timing:'}</span>
+                    <strong className="text-amber-300">
+                      {activeDoc.details?.touchdown || activeDoc.details?.departureTime || 'Dec 4, 2026 @ 13:30 CET'}
+                    </strong>
+                  </span>
+                </>
+              )}
+              {(activeDoc.details?.confirmation || isDeltaFlight) && (
+                <>
+                  <span>:</span>
+                  <span>Conf: <strong className="font-mono text-emerald-300">{activeDoc.details?.confirmation || 'GUDI3J'}</strong></span>
+                </>
+              )}
             </div>
 
-            <div className="text-[11px] text-slate-400 flex items-center space-x-1.5">
-              <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
-              <span>SKA1 airport train connects to Kraków Główny in 17 min (~15:00 check-in match)</span>
-            </div>
+            {(activeDoc.details?.lodgingSync || activeDoc.details?.layover || isInboundDelta) && (
+              <div className="text-[11px] text-slate-400 flex items-center space-x-1.5">
+                <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                <span>{activeDoc.details?.lodgingSync || activeDoc.details?.layover || 'SKA1 airport train connects to Kraków Główny in 17 min (~15:00 check-in match)'}</span>
+              </div>
+            )}
           </div>
         ) : isHotel ? (
           <div className="bg-gradient-to-r from-emerald-950/70 via-slate-900 to-emerald-950/70 border-b border-emerald-500/20 p-3 px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
@@ -330,16 +428,22 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-300">
               <span className="flex items-center space-x-1.5">
                 <Train className="w-3.5 h-3.5 text-amber-400" />
-                <strong className="text-white">{activeDoc.details?.trainNumber || activeDoc.safe_display_name || 'PKP Intercity IC'}</strong>
-                <span className="text-slate-400">({activeDoc.details?.route || 'Kraków Gł. ➔ Wrocław Gł.'})</span>
+                <strong className="text-white">{activeDoc.details?.trainNumber || activeDoc.safe_display_name || 'PKP Intercity Rail Ticket'}</strong>
+                {activeDoc.details?.route && (
+                  <span className="text-slate-400">({activeDoc.details.route})</span>
+                )}
               </span>
-              <span>:</span>
-              <span className="flex items-center space-x-1.5">
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Departure:</span>
-                <strong className="text-amber-300">{activeDoc.details?.departureTime || '11:50'} CET</strong>
-                <span className="text-slate-400">({activeDoc.details?.date || 'Dec 7, 2026'})</span>
-              </span>
+              {activeDoc.details?.departureTime && (
+                <>
+                  <span>:</span>
+                  <span className="flex items-center space-x-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Departure:</span>
+                    <strong className="text-amber-300">{activeDoc.details.departureTime} CET</strong>
+                    {activeDoc.details?.date && <span className="text-slate-400">({activeDoc.details.date})</span>}
+                  </span>
+                </>
+              )}
               {activeDoc.details?.seats && (
                 <>
                   <span>:</span>
@@ -375,15 +479,19 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
               <Loader2 className="w-8 h-8 text-sky-400 animate-spin" />
               <p className="text-xs text-slate-400">Loading document preview...</p>
             </div>
-          ) : embedError ? (
+          ) : (embedError || !fileUrl) ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-6 sm:p-10 space-y-5 max-w-xl">
               <div className="p-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
                 <AlertTriangle className="w-12 h-12" />
               </div>
               <div className="space-y-2">
-                <h4 className="text-lg font-bold text-white">Browser Embedded Preview Restricted</h4>
+                <h4 className="text-lg font-bold text-white">
+                  {fileUrl ? 'Browser Embedded Preview Restricted' : 'Local Document File Not Attached'}
+                </h4>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Your browser environment or sandbox prevented inline rendering of this document. You can open it in a new window, download the file, or inspect the extracted itinerary metadata below.
+                  {fileUrl
+                    ? 'Your browser environment or sandbox prevented inline rendering of this document. You can open it in a new window, download the file, or inspect the extracted itinerary metadata below.'
+                    : 'No binary PDF or ticket file is stored on this browser yet. Attach the local document copy below or review the booking summary.'}
                 </p>
               </div>
 
@@ -393,45 +501,72 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
                   <div className="font-bold text-emerald-300 flex items-center justify-between border-b border-white/10 pb-2">
                     <span className="flex items-center space-x-1.5">
                       <Ticket className="w-4 h-4 text-emerald-400" />
-                      <span>GetYourGuide Official Excursion Voucher</span>
+                      <span>{activeDoc.details?.provider || (isAuschwitzGyg ? 'GetYourGuide Official Excursion Voucher' : 'Excursion Voucher Summary')}</span>
                     </span>
-                    <a
-                      href="https://www.getyourguide.com/booking/6ICXW284P0LJK9OYS594M5NZKD52BTFT"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sky-300 hover:text-white underline text-[11px] font-semibold flex items-center space-x-1"
-                    >
-                      <span>Open GetYourGuide Portal</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+                    {isAuschwitzGyg && (
+                      <a
+                        href="https://www.getyourguide.com/booking/6ICXW284P0LJK9OYS594M5NZKD52BTFT"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sky-300 hover:text-white underline text-[11px] font-semibold flex items-center space-x-1"
+                      >
+                        <span>Open GetYourGuide Portal</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-slate-300 pt-1">
-                    <div>Activity: <strong className="text-white">Auschwitz & Wieliczka Tour</strong></div>
-                    <div>Pickup Window: <strong className="text-amber-300">05:30 - 07:30 (Dec 6)</strong></div>
-                    <div>Operator: <strong className="text-white">Mr.Shuttle (Poland)</strong></div>
-                    <div>Confirmation: <strong className="font-mono text-emerald-300">GYG7VKK692WY</strong></div>
-                    <div>Participants: <strong className="text-white">2 Adults (English, 11 hours)</strong></div>
-                    <div>Total Cost: <strong className="text-emerald-300">$ 284.76 USD (Paid)</strong></div>
-                    <div className="col-span-2 text-amber-300 text-[11px] pt-1">
-                      Museum Restriction: Maximum bag size 30x20x10 cm on museum grounds. Belongings can remain inside the locked bus.
-                    </div>
+                    <div>Activity: <strong className="text-white">{activeDoc.safe_display_name || (isAuschwitzGyg ? 'Auschwitz & Wieliczka Tour' : 'Guided Excursion')}</strong></div>
+                    {(activeDoc.details?.pickupWindow || isAuschwitzGyg) && (
+                      <div>Pickup Window: <strong className="text-amber-300">{activeDoc.details?.pickupWindow || '05:30 - 07:30 (Dec 6)'}</strong></div>
+                    )}
+                    {(activeDoc.details?.supplier || isAuschwitzGyg) && (
+                      <div>Operator: <strong className="text-white">{activeDoc.details?.supplier || 'Mr.Shuttle (Poland)'}</strong></div>
+                    )}
+                    {(activeDoc.details?.confirmation || isAuschwitzGyg) && (
+                      <div>Confirmation: <strong className="font-mono text-emerald-300">{activeDoc.details?.confirmation || 'GYG7VKK692WY'}</strong></div>
+                    )}
+                    {(activeDoc.details?.passengers || isAuschwitzGyg) && (
+                      <div>Participants: <strong className="text-white">{activeDoc.details?.passengers || '2 Adults (English, 11 hours)'}</strong></div>
+                    )}
+                    {activeDoc.details?.location && (
+                      <div>Location: <strong className="text-white">{activeDoc.details.location}</strong></div>
+                    )}
+                    {(activeDoc.details?.bagRestriction || isAuschwitzGyg) && (
+                      <div className="col-span-2 text-amber-300 text-[11px] pt-1">
+                        Museum Restriction: {activeDoc.details?.bagRestriction || 'Maximum bag size 30x20x10 cm on museum grounds. Belongings can remain inside the locked bus.'}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : isFlight ? (
                 <div className="w-full text-left p-4 rounded-2xl bg-wf-navy border border-white/10 space-y-2 text-xs">
                   <div className="font-bold text-sky-300 flex items-center space-x-1.5 border-b border-white/10 pb-2">
                     <Plane className="w-4 h-4" />
-                    <span>Delta Inbound Flight Details (Poland 2026)</span>
+                    <span>{activeDoc.details?.provider || 'Flight Itinerary Details'} (Poland 2026)</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-slate-300 pt-1">
-                    <div>Flight: <strong className="text-white">DL9208 (AMS ➔ KRK)</strong></div>
-                    <div>Touchdown: <strong className="text-amber-300">13:30 CET (Dec 4)</strong></div>
-                    <div>Inbound: <strong className="text-white">DL0074 (ATL ➔ AMS)</strong></div>
-                    <div>Confirmation: <strong className="font-mono text-emerald-300">GUDI3J</strong></div>
-                    <div className="col-span-2">Passengers: <strong className="text-white">Ronald Milton Few, Jonathan Kemp</strong></div>
-                    <div className="col-span-2 text-slate-400 text-[11px] pt-1">
-                      Hotel Check-in Match: SKA1 direct airport train delivers passengers to Old Town/Kazimierz by ~14:45-15:15 CET, perfectly matching standard 15:00 check-in.
-                    </div>
+                    <div>Flight: <strong className="text-white">{activeDoc.details?.flightLeg || (isInboundDelta ? 'DL9208 (AMS ➔ KRK)' : activeDoc.safe_display_name)}</strong></div>
+                    {(activeDoc.details?.touchdown || activeDoc.details?.departureTime) && (
+                      <div>{activeDoc.details?.departureTime && !activeDoc.details?.touchdown ? 'Departure:' : 'Timing:'} <strong className="text-amber-300">{activeDoc.details?.touchdown || activeDoc.details?.departureTime}</strong></div>
+                    )}
+                    {activeDoc.details?.departureTime && activeDoc.details?.touchdown && (
+                      <div>Departure: <strong className="text-sky-300">{activeDoc.details.departureTime}</strong></div>
+                    )}
+                    {activeDoc.details?.originLeg && (
+                      <div>Connection: <strong className="text-white">{activeDoc.details.originLeg}</strong></div>
+                    )}
+                    {(activeDoc.details?.confirmation || isDeltaFlight) && (
+                      <div>Confirmation: <strong className="font-mono text-emerald-300">{activeDoc.details?.confirmation || 'GUDI3J'}</strong></div>
+                    )}
+                    {activeDoc.details?.passengers && (
+                      <div className="col-span-2">Passengers: <strong className="text-white">{activeDoc.details.passengers}</strong></div>
+                    )}
+                    {(activeDoc.details?.lodgingSync || activeDoc.details?.layover) && (
+                      <div className="col-span-2 text-slate-400 text-[11px] pt-1">
+                        {activeDoc.details?.lodgingSync || activeDoc.details?.layover}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : isHotel ? (
@@ -481,10 +616,16 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
                     )}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-300 pt-1">
-                    <div>Route: <strong className="text-white">{activeDoc.details?.route || 'Kraków Gł. ➔ Wrocław Gł.'}</strong></div>
-                    <div>Schedule: <strong className="text-amber-300">{activeDoc.details?.departureTime || '11:50'} - {activeDoc.details?.arrivalTime || '14:50'} CET</strong></div>
-                    <div>Date: <strong className="text-white">{activeDoc.details?.date || 'Monday, Dec 7, 2026'}</strong></div>
-                    <div>Class & Carriage: <strong className="text-amber-300">1st Class (1. Klasa) • {activeDoc.details?.seats || 'Carriage 272'}</strong></div>
+                    {activeDoc.details?.route && (
+                      <div>Route: <strong className="text-white">{activeDoc.details.route}</strong></div>
+                    )}
+                    {activeDoc.details?.departureTime && (
+                      <div>Schedule: <strong className="text-amber-300">{activeDoc.details.departureTime}{activeDoc.details?.arrivalTime ? ` - ${activeDoc.details.arrivalTime}` : ''} CET</strong></div>
+                    )}
+                    {activeDoc.details?.date && (
+                      <div>Date: <strong className="text-white">{activeDoc.details.date}</strong></div>
+                    )}
+                    <div>Class & Carriage: <strong className="text-amber-300">1st Class (1. Klasa) • {activeDoc.details?.seats || 'Reserved Seating'}</strong></div>
                     <div>Passengers: <strong className="text-white">{activeDoc.details?.passengers || '2 Adults'}</strong></div>
                     <div>Carrier: <strong className="text-white">{activeDoc.details?.provider || 'PKP Intercity S.A.'}</strong></div>
                     <div className="col-span-1 sm:col-span-2 text-slate-400 text-[11px] pt-1">
@@ -549,7 +690,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span>Secure Client Document Inspection</span>
           </span>
-          <span>Target City: Kraków (Stop 01) | Poland Christmas 2026</span>
+          <span>{targetCityLabel}</span>
         </div>
       </div>
     </div>

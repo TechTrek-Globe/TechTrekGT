@@ -294,7 +294,7 @@ export function MustSeeCard(props) {
           {/* GetYourGuide & Viator Walking Tour Booking Action Bar */}
           <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
             <a
-              href={sight?.gygUrl || `https://www.getyourguide.com/s/?q=Krakow+${encodeURIComponent(cardTitle)}+walking+tour`}
+              href={sight?.gygUrl || `https://www.getyourguide.com/s/?q=${encodeURIComponent(cityName || 'Poland')}+${encodeURIComponent(cardTitle)}+walking+tour`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 py-1.5 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm min-h-[32px] sm:min-h-[34px]"
@@ -304,7 +304,7 @@ export function MustSeeCard(props) {
               <span>GetYourGuide</span>
             </a>
             <a
-              href={sight?.viatorUrl || `https://www.viator.com/searchResults/all?text=Krakow+${encodeURIComponent(cardTitle)}+walking+tour`}
+              href={sight?.viatorUrl || `https://www.viator.com/searchResults/all?text=${encodeURIComponent(cityName || 'Poland')}+${encodeURIComponent(cardTitle)}+walking+tour`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center space-x-1 shadow-sm min-h-[32px] sm:min-h-[34px]"

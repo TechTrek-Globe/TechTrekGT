@@ -368,12 +368,299 @@ export function applyCustomTimelineOrder(items, orderKeys) {
   });
 }
 
+// Travel ticket & DOM-anchor classification helpers for public schedule cards
+const CITY_DISPLAY_NAMES = {
+  krakow: 'Kraków',
+  wroclaw: 'Wrocław',
+  poznan: 'Poznań',
+  torun: 'Toruń',
+  gdansk: 'Gdańsk',
+  warsaw: 'Warsaw'
+};
+
+export function isConfirmedIntercityRail(itemData) {
+  if (!itemData) return false;
+  const itemType = (itemData.itemType || itemData.item_type || itemData.docType || '').toLowerCase();
+  if (itemType !== 'rail' && itemType !== 'train') return false;
+  const title = (itemData.title || '').toLowerCase();
+  const location = (itemData.location || '').toLowerCase();
+  const badge = (itemData.badge || '').toLowerCase();
+  // Exclude urban/commuter rail (SKA1 Airport Train), optional suburban ideas (Sopot SKM), and layovers
+  if (
+    title.includes('ska1') ||
+    title.includes('airport train') ||
+    title.includes('sopot') ||
+    title.includes('layover') ||
+    title.includes('ams transit') ||
+    title.includes('optional') ||
+    location.includes('schiphol') ||
+    badge.includes('optional') ||
+    badge.includes('layover')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function isFlightScheduleItem(itemData) {
+  if (!itemData) return false;
+  const itemType = (itemData.itemType || itemData.item_type || itemData.docType || '').toLowerCase();
+  const title = itemData.title || '';
+  return (
+    itemType === 'flight' ||
+    title.includes('DL9208') ||
+    title.includes('DL9528') ||
+    title.includes('DL9227') ||
+    title.includes('Return Flight') ||
+    title.includes('Homeward Flight')
+  );
+}
+
+export function getTravelDomIdForScheduleItem(itemData, dayNumber) {
+  if (!itemData) return null;
+  const titleLower = (itemData.title || '').toLowerCase();
+  const timeStr = itemData.time || itemData.local_time || '';
+
+  if (isFlightScheduleItem(itemData)) {
+    if (dayNumber === 1) return 'travel-flight-krk';
+    if (dayNumber === 10) {
+      if (
+        titleLower.includes('dl9227') ||
+        titleLower.includes('atlanta') ||
+        titleLower.includes('homeward') ||
+        timeStr.startsWith('10')
+      ) {
+        return 'travel-flight-atl';
+      }
+      return 'travel-flight-gdn';
+    }
+    return null;
+  }
+
+  if (isConfirmedIntercityRail(itemData)) {
+    if (dayNumber === 4) return 'travel-train-krakow-wroclaw';
+    if (dayNumber === 6) return 'travel-train-wroclaw-poznan';
+    if (dayNumber === 7) {
+      if (
+        timeStr.startsWith('08') ||
+        titleLower.includes('poznań') ||
+        titleLower.includes('poznan')
+      ) {
+        return 'travel-train-poznan-torun';
+      }
+      if (
+        timeStr.startsWith('15') ||
+        titleLower.includes('gdańsk') ||
+        titleLower.includes('gdansk') ||
+        titleLower.includes('coastal')
+      ) {
+        return 'travel-train-torun-gdansk';
+      }
+    }
+  }
+
+  return null;
+}
+
+export function getTravelDocForScheduleItem(data, dayItem) {
+  if (!data || !dayItem) return null;
+  const titleLower = (data.title || '').toLowerCase();
+  const timeStr = data.time || data.local_time || '';
+
+  if (isConfirmedIntercityRail(data)) {
+    if (dayItem.day === 4) {
+      return {
+        id: '967d6a06-610d-4c56-a95f-d4ca5a5d1769',
+        filename: 'Bilet - WN71563945.pdf',
+        safe_display_name: 'PKP Intercity IC 58 Galicja: Kraków Gł. - Wrocław Gł.',
+        item_type: 'rail',
+        detected_doc_type: 'rail',
+        details: {
+          confirmation: 'WN 71563945',
+          trainNumber: 'IC 58 Galicja',
+          route: 'Kraków Główny ➔ Wrocław Główny',
+          departureTime: '11:50',
+          arrivalTime: '14:50',
+          date: 'Monday, Dec 7, 2026',
+          seats: 'Carriage 272, Seats 34 & 36 (1st Class)',
+          passengers: 'Ronald Milton Few, Jonathan Kemp',
+          provider: 'PKP Intercity S.A.',
+          fare: '128.00 PLN (~$34.13 USD)',
+          location: 'Kraków Główny Central Station',
+          targetCity: 'Kraków ➔ Wrocław (Day 4 Rail Transfer) | Poland Christmas 2026'
+        }
+      };
+    }
+    if (dayItem.day === 6) {
+      return {
+        id: 'pkp-wroclaw-poznan',
+        filename: 'PKP_Intercity_Wroclaw_Poznan.pdf',
+        safe_display_name: 'PKP Intercity IC: Wrocław Główny ➔ Poznań Główny',
+        item_type: 'rail',
+        detected_doc_type: 'rail',
+        details: {
+          confirmation: 'SCHEDULED-PKP-06',
+          trainNumber: 'PKP Intercity IC Direct',
+          route: 'Wrocław Główny ➔ Poznań Główny',
+          departureTime: '10:35',
+          arrivalTime: '12:15',
+          date: 'Wednesday, Dec 9, 2026',
+          seats: '1st Class Assigned Seating (Quiet Zone)',
+          passengers: '2 Adults',
+          provider: 'PKP Intercity S.A.',
+          location: 'Wrocław Główny Central Station',
+          targetCity: 'Wrocław ➔ Poznań (Day 6 Rail Transfer) | Poland Christmas 2026'
+        }
+      };
+    }
+    if (dayItem.day === 7 && (timeStr.startsWith('08') || titleLower.includes('poznań') || titleLower.includes('poznan'))) {
+      return {
+        id: 'pkp-poznan-torun',
+        filename: 'PKP_Morning_Poznan_Torun.pdf',
+        safe_display_name: 'PKP Morning Rail: Poznań Główny ➔ Toruń Główny',
+        item_type: 'rail',
+        detected_doc_type: 'rail',
+        details: {
+          confirmation: 'SCHEDULED-PKP-07A',
+          trainNumber: 'PKP Morning Rail (Day Stop)',
+          route: 'Poznań Główny ➔ Toruń Główny',
+          departureTime: '08:30',
+          arrivalTime: '10:15',
+          date: 'Thursday, Dec 10, 2026',
+          seats: '1st Class Seating',
+          passengers: '2 Adults',
+          provider: 'PKP Intercity S.A.',
+          location: 'Poznań Główny',
+          targetCity: 'Poznań ➔ Toruń (Day 7 Morning Rail) | Poland Christmas 2026'
+        }
+      };
+    }
+    if (dayItem.day === 7 && (timeStr.startsWith('15') || titleLower.includes('gdańsk') || titleLower.includes('gdansk') || titleLower.includes('coastal'))) {
+      return {
+        id: 'pkp-torun-gdansk',
+        filename: 'PKP_Coastal_Torun_Gdansk.pdf',
+        safe_display_name: 'PKP Coastal Rail: Toruń Główny ➔ Gdańsk Główny',
+        item_type: 'rail',
+        detected_doc_type: 'rail',
+        details: {
+          confirmation: 'SCHEDULED-PKP-07B',
+          trainNumber: 'PKP Coastal Intercity',
+          route: 'Toruń Główny ➔ Gdańsk Główny',
+          departureTime: '15:45',
+          arrivalTime: '17:30',
+          date: 'Thursday, Dec 10, 2026',
+          seats: '1st Class Seating',
+          passengers: '2 Adults',
+          provider: 'PKP Intercity S.A.',
+          location: 'Toruń Główny',
+          targetCity: 'Toruń ➔ Gdańsk (Day 7 Coastal Rail) | Poland Christmas 2026'
+        }
+      };
+    }
+    return null;
+  }
+
+  if (isFlightScheduleItem(data)) {
+    if (dayItem.day === 1) {
+      return {
+        id: 'delta-poland-2026',
+        filename: 'Poland_Delta.pdf',
+        safe_display_name: 'Delta Air Lines: Inbound Flight Confirmation (DL0074 / DL9208)',
+        item_type: 'flight',
+        detected_doc_type: 'flight',
+        details: {
+          confirmation: 'GUDI3J',
+          provider: 'Delta Air Lines / KLM Cityhopper',
+          passengers: 'Ronald Milton Few, Jonathan Kemp',
+          touchdown: 'Dec 4, 2026 at 13:30 CET (Local Poland Time)',
+          flightLeg: 'DL9208 (AMS ➔ KRK)',
+          originLeg: 'DL0074 (ATL ➔ AMS, departs Dec 3 at 20:10 EST)',
+          layover: '55 minutes at Amsterdam Schiphol (AMS)',
+          lodgingSync: 'Arrives in Kraków Old Town/Kazimierz at ~14:45-15:15 CET via 17m SKA1 train, matching standard 15:00 check-in.',
+          targetCity: 'Target City: Kraków (Stop 01) | Poland Christmas 2026'
+        }
+      };
+    }
+    if (dayItem.day === 10) {
+      if (titleLower.includes('dl9227') || titleLower.includes('atlanta') || titleLower.includes('homeward') || timeStr.startsWith('10')) {
+        return {
+          id: 'delta-dl9227-ams-atl',
+          filename: 'Poland_Delta.pdf',
+          safe_display_name: 'Delta Air Lines DL9227: Amsterdam (AMS) ➔ Atlanta (ATL)',
+          item_type: 'flight',
+          detected_doc_type: 'flight',
+          details: {
+            confirmation: 'GUDI3J',
+            provider: 'Delta Air Lines',
+            passengers: 'Ronald Milton Few, Jonathan Kemp',
+            flightLeg: 'DL9227 (AMS ➔ ATL)',
+            departureTime: 'Dec 13, 2026 @ 10:00 CET',
+            touchdown: 'Dec 13, 2026 at 13:35 EST (Atlanta)',
+            originLeg: 'Connects from DL9528 (GDN ➔ AMS, arrives 08:40 CET)',
+            layover: '1h 20m international transit at Amsterdam Schiphol (AMS)',
+            lodgingSync: 'Direct transatlantic return from Amsterdam Schiphol to Atlanta Hartsfield-Jackson (ATL).',
+            targetCity: 'Return Leg: Amsterdam (AMS) ➔ Atlanta (ATL) | Poland Christmas 2026'
+          }
+        };
+      }
+      return {
+        id: 'delta-dl9528-gdn-ams',
+        filename: 'Poland_Delta.pdf',
+        safe_display_name: 'Delta / KLM DL9528: Gdańsk (GDN) ➔ Amsterdam (AMS)',
+        item_type: 'flight',
+        detected_doc_type: 'flight',
+        details: {
+          confirmation: 'GUDI3J',
+          provider: 'Delta Air Lines / KLM Cityhopper',
+          passengers: 'Ronald Milton Few, Jonathan Kemp',
+          flightLeg: 'DL9528 (GDN ➔ AMS)',
+          departureTime: 'Dec 13, 2026 @ 06:45 CET',
+          touchdown: 'Dec 13, 2026 at 08:40 CET (Amsterdam Schiphol)',
+          originLeg: 'Departs Gdańsk Lech Wałęsa Airport (GDN)',
+          layover: '1h 20m connection in AMS onto DL9227 (AMS ➔ ATL at 10:00 CET)',
+          lodgingSync: '04:30 transfer from Gdańsk (~35-40 min taxi/Bolt to GDN) ahead of 06:45 departure.',
+          targetCity: 'Departure Stop: Gdańsk (GDN) | Poland Christmas 2026'
+        }
+      };
+    }
+  }
+
+  return null;
+}
+
 // Maps timeline event items to deep links in city guides and specific Must-Have dining tiles
 export function getItemDestination(itemData, dayCityId) {
   if (!itemData) return null;
   const type = itemData.itemType || '';
   const title = (itemData.title || '').toLowerCase();
-  const city = dayCityId || 'krakow';
+  const location = (itemData.location || '').toLowerCase();
+
+  let city = dayCityId || 'krakow';
+  if (
+    title.includes('gdansk') ||
+    title.includes('gdańsk') ||
+    title.includes('targ weglowy') ||
+    title.includes('targ węglowy') ||
+    title.includes('motlawa') ||
+    title.includes('motława') ||
+    title.includes('sopot') ||
+    location.includes('gdansk') ||
+    location.includes('gdańsk') ||
+    location.includes('sopot')
+  ) {
+    city = 'gdansk';
+  }
+  const cityName = CITY_DISPLAY_NAMES[city] || 'Poland';
+
+  if (type === 'rail' && (title.includes('sopot') || title.includes('baltic coast') || location.includes('sopot'))) {
+    return {
+      type: 'sight',
+      cityName: 'Gdańsk',
+      venueName: 'Sopot Pier & Baltic Coast',
+      url: '/wayfinder/poland-christmas-2026/cities/gdansk/attractions#sopot-pier',
+      buttonText: 'View Sopot Pier & Baltic Coast Tile'
+    };
+  }
 
   if (type === 'food' || type === 'restaurant' || title.includes('dinner') || title.includes('lunch')) {
     let venueHash = '';
@@ -387,6 +674,9 @@ export function getItemDestination(itemData, dayCityId) {
     } else if (title.includes('pod wawelem')) {
       venueHash = '#pod-wawelem';
       venueName = 'Pod Wawelem';
+    } else if (title.includes('zapiekank') || title.includes('plac nowy')) {
+      venueHash = '#plac-nowy-zapiekanki';
+      venueName = 'Plac Nowy Zapiekanki';
     } else if (title.includes('konspira')) {
       venueHash = '#konspira';
       venueName = 'Konspira';
@@ -412,6 +702,7 @@ export function getItemDestination(itemData, dayCityId) {
 
     return {
       type: 'food',
+      cityName,
       venueName,
       url: `/wayfinder/poland-christmas-2026/cities/${city}/restaurants${venueHash}`,
       buttonText: venueName !== 'Must-Have Dining' ? `View ${venueName} Tile` : 'View Must-Have Dining Guide'
@@ -473,6 +764,7 @@ export function getItemDestination(itemData, dayCityId) {
 
     return {
       type: 'market',
+      cityName,
       venueName,
       url: `/wayfinder/poland-christmas-2026/cities/${city}/markets${venueHash}`,
       buttonText: venueName !== 'Christmas Market' ? `View ${venueName} Tile` : 'View Christmas Market Guide'
@@ -600,12 +892,12 @@ export function getItemDestination(itemData, dayCityId) {
       if (title.includes('dlugi targ') || title.includes('długi targ') || title.includes('royal way') || title.includes('long market')) {
         venueHash = '#gdansk-dlugi-targ';
         venueName = 'Long Market & Main Town Hall';
-      } else if (title.includes('mariack') || title.includes('st. mary')) {
-        venueHash = '#gdansk-bazylika-mariacka';
-        venueName = "St. Mary's Basilica";
       } else if (title.includes('crane') || title.includes('zuraw') || title.includes('żuraw') || title.includes('motlawa') || title.includes('motława')) {
         venueHash = '#gdansk-zuraw';
         venueName = 'Medieval Port Crane & Motława';
+      } else if (title.includes('mariack') || title.includes('st. mary')) {
+        venueHash = '#gdansk-bazylika-mariacka';
+        venueName = "St. Mary's Basilica";
       } else if (title.includes('neptun')) {
         venueHash = '#gdansk-fontanna-neptuna';
         venueName = "Neptune's Fountain";
@@ -629,6 +921,7 @@ export function getItemDestination(itemData, dayCityId) {
 
     return {
       type: 'sight',
+      cityName,
       venueName,
       url: `/wayfinder/poland-christmas-2026/cities/${city}/attractions${venueHash}`,
       buttonText: venueName !== 'Must-See Sight' ? `View ${venueName} Tile` : 'View Attractions Guide'

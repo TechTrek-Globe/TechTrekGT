@@ -1,9 +1,11 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, Wallet, MessageSquare, Backpack, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Wallet, MessageSquare, Backpack, AlertTriangle, RefreshCw, Lock } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { useExchangeRate } from '../hooks/useExchangeRate';
+import { useAuth } from '../context/AuthContext';
 
 export function PracticalPage() {
+  const { isAuthenticated, setIsAuthModalOpen } = useAuth();
   const exchangeRates = useExchangeRate();
 
   const pushRoute = (e, path) => {
@@ -70,14 +72,25 @@ export function PracticalPage() {
               <Backpack className="w-5 h-5 text-wf-evergreen" />
               <span>Winter Expedition Packing</span>
             </h2>
-            <a
-              href="/wayfinder/poland-christmas-2026/private/packing"
-              onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private/packing')}
-              className="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 hover:text-white text-xs font-bold transition-all flex items-center space-x-1.5 self-start sm:self-auto shadow-md"
-            >
-              <span>Interactive Checklist & Luggage Budget</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </a>
+            {isAuthenticated ? (
+              <a
+                href="/wayfinder/poland-christmas-2026/private/packing"
+                onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private/packing')}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 hover:text-white text-xs font-bold transition-all flex items-center space-x-1.5 self-start sm:self-auto shadow-md"
+              >
+                <span>Interactive Checklist & Luggage Budget</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 hover:text-white text-xs font-bold transition-all flex items-center space-x-1.5 self-start sm:self-auto shadow-md cursor-pointer"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Sign In for Luggage Budget & Sync</span>
+              </button>
+            )}
           </div>
           <p className="text-wf-cream leading-relaxed">{practicalTools.packing}</p>
         </div>

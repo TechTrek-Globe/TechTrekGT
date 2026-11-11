@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, CalendarClock, Backpack, Coins, ShieldCheck } from 'lucide-react';
+import { MapPin, CalendarClock, Backpack, Coins, ShieldCheck, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useWayfinder } from '../context/WayfinderContext';
 
@@ -31,18 +31,19 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
-  const isCities = currentPath.startsWith(`${BASE}/cities`) || currentPath === BASE || currentPath === `${BASE}/`;
-  const isDocs = currentPath.includes('/documents');
-  const isPacking = currentPath.includes('/packing');
-  const isSchedule = currentPath.includes('scroll=journey-sequence') || currentPath.includes('#journey-sequence') || (currentPath.startsWith(`${BASE}/private`) && !isDocs && !isPacking);
-  const isPractical = currentPath.startsWith(`${BASE}/practical`);
-  const { isAuthenticated } = useAuth();
+  const pathOnly = (currentPath || '').split('?')[0].split('#')[0].toLowerCase();
+  const isDocs = pathOnly.includes('/documents');
+  const isPacking = pathOnly.includes('/packing');
+  const isSchedule = currentPath.includes('scroll=journey-sequence') || currentPath.includes('#journey-sequence') || (pathOnly.startsWith(`${BASE}/private`) && !isDocs && !isPacking);
+  const isCities = !isSchedule && (pathOnly.startsWith(`${BASE}/cities`) || pathOnly === BASE || pathOnly === `${BASE}/` || pathOnly === '/wayfinder' || pathOnly === '/wayfinder/' || pathOnly === '/');
+  const isPractical = pathOnly.startsWith(`${BASE}/practical`);
+  const { isAuthenticated, setIsAuthModalOpen } = useAuth();
   const { agendaAccess } = useWayfinder();
-  const hubPath = (!isAuthenticated || agendaAccess.permissions.documents) ? `${BASE}/private/documents` : `${BASE}/private`;
+  const hubPath = agendaAccess.permissions.documents ? `${BASE}/private/documents` : `${BASE}/private`;
 
   const handleScheduleClick = (e) => {
     e.preventDefault();
-    const isMain = currentPath === BASE || currentPath === `${BASE}/` || currentPath === '/wayfinder' || currentPath === '/wayfinder/';
+    const isMain = pathOnly === BASE || pathOnly === `${BASE}/` || pathOnly === '/wayfinder' || pathOnly === '/wayfinder/' || pathOnly === '/';
     if (isMain) {
       const el = document.getElementById('journey-sequence');
       if (el) {
@@ -90,15 +91,27 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
           <Coins className="w-5 h-5" strokeWidth={2} />
           <span className="text-[10px] font-bold tracking-wide leading-none">Money</span>
         </button>
-        <TabItem
-          icon={ShieldCheck}
-          label="Hub"
-          href={hubPath}
-          isActive={isDocs || isPacking}
-          onClick={(e) => pushRoute(e, hubPath)}
-          colorActive="text-sky-400"
-          bgActive="bg-sky-500/15"
-        />
+        {isAuthenticated ? (
+          <TabItem
+            icon={ShieldCheck}
+            label="Hub"
+            href={hubPath}
+            isActive={isDocs || isPacking}
+            onClick={(e) => pushRoute(e, hubPath)}
+            colorActive="text-sky-400"
+            bgActive="bg-sky-500/15"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsAuthModalOpen(true)}
+            className="flex flex-col items-center justify-center flex-1 py-2 gap-0.5 rounded-xl text-slate-500 hover:text-sky-400 transition-all min-h-[56px]"
+            aria-label="Sign in to access private travel hub"
+          >
+            <Lock className="w-5 h-5" strokeWidth={2} />
+            <span className="text-[10px] font-bold tracking-wide leading-none">Sign In</span>
+          </button>
+        )}
       </div>
     </nav>
   );

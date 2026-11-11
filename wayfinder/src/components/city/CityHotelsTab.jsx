@@ -482,7 +482,7 @@ export function CityHotelsTab({
       </div>
 
       {/* Confirmed Stay Booking Voucher Modal */}
-      {confirmedStay && (
+      {isAuthenticated && confirmedStay && (
         <DocumentViewerModal
           isOpen={isStayDocViewerOpen}
           onClose={() => setIsStayDocViewerOpen(false)}
@@ -512,25 +512,27 @@ export function CityHotelsTab({
       )}
 
       {/* Delta Flight Document Preview Modal */}
-      <DocumentViewerModal
-        isOpen={isFlightDocViewerOpen}
-        onClose={() => setIsFlightDocViewerOpen(false)}
-        doc={{
-          id: 'delta-poland-2026',
-          filename: 'Poland_Delta.pdf',
-          safe_display_name: 'Delta Air Lines: Flight Confirmation (ATL -> AMS -> KRK)',
-          mime_type: 'application/pdf',
-          details: {
-            confirmation: 'GUDI3J',
-            passengers: 'Ronald Milton Few, Jonathan Kemp',
-            touchdown: 'Dec 4, 2026 at 13:30 CET (Local Poland Time)',
-            flightLeg: 'DL9208 (AMS -> KRK)',
-            originLeg: 'DL0074 (ATL -> AMS, departs Dec 3 at 20:10 EST)',
-            layover: '55 minutes at Amsterdam (AMS)',
-            lodgingSync: 'Arrives in Krakow Old Town/Kazimierz at ~14:45-15:15 CET, synchronizing with standard 15:00 check-in.'
-          }
-        }}
-      />
+      {isAuthenticated && (
+        <DocumentViewerModal
+          isOpen={isFlightDocViewerOpen}
+          onClose={() => setIsFlightDocViewerOpen(false)}
+          doc={{
+            id: 'delta-poland-2026',
+            filename: 'Poland_Delta.pdf',
+            safe_display_name: 'Delta Air Lines: Flight Confirmation (ATL -> AMS -> KRK)',
+            mime_type: 'application/pdf',
+            details: {
+              confirmation: 'GUDI3J',
+              passengers: 'Ronald Milton Few, Jonathan Kemp',
+              touchdown: 'Dec 4, 2026 at 13:30 CET (Local Poland Time)',
+              flightLeg: 'DL9208 (AMS -> KRK)',
+              originLeg: 'DL0074 (ATL -> AMS, departs Dec 3 at 20:10 EST)',
+              layover: '55 minutes at Amsterdam (AMS)',
+              lodgingSync: 'Arrives in Krakow Old Town/Kazimierz at ~14:45-15:15 CET, synchronizing with standard 15:00 check-in.'
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

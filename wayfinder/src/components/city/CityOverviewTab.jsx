@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Landmark, Crown, Award, MapPin, BookOpen, Sparkles, Utensils, ArrowRight, Map, Train, Bus, Compass, Info, Thermometer, CreditCard, Navigation, FileText, Plane } from 'lucide-react';
 import { FormatText, FormatCurrency } from '../Formatters';
 import { DocumentViewerModal } from '../DocumentViewerModal';
+import { useAuth } from '../../context/AuthContext';
 
 export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, exchangeRates }) {
+  const { isAuthenticated } = useAuth();
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   return (
     <div className="space-y-10 animate-fade-in">
@@ -176,7 +178,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
                       <Train className="w-5 h-5" />
                       <span>Airport Transfer</span>
                     </div>
-                    {city.id === 'krakow' && (
+                    {isAuthenticated && city.id === 'krakow' && (
                       <button
                         type="button"
                         onClick={() => setIsDocViewerOpen(true)}
@@ -301,10 +303,12 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
       )}
 
       {/* Universal Document Preview Modal */}
-      <DocumentViewerModal
-        isOpen={isDocViewerOpen}
-        onClose={() => setIsDocViewerOpen(false)}
-      />
+      {isAuthenticated && (
+        <DocumentViewerModal
+          isOpen={isDocViewerOpen}
+          onClose={() => setIsDocViewerOpen(false)}
+        />
+      )}
     </div>
   );
 }

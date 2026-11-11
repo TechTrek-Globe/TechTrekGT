@@ -233,12 +233,15 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
   }, [city, activeSubPage]);
 
-  // OpenStreetMap embed bbox for Kraków, Wrocław, or generic fallback
-  const mapUrl = cityId === 'krakow'
-    ? "https://www.openstreetmap.org/export/embed.html?bbox=19.9200%2C50.0450%2C19.9650%2C50.0700&amp;layer=mapnik&amp;marker=50.0614%2C19.9366"
-    : cityId === 'wroclaw'
-      ? "https://www.openstreetmap.org/export/embed.html?bbox=17.0150%2C51.1000%2C17.0500%2C51.1200&amp;layer=mapnik&amp;marker=51.1095%2C17.0318"
-      : "https://www.openstreetmap.org/export/embed.html?bbox=16.9000%2C51.1000%2C17.1000%2C51.1300&amp;layer=mapnik";
+  // OpenStreetMap embed bbox per destination stop (raw '&' separators)
+  const osmMapByCity = {
+    krakow: 'https://www.openstreetmap.org/export/embed.html?bbox=19.9200%2C50.0450%2C19.9650%2C50.0700&layer=mapnik&marker=50.0614%2C19.9366',
+    wroclaw: 'https://www.openstreetmap.org/export/embed.html?bbox=17.0150%2C51.1000%2C17.0500%2C51.1200&layer=mapnik&marker=51.1095%2C17.0318',
+    poznan: 'https://www.openstreetmap.org/export/embed.html?bbox=16.9100%2C52.3980%2C16.9500%2C52.4180&layer=mapnik&marker=52.4082%2C16.9335',
+    torun: 'https://www.openstreetmap.org/export/embed.html?bbox=18.5880%2C53.0020%2C18.6220%2C53.0200&layer=mapnik&marker=53.0103%2C18.6048',
+    gdansk: 'https://www.openstreetmap.org/export/embed.html?bbox=18.6320%2C54.3400%2C18.6720%2C54.3600&layer=mapnik&marker=54.3485%2C18.6532'
+  };
+  const mapUrl = osmMapByCity[cityId] || osmMapByCity.krakow;
 
   return (
     <div ref={cityHeaderRef} className="w-full max-w-7xl min-w-0 mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8">

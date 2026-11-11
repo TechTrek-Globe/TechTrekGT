@@ -10,11 +10,11 @@ export function CityFoodTab({
   toggleItinerary, 
   isAuthenticated 
 }) {
-  const detailedItems = [
+  const detailedItems = React.useMemo(() => [
     ...(city.restaurantsDetailed || city[`${city.id}RestaurantsDetailed`] || []),
     ...(city.drinksDetailed || city[`${city.id}DrinksDetailed`] || []),
     ...(city.cafesDetailed || city[`${city.id}CafesDetailed`] || [])
-  ];
+  ], [city]);
   const hasDetailed = detailedItems.length > 0;
   if (!hasDetailed && (!city.restaurants || city.restaurants.length === 0)) return null;
 
@@ -26,8 +26,8 @@ export function CityFoodTab({
       const targetId = hash || params.get('venue') || params.get('item');
       if (targetId) {
         const targetItem = detailedItems.find(i => i.id === targetId);
-        if (targetItem && restaurantCategoryFilter !== 'all' && restaurantCategoryFilter !== targetItem.category) {
-          setRestaurantCategoryFilter('all');
+        if (targetItem) {
+          setRestaurantCategoryFilter((prev) => (prev !== 'all' && prev !== targetItem.category ? 'all' : prev));
         }
         setTimeout(() => {
           const el = document.getElementById(targetId);
@@ -43,8 +43,12 @@ export function CityFoodTab({
     };
     checkAndScroll();
     window.addEventListener('hashchange', checkAndScroll);
-    return () => window.removeEventListener('hashchange', checkAndScroll);
-  }, [detailedItems]);
+    window.addEventListener('popstate', checkAndScroll);
+    return () => {
+      window.removeEventListener('hashchange', checkAndScroll);
+      window.removeEventListener('popstate', checkAndScroll);
+    };
+  }, [detailedItems, setRestaurantCategoryFilter]);
 
   return (
     <div id="restaurants-section" className="space-y-4 animate-fade-in scroll-mt-32">

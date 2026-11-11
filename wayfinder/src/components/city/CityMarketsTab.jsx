@@ -38,8 +38,12 @@ export function CityMarketsTab({
     };
     checkAndScroll();
     window.addEventListener('hashchange', checkAndScroll);
-    return () => window.removeEventListener('hashchange', checkAndScroll);
-  }, [city.markets]);
+    window.addEventListener('popstate', checkAndScroll);
+    return () => {
+      window.removeEventListener('hashchange', checkAndScroll);
+      window.removeEventListener('popstate', checkAndScroll);
+    };
+  }, [city.markets, setActiveMarketTab]);
 
   return (
     <div id="markets-section" className="space-y-6 animate-fade-in scroll-mt-32">

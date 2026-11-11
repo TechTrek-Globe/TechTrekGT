@@ -17,12 +17,16 @@ import {
   getCustomTimelineOrder, 
   saveCustomTimelineOrder, 
   clearCustomTimelineOrder,
-  getItemDestination
+  getItemDestination,
+  isConfirmedIntercityRail,
+  isFlightScheduleItem,
+  getTravelDomIdForScheduleItem,
+  getTravelDocForScheduleItem
 } from '../utils/itineraryTimeline';
 import { FormatTime } from './Formatters';
 
 export function ItineraryView() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, setIsAuthModalOpen } = useAuth();
   const { itinerary: privateItems = [], accommodations = [] } = useWayfinder();
   const [selectedCity, setSelectedCity] = useState('all');
   const [selectedDay, setSelectedDay] = useState(() => {
@@ -155,6 +159,7 @@ export function ItineraryView() {
     switch (type) {
       case 'flight': return <Plane className="w-4 h-4" />;
       case 'rail': return <Train className="w-4 h-4" />;
+      case 'transit': return <Clock className="w-4 h-4" />;
       case 'hotel': return <Building className="w-4 h-4" />;
       case 'market': return <Sparkles className="w-4 h-4" />;
       case 'sight': return <Landmark className="w-4 h-4" />;
@@ -168,6 +173,7 @@ export function ItineraryView() {
     switch (type) {
       case 'flight': return 'bg-sky-500/15 text-sky-300 border-sky-500/30';
       case 'rail': return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+      case 'transit': return 'bg-sky-500/10 text-sky-300 border-sky-500/25';
       case 'hotel': return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
       case 'market': return 'bg-purple-500/15 text-purple-300 border-purple-500/30';
       case 'sight': return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
@@ -180,6 +186,7 @@ export function ItineraryView() {
     switch (type) {
       case 'flight': return 'bg-sky-500/20 text-sky-300 border-sky-400/40';
       case 'rail': return 'bg-amber-500/20 text-amber-300 border-amber-400/40';
+      case 'transit': return 'bg-sky-500/15 text-sky-200 border-sky-400/30';
       case 'hotel': return 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40';
       case 'market': return 'bg-purple-500/20 text-purple-300 border-purple-400/40';
       case 'sight': return 'bg-blue-500/20 text-blue-300 border-blue-400/40';
@@ -205,118 +212,13 @@ export function ItineraryView() {
   const getAccommodationsForDay = (dayDate) => accommodations.filter(item => item.check_in_date === dayDate);
 
   const handleOpenTravelDoc = (data, dayItem) => {
-    const itemType = (data?.itemType || data?.item_type || data?.docType || '').toLowerCase();
-    const isTrain = itemType === 'rail' || itemType === 'train';
-
-    if (isTrain) {
-      let customDoc = null;
-      if (dayItem.day === 4) {
-        customDoc = {
-          id: '967d6a06-610d-4c56-a95f-d4ca5a5d1769',
-          filename: 'Bilet - WN71563945.pdf',
-          safe_display_name: 'PKP Intercity IC 58 Galicja: Kraków Gł. - Wrocław Gł.',
-          item_type: 'rail',
-          detected_doc_type: 'rail',
-          details: {
-            confirmation: 'WN 71563945',
-            trainNumber: 'IC 58 Galicja',
-            route: 'Kraków Główny ➔ Wrocław Główny',
-            departureTime: '11:50',
-            arrivalTime: '14:50',
-            date: 'Monday, Dec 7, 2026',
-            seats: 'Carriage 272, Seats 34 & 36 (1st Class)',
-            passengers: 'Ronald Milton Few, Jonathan Kemp',
-            provider: 'PKP Intercity S.A.',
-            fare: '128.00 PLN (~$34.13 USD)',
-            location: 'Kraków Główny Central Station'
-          }
-        };
-      } else if (dayItem.day === 6) {
-        customDoc = {
-          id: 'pkp-wroclaw-poznan',
-          filename: 'PKP_Intercity_Wroclaw_Poznan.pdf',
-          safe_display_name: 'PKP Intercity IC: Wrocław Główny ➔ Poznań Główny',
-          item_type: 'rail',
-          detected_doc_type: 'rail',
-          details: {
-            confirmation: 'SCHEDULED-PKP-06',
-            trainNumber: 'PKP Intercity IC Direct',
-            route: 'Wrocław Główny ➔ Poznań Główny',
-            departureTime: '10:35',
-            arrivalTime: '12:15',
-            date: 'Wednesday, Dec 9, 2026',
-            seats: '1st Class Assigned Seating (Quiet Zone)',
-            passengers: '2 Adults',
-            provider: 'PKP Intercity S.A.',
-            location: 'Wrocław Główny Central Station'
-          }
-        };
-      } else if (dayItem.day === 7 && ((data.time || '').startsWith('08') || (data.title || '').toLowerCase().includes('poznań') || (data.title || '').toLowerCase().includes('poznan'))) {
-        customDoc = {
-          id: 'pkp-poznan-torun',
-          filename: 'PKP_Morning_Poznan_Torun.pdf',
-          safe_display_name: 'PKP Morning Rail: Poznań Główny ➔ Toruń Główny',
-          item_type: 'rail',
-          detected_doc_type: 'rail',
-          details: {
-            confirmation: 'SCHEDULED-PKP-07A',
-            trainNumber: 'PKP Morning Rail (Day Stop)',
-            route: 'Poznań Główny ➔ Toruń Główny',
-            departureTime: '08:30',
-            arrivalTime: '10:15',
-            date: 'Thursday, Dec 10, 2026',
-            seats: '1st Class Seating',
-            passengers: '2 Adults',
-            provider: 'PKP Intercity S.A.',
-            location: 'Poznań Główny'
-          }
-        };
-      } else {
-        customDoc = {
-          id: 'pkp-torun-gdansk',
-          filename: 'PKP_Coastal_Torun_Gdansk.pdf',
-          safe_display_name: 'PKP Coastal Rail: Toruń Główny ➔ Gdańsk Główny',
-          item_type: 'rail',
-          detected_doc_type: 'rail',
-          details: {
-            confirmation: 'SCHEDULED-PKP-07B',
-            trainNumber: 'PKP Coastal Intercity',
-            route: 'Toruń Główny ➔ Gdańsk Główny',
-            departureTime: '15:45',
-            arrivalTime: '17:30',
-            date: 'Thursday, Dec 10, 2026',
-            seats: '1st Class Seating',
-            passengers: '2 Adults',
-            provider: 'PKP Intercity S.A.',
-            location: 'Toruń Główny'
-          }
-        };
-      }
-      setViewerDoc(customDoc);
-      setIsDocViewerOpen(true);
+    if (!isAuthenticated) {
+      setIsAuthModalOpen(true);
       return;
     }
-
-    // Flight items
-    if (dayItem.day === 10) {
-      setViewerDoc({
-        id: 'delta-return-poland',
-        filename: 'Poland_Delta_Return.pdf',
-        safe_display_name: 'Delta Air Lines DL9528: Gdańsk (GDN) ➔ Atlanta (ATL)',
-        item_type: 'flight',
-        detected_doc_type: 'flight',
-        details: {
-          confirmation: 'GUDI3J',
-          passengers: 'Ronald Milton Few, Jonathan Kemp',
-          flightLeg: 'DL9528 (GDN ➔ AMS ➔ ATL)',
-          departureTime: '06:45 CET',
-          touchdown: 'Dec 13, 2026',
-          layover: 'Amsterdam Schiphol (AMS)'
-        }
-      });
-    } else {
-      setViewerDoc(null);
-    }
+    const matchedDoc = getTravelDocForScheduleItem(data, dayItem);
+    if (!matchedDoc) return;
+    setViewerDoc(matchedDoc);
     setIsDocViewerOpen(true);
   };
 
@@ -364,16 +266,16 @@ export function ItineraryView() {
             </button>
           )}
           <a
-            href="/wayfinder/poland-christmas-2026/route"
-            onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/route')}
+            href="/wayfinder/poland-christmas-2026"
+            onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026')}
             className="px-3.5 py-2 rounded-xl bg-wf-navy-mid border border-white/10 hover:border-amber-400/50 text-white text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-sm"
           >
             <Train className="w-3.5 h-3.5 text-amber-400" />
             <span>Rail Map</span>
           </a>
           <a
-            href="/wayfinder/poland-christmas-2026/markets"
-            onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/markets')}
+            href={`/wayfinder/poland-christmas-2026/cities/${selectedCity !== 'all' ? selectedCity : 'krakow'}/markets`}
+            onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${selectedCity !== 'all' ? selectedCity : 'krakow'}/markets`)}
             className="px-3.5 py-2 rounded-xl bg-wf-navy-mid border border-white/10 hover:border-amber-400/50 text-white text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-sm"
           >
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
@@ -400,8 +302,8 @@ export function ItineraryView() {
 
         <div className="flex flex-wrap gap-2 shrink-0">
           <a
-            href="/wayfinder/poland-christmas-2026/stays-and-food"
-            onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/stays-and-food')}
+            href={`/wayfinder/poland-christmas-2026/cities/${selectedCity !== 'all' ? selectedCity : 'krakow'}/hotels`}
+            onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${selectedCity !== 'all' ? selectedCity : 'krakow'}/hotels`)}
             className="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 hover:border-amber-400/40 text-slate-200 text-xs font-bold transition-colors flex items-center space-x-1"
           >
             <Building className="w-3.5 h-3.5 text-emerald-400" />
@@ -471,7 +373,7 @@ export function ItineraryView() {
       </div>
 
       {/* Private Synced Items Overlay (If Authenticated User has Uploaded Bookings) */}
-      {validPrivateItems.length > 0 && (
+      {isAuthenticated && validPrivateItems.length > 0 && (
         <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between">
           <div className="flex items-center space-x-3 text-emerald-300 text-xs font-bold">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -578,29 +480,11 @@ export function ItineraryView() {
                     const isDragging = draggedItem?.day === dayItem.day && draggedItem?.index === idx;
                     const isDropTarget = dropTarget?.day === dayItem.day && dropTarget?.index === idx;
 
-                    const itemType = (timelineItem.data.itemType || timelineItem.data.item_type || timelineItem.data.docType || '').toLowerCase();
-                    const isTrainItem = itemType === 'rail' || itemType === 'train';
-                    const isFlightItem = itemType === 'flight' || (timelineItem.data.title || '').includes('DL9208') || (timelineItem.data.title || '').includes('Return Flight');
-
-                    let travelDomId = null;
-                    if (isFlightItem && dayItem.day === 1) {
-                      travelDomId = 'travel-flight-krk';
-                    } else if (isFlightItem && dayItem.day === 10) {
-                      travelDomId = 'travel-flight-gdn';
-                    } else if (isTrainItem && dayItem.day === 4) {
-                      travelDomId = 'travel-train-krakow-wroclaw';
-                    } else if (isTrainItem && dayItem.day === 6) {
-                      travelDomId = 'travel-train-wroclaw-poznan';
-                    } else if (isTrainItem && dayItem.day === 7) {
-                      const timeStr = timelineItem.data.time || timelineItem.data.local_time || '';
-                      if (timeStr.startsWith('08') || (timelineItem.data.title || '').toLowerCase().includes('poznań') || (timelineItem.data.title || '').toLowerCase().includes('poznan') || (timelineItem.data.title || '').toLowerCase().includes('toruń') || (timelineItem.data.title || '').toLowerCase().includes('torun')) {
-                        travelDomId = 'travel-train-poznan-torun';
-                      } else {
-                        travelDomId = 'travel-train-torun-gdansk';
-                      }
-                    }
-
-                    const isTravelCard = isTrainItem || isFlightItem;
+                    const isTrainItem = isConfirmedIntercityRail(timelineItem.data);
+                    const isFlightItem = isFlightScheduleItem(timelineItem.data);
+                    const travelDomId = getTravelDomIdForScheduleItem(timelineItem.data, dayItem.day);
+                    const travelDoc = isAuthenticated ? getTravelDocForScheduleItem(timelineItem.data, dayItem) : null;
+                    const isTravelCard = Boolean(travelDoc);
                     const destination = getItemDestination(timelineItem.data, dayItem.cityId);
 
                     const reorderControls = (
@@ -665,14 +549,14 @@ export function ItineraryView() {
 
                             <div 
                               onClick={(e) => {
-                                if (isTravelCard && !e.target.closest('a, button, input')) {
+                                if (isAuthenticated && isTravelCard && !e.target.closest('a, button, input')) {
                                   handleOpenTravelDoc(timelineItem.data, dayItem);
                                 }
                               }}
                               className={`glass-panel p-4 sm:p-5 rounded-2xl border ${
-                                isTravelCard ? 'border-white/15 hover:border-amber-400/60 cursor-pointer' : 'border-white/10 group-hover:border-amber-500/40'
+                                isAuthenticated && isTravelCard ? 'border-white/15 hover:border-amber-400/60 cursor-pointer' : 'border-white/10 group-hover:border-amber-500/40'
                               } transition-all shadow-md bg-slate-900/90 space-y-3`}
-                              title={isTravelCard ? "Click to view ticket and travel details" : undefined}
+                              title={isAuthenticated && isTravelCard ? "Click to view ticket and travel details" : undefined}
                             >
                               {/* Top Bar: Time, Category Icon, Title, Badge, and Reorder Controls */}
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -781,13 +665,13 @@ export function ItineraryView() {
                                     <ArrowRight className="w-3.5 h-3.5 opacity-80 group-hover/btn:translate-x-0.5 transition-transform" />
                                   </a>
                                   <span className="text-[11px] text-slate-400 font-medium">
-                                    {dayItem.cityName} {destination.type === 'food' ? 'Dining Guide' : destination.type === 'market' ? 'Market Guide' : 'Attractions Guide'}
+                                    {destination.cityName || dayItem.cityName} {destination.type === 'food' ? 'Dining Guide' : destination.type === 'market' ? 'Market Guide' : 'Attractions Guide'}
                                   </span>
                                 </div>
                               )}
 
                               {/* Rail Ticket & Pass Action Trigger */}
-                              {isTrainItem && (
+                              {isAuthenticated && isTrainItem && travelDoc && (
                                 <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-2">
                                   <button
                                     type="button"
@@ -799,13 +683,13 @@ export function ItineraryView() {
                                     <span>View PKP Rail Ticket & Transit Details</span>
                                   </button>
                                   <span className="text-[11px] text-amber-300/80 font-mono">
-                                    1st-Class PKP Intercity
+                                    {travelDoc.details?.trainNumber || '1st-Class PKP Intercity'}
                                   </span>
                                 </div>
                               )}
 
                               {/* Flight Arrival/Departure Document Trigger */}
-                              {isFlightItem && (
+                              {isAuthenticated && isFlightItem && travelDoc && (
                                 <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-2">
                                   <button
                                     type="button"
@@ -817,7 +701,7 @@ export function ItineraryView() {
                                     <span>View Delta Flight Confirmation</span>
                                   </button>
                                   <span className="text-[11px] text-slate-400 font-mono">
-                                    Conf: <strong className="text-emerald-300">GUDI3J</strong>
+                                    {travelDoc.details?.flightLeg ? `${travelDoc.details.flightLeg} • ` : ''}Conf: <strong className="text-emerald-300">{travelDoc.details?.confirmation || 'GUDI3J'}</strong>
                                   </span>
                                 </div>
                               )}
@@ -854,8 +738,8 @@ export function ItineraryView() {
             Start with Kraków Guide
           </a>
           <a
-            href="/wayfinder/poland-christmas-2026/route"
-            onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/route')}
+            href="/wayfinder/poland-christmas-2026"
+            onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026')}
             className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs transition-colors"
           >
             View Rail Route Map
@@ -864,20 +748,24 @@ export function ItineraryView() {
       </div>
 
       {/* Universal Document Preview Modal */}
-      <DocumentViewerModal
-        isOpen={isDocViewerOpen}
-        onClose={() => {
-          setIsDocViewerOpen(false);
-          setViewerDoc(null);
-        }}
-        doc={viewerDoc}
-      />
+      {isAuthenticated && (
+        <DocumentViewerModal
+          isOpen={isDocViewerOpen}
+          onClose={() => {
+            setIsDocViewerOpen(false);
+            setViewerDoc(null);
+          }}
+          doc={viewerDoc}
+        />
+      )}
 
       {/* Calendar Subscription & Export Modal */}
-      <CalendarSubscribeModal
-        isOpen={isCalendarModalOpen}
-        onClose={() => setIsCalendarModalOpen(false)}
-      />
+      {isAuthenticated && (
+        <CalendarSubscribeModal
+          isOpen={isCalendarModalOpen}
+          onClose={() => setIsCalendarModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

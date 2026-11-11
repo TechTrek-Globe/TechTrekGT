@@ -358,8 +358,8 @@ export function RouteVisualization() {
         </div>
 
         <a
-          href="/wayfinder/poland-christmas-2026/itinerary"
-          onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/itinerary')}
+          href={isAuthenticated ? '/wayfinder/poland-christmas-2026/private' : '/wayfinder/poland-christmas-2026?scroll=journey-sequence'}
+          onClick={(e) => pushRoute(e, isAuthenticated ? '/wayfinder/poland-christmas-2026/private' : '/wayfinder/poland-christmas-2026?scroll=journey-sequence')}
           className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center space-x-1.5 transition-all shadow-md shadow-amber-500/20 self-start sm:self-auto shrink-0 min-h-[40px]"
         >
           <Calendar className="w-4 h-4" />
@@ -813,10 +813,12 @@ export function RouteVisualization() {
       )}
 
       {/* Universal Document Preview Modal */}
-      <DocumentViewerModal
-        isOpen={isDocViewerOpen}
-        onClose={() => setIsDocViewerOpen(false)}
-      />
+      {isAuthenticated && (
+        <DocumentViewerModal
+          isOpen={isDocViewerOpen}
+          onClose={() => setIsDocViewerOpen(false)}
+        />
+      )}
     </div>
   );
 }

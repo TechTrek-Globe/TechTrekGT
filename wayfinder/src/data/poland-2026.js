@@ -4058,7 +4058,7 @@ export const polandJourney = {
           "category": "Winter Illuminations",
           "isWinterExclusive": true,
           "winterExclusiveLabel": "Dec Only",
-          "websiteUrl": "https://archikatedra.gdansk.pl/",
+          "websiteUrl": "https://www.gdansk.pl/",
           "description": "The historic Oliwa Park (one of Poland's most romantic classical gardens) is transformed each December into a magical illuminated winter walkway. Thousands of warm LED lights trace the 300-year-old avenues, fountains, and pond bridges from dusk until 9:00 PM. The illuminations are switched on daily at 4:00 PM, perfectly timed after the last afternoon organ concert in the Cathedral.",
           "imageUrl": "/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-oliwa-park-illuminations.jpg",
           "imageSrc": "/wayfinder/Poland-2026/images/gdansk/attractions/gdansk-oliwa-park-illuminations.jpg",
@@ -5265,7 +5265,7 @@ export const polandJourney = {
         },
         {
           "time": "08:40",
-          "itemType": "rail",
+          "itemType": "transit",
           "title": "AMS Transit: 1h 20min Amsterdam Schiphol Layover",
           "description": "1 hour 20 minute layover at Amsterdam Schiphol Airport (AMS). Remain in the international transit zone - no customs exit required. Proceed directly to transatlantic departure gates.",
           "location": "Amsterdam Schiphol Airport (AMS) - International Transit",

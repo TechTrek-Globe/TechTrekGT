@@ -13,10 +13,10 @@ export function Layout({ children }) {
   const { isSettingsOpen, setIsSettingsOpen } = useSettings();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isConverterOpen, setIsConverterOpen] = useState(false);
-  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname + window.location.search);
 
   React.useEffect(() => {
-    const handlePopState = () => setCurrentPath(window.location.pathname);
+    const handlePopState = () => setCurrentPath(window.location.pathname + window.location.search);
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);

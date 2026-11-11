@@ -27,7 +27,7 @@ Client state is partitioned into specialized React Context providers:
   - Synchronization: Broadcasts window event `wayfinder:timeline-order-changed` on every reorder or reset, syncing state across [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx) and [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) without page reload.
 - Map Travel Navigation & Document Preview State: Governed by [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) and [ItineraryView.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ItineraryView.jsx).
   - State Fields: `highlightedTravelId` (DOM id of active travel event, e.g. `travel-train-krakow-wroclaw`), `viewerDoc` (active document or synthetic ticket object passed to [DocumentViewerModal.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentViewerModal.jsx)), and `isDocViewerOpen`.
-  - Capabilities: Highlights matched cards with a pulsating amber ring for 3.5s after clicking map train or airplane badges, and surfaces ticket inspection modal without requiring user authentication.
+  - Capabilities: Highlights matched cards with a pulsating amber ring for 3.5s after clicking map train or airplane badges, while gating travel document inspection modals strictly behind `isAuthenticated === true`.
 
 ## 3. Static POI Catalog Memory Model
 
@@ -83,7 +83,7 @@ Transient edge state is isolated to specific performance and security layers:
 - Itinerary API Item Sanitization: Handled in [itinerary.js](file:///e:/TechTrekGT/wayfinder/functions/api/wayfinder/itinerary.js) `sanitizeItem` which automatically extracts and exposes `confirmation_number` from `notes` regex matching (`confirmation:\s*([A-Za-z0-9]+)`).
 - Client Route Optimizer State: Managed locally in [CityAttractionsTab.jsx](file:///e:/TechTrekGT/wayfinder/src/components/city/CityAttractionsTab.jsx) via `useState` and `useMemo`. Tracks `isOptimized` (boolean toggle between curated and 2-opt order), `anchorMode` ('market' base vs 'none' / first sight), `isRoundTrip` (whether loop closes back to base), and `includeExcursions` (whether day-trip sights >12km are grouped into city walks). Computations execute deterministically in memory via [routeOptimizer.js](file:///e:/TechTrekGT/wayfinder/src/utils/routeOptimizer.js) with zero backend round-trips.
 - Persistent Navigation State: Handled via popstate events in [wayfinder/src/components/Layout.jsx](file:///e:/TechTrekGT/wayfinder/src/components/Layout.jsx) and synchronized down to [wayfinder/src/components/BottomTabBar.jsx](file:///e:/TechTrekGT/wayfinder/src/components/BottomTabBar.jsx). Active state indicators (isCities, isSchedule, isPractical, isDocs) dynamically evaluate against current window.location.pathname.
-- Unauthenticated View State in PrivateHub: [wayfinder/src/components/PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) dynamically bifurcates view state between documents (hard auth gated), packing manager (available offline and syncable), and the itinerary schedule (public timeline rendered with an overlay sign-in invite), eliminating dead-end navigation loops.
+- Protected Routing & PrivateHub Auth State: All `/private/*` routes (and aliases `/documents*`, `/Poland-2026/docs/*`, `/itinerary`, `/timeline`, `/expenses`, `/budget`, `/ledger`, `/packing`, `/admin`) evaluate session state through [ProtectedRoute.jsx](file:///e:/TechTrekGT/wayfinder/src/components/ProtectedRoute.jsx). Unauthenticated visitors receive a session verification / Sign-In prompt without rendering `ItineraryView` or private overlays; once authenticated, [PrivateHub.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PrivateHub.jsx) resolves `agendaAccess.permissions` and parses `:docId` / `?doc=` into `initialDocId` state for [DocumentCenter.jsx](file:///e:/TechTrekGT/wayfinder/src/components/DocumentCenter.jsx).
 - PolandLanding Journey Sequence State: [wayfinder/src/components/PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) manages viewMode (defaults to 'cards' with toggle to 'schedule'), selectedStopFilter ('all' or individual city IDs), and expandedStops object state. When authenticated, D1 private itinerary items and accommodations fetched via WayfinderContext are merged into matching stop date windows.
 
 ## 6. Booking Import State
@@ -448,8 +448,14 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
 - Timeline Overlay State:
   - `buildUnifiedDayTimeline(dayItem, dayPrivate, dayAccommodations, isAuthenticated)` dynamically upgrades public flight events to confirmed personal itineraries and injects private D1 records only when `isAuthenticated === true`.
   - When `isAuthenticated === false`, `dayPrivate` and `dayAccommodations` are forced to empty collections (`[]`), ensuring unauthenticated visitors cannot access private reservations.
-- Document Vault Gating Invariant:
-  - `DocumentViewerModal` verifies `isAuthenticated` on mount and enforces an early return (`if (!isOpen || !isAuthenticated) return null;`), preventing unauthenticated preview or transmission of private vouchers and PDF records.
+- Document Vault & Asset Verification Invariant:
+  - `DocumentViewerModal` checks `isAuthenticated` in both `useEffect` (short-circuiting lookups when unauthenticated) and render (`if (!isOpen || !isAuthenticated) return null;`), and every parent modal mount (`PolandLanding`, `ItineraryView`, `CityOverviewTab`, `CityHotelsTab`, `RouteVisualization`, `PrivateBookingCard`) is similarly gated by `isAuthenticated`.
+  - Unauthenticated DOM surfaces strip all links to `/private/documents`, `/private/packing`, PKP/Delta document buttons, `Conf: GUDI3J`, `WN 71563945`, and clickable `isTravelCard` handlers (`BottomTabBar` swaps Hub for Sign In; `PracticalPage` swaps checklist link for Sign In; `PrivateBookingCard` returns `null` after hooks).
+  - Static PDF fallback resolution uses the strict `BUNDLED_STATIC_PDFS` allowlist (`Poland_Delta.pdf`, `GetYourGuide_Ticket_GYG7VKK692WY.pdf`, `Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`) and performs `HEAD` `content-type` checks (rejecting `text/html` SPA fallback responses) in `DocumentViewerModal` and `DocumentCenter.openPdfPreview`. The `<iframe>` only mounts when `!embedError && Boolean(fileUrl)`.
+- Protected Route & Deep-Link Resolution Invariant:
+  - `App.jsx` preserves mixed-case segments (`rawNormalizedPath`) and wraps all `/private*`, `/documents*`, `/Poland-2026/docs/*`, `/itinerary`, `/timeline`, `/expenses`, `/budget`, `/ledger`, `/packing`, `/gmail-callback`, and `/admin` (`requireAdmin`) views inside `<ProtectedRoute>`.
+  - `ProtectedRoute` waits on `AuthContext.isLoading` before prompting unauthenticated sign-in once per route entry (and `AdminView` awaits `authLoading` before calling `fetchStats()`), eliminating spurious 401 calls and raw 404s.
+  - `PrivateHub` extracts `:docId` / `?doc=` and passes `initialDocId` to `DocumentCenter`, which matches by vault `id`, filename, or title and surfaces a dismissible `missingDocNotice` banner when no matching vault item exists.
 - Calendar Sync Authentication Gating Invariant:
   - `CalendarSubscribeModal` requires `isAuthenticated === true` (`if (!isOpen || !isAuthenticated) return null;`), preventing unauthenticated initialization or feed token retrieval.
   - Cloudflare edge worker route `GET /api/wayfinder/calendar/export.ics` enforces `requireAuth` (`if (!auth.ok) return auth.error;`), restricting .ics snapshot downloads to authenticated sessions.
@@ -617,6 +623,29 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
 - Mobile Modal Z-Index & Gesture Clearance Invariant:
   - All dialog overlays in `DocumentCenter.jsx` MUST specify `z-[100]` to strictly supersede the fixed mobile bottom navigation bar (`BottomTabBar.jsx`, `z-50`).
   - Action footers inside modals MUST include `pb-safe` or equivalent touch padding to prevent button occlusion by native iOS home indicator bars.
+
+### 16.20 Interactive 3D Route Map Coordinate & Layering Invariants (`PolandLanding.jsx`)
+
+- Unified Aspect-Locked Canvas Invariant:
+  - The 3D relief map asset ([poland-map-route-clean.png](file:///e:/TechTrekGT/wayfinder/src/assets/poland-map-route-clean.png), 1264x848 landscape relief) MUST remain free of baked-in trains or duplicate track graphics; all rail lines and indicators are rendered dynamically via React + SVG.
+  - The outer map container in [PolandLanding.jsx](file:///e:/TechTrekGT/wayfinder/src/components/PolandLanding.jsx) locks proportions (`aspect-[7/6] sm:aspect-[3/2]`) and houses a centered `aspect-[3/2]` coordinate canvas (`object-fill`), ensuring city nodes, quadratic Bezier SVG tracks (`vectorEffect="non-scaling-stroke"`), flight badges, and PKP train pills stay pixel-locked across mobile and desktop breakpoints without `object-cover` vertical clipping or hover-zoom drift (`group-hover:scale-[1.02]` applied to the unified wrapper rather than the bare `<img>`).
+- Map Z-Index & Pointer Isolation Invariant:
+  - Map rendering layers follow strict stacking order: relief `<img>` (`z-0`), SVG vector paths (`z-10 pointer-events-none`), interactive flight/train buttons (`z-20 hover:z-40 focus:z-40`), and the city micro-nodes wrapper (`z-30 pointer-events-none`) with `pointer-events-auto hover:z-40 focus:z-40` on individual city `<a>` anchors.
+  - Each city anchor is centered directly on its avatar circle (`w-6 h-6 sm:w-9 sm:h-9 -translate-x-1/2 -translate-y-1/2`) while its pill label is offset directionally (`bottom`, `right`, or `top`) so adjacent northern/central stops (Toruń, Gdańsk, Poznań) never collide with `PKP • DAY 4/6/7` pills positioned at exact quadratic Bezier midpoints.
+
+### 16.21 Travel Ticket Mapping, Deep-Link Resolution & Navigation Sync Invariants
+
+- Confirmed Travel Document Matching Invariant (`itineraryTimeline.js`):
+  - `isConfirmedIntercityRail(itemData)` MUST return `false` for urban/commuter shuttles (`SKA1 Airport Train`), optional regional day trips (`Sopot`), and layovers (`AMS Transit`).
+  - `getTravelDocForScheduleItem(data, dayItem)` MUST return `null` when an item is neither a confirmed intercity PKP rail leg (Days 4, 6, 7 morning/afternoon) nor a confirmed Delta flight leg (Day 1 arrival, Day 10 `DL9528` / `DL9227`). Unmatched rail/transit cards MUST NOT fall back to an unrelated train ticket (such as `SCHEDULED-PKP-07B`).
+  - `getTravelDomIdForScheduleItem(itemData, dayNumber)` guarantees globally unique DOM element IDs across all 10 itinerary days (`travel-flight-krk`, `travel-flight-gdn`, `travel-flight-atl`, `travel-train-krakow-wroclaw`, `travel-train-wroclaw-poznan`, `travel-train-poznan-torun`, `travel-train-torun-gdansk`).
+- Fallback Identity Isolation Invariant (`DocumentViewerModal.jsx`, `PrivateBookingCard.jsx`, `DocumentCenter.jsx`):
+  - Static bundled PDFs (`Poland_Delta.pdf`, `GetYourGuide_Ticket_GYG7VKK692WY.pdf`) and hardcoded confirmation identifiers (`GUDI3J`, `WN 71563945`, `GYG7VKK692WY`) are strictly scoped via record predicates (`isDeltaFlight`, `isGalicjaRail`, `isAuschwitzGyg`, `isAltusHotel`). Unrelated records render dynamic `activeDoc.details` without injecting mismatched confirmations or URLs.
+- Deep-Link & Navigation Synchronization Invariant:
+  - Every `#hash` emitted by `getItemDestination` MUST correspond to an element ID mounted in the target city sub-tab (`markets`, `attractions`, or `restaurants`).
+  - `CityMarketsTab`, `CityFoodTab`, and `CityAttractionsTab` listen to both `hashchange` and `popstate` events so `window.history.pushState` route transitions reliably trigger card scrolling and focus highlights.
+  - `Layout.jsx` tracks `window.location.pathname + window.location.search` so `BottomTabBar.jsx` evaluates `?scroll=journey-sequence` accurately and keeps `Cities` vs `Schedule` active states mutually exclusive.
+  - `CityPage.jsx` OpenStreetMap embed URLs use raw `&` query separators and map each of the 5 stops (`krakow`, `wroclaw`, `poznan`, `torun`, `gdansk`) to its own bounding box and pin coordinates.
 
 
 

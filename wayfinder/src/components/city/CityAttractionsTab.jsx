@@ -54,7 +54,11 @@ export function CityAttractionsTab({ city }) {
     };
     checkAndScroll();
     window.addEventListener('hashchange', checkAndScroll);
-    return () => window.removeEventListener('hashchange', checkAndScroll);
+    window.addEventListener('popstate', checkAndScroll);
+    return () => {
+      window.removeEventListener('hashchange', checkAndScroll);
+      window.removeEventListener('popstate', checkAndScroll);
+    };
   }, [displayedPlaces]);
 
   return (

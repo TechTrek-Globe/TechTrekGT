@@ -197,6 +197,23 @@ Tracks shared expedition costs, member split allocations, and debt settlements i
 - `expense_id`: optional foreign key referencing specific parent `wayfinder_expenses(id)` for item-by-item settlements.
 - `split_id`: optional foreign key referencing specific `wayfinder_expense_splits(id)` for item-by-item settlements.
 
+### 9.4 Person-by-Person Breakdown Client State (`PersonBreakdownPanel.jsx` & `expenseLedger.js`)
+- `personFilter`: lifted state in `ExpenseLedger.jsx` (`null | 'paid_by' | 'owed_by' | 'settled'`) controlling whether the main ledger feed is filtered by a participant's out-of-pocket spend, unsettled fair share liability, or fully settled items.
+- `activePersonId`: lifted state in `ExpenseLedger.jsx` (`null | string`) designating the selected traveler ID for filtering.
+- `isExpanded`: component state in `PersonBreakdownPanel.jsx` toggling expansion of the top-level participant overview dashboard.
+- `activeTooltipId`: component state in `PersonBreakdownPanel.jsx` displaying the epsilon-safe mathematical formula popover for the active participant, constrained to `max-w-[calc(100vw-3rem)]` for mobile viewport compliance.
+- `activeFeedFilter`: local state in `PersonBreakdownPanel.jsx` (`{ personId, mode }`) highlighting active filter pill states and rendering the filter status banner.
+- `contributionPct` vs `fairSharePct`: dual progress bar computations comparing actual cash fronted (`bal.paid / totalExpeditionInDisplay`) vs. 50/50 liability fair share (`bal.owed / totalExpeditionInDisplay`), alongside surfaced **Total Trip Cost** (`totalExpeditionInDisplay`) in the panel header badge, summary banner, and Fair Share subtitles.
+- `sentToLabel`, `receivedAmount`, & `receivedFromLabel`: derived properties in `participantBalances` (`useMemo` over `settlements` + `expenses`) resolving exact reimbursement direction (who sent funds to whom) for each participant card.
+- `computePersonCategoryBreakdown(expenses, personId, displayCurrency)`: pure ESM utility in `expenseLedger.js` computing 2-decimal rounded out-of-pocket spend and fair share allocations across 7 canonical categories.
+- `computePersonPaymentMethods(expenses, personId, displayCurrency)`: pure ESM utility in `expenseLedger.js` summarizing amounts and counts per payment instrument.
+- `buildNetFormula(balance, displayCurrency)`: pure ESM utility in `expenseLedger.js` formatting exact string representations for the net balance formula tooltip.
+
+### 9.5 Trip-Persistent Payment Methods & Vendor Stores (`ExpenseLedger.jsx`)
+- `savedPaymentMethods`: component state in `ExpenseLedger.jsx` synced with `localStorage` key `wf_payment_methods_${journeyId}` holding traveler-added custom payment instruments (e.g. `US Bank VISA`).
+- `availablePaymentMethods`: memoized collection merging saved custom cards, unique methods extracted from active trip expenses (`expenses.map(e => e.payment_method)`), and standard base defaults (`Visa`, `Mastercard`, `Amex`, `Apple Pay`, `PayPal`, `Cash`) with case-insensitive deduplication and custom card priority. Connected to native `<datalist id="trip-payment-methods-list">` and interactive quick-select pills.
+- `savedBookingSites` & `availableBookingSites`: parallel persistent store and auto-discovery pipeline for booking vendors (`wf_booking_sites_${journeyId}`).
+
 ## 10. Confirmed Excursion State & Timeline Occlusion Architecture
 
 Tracks confirmed private tour bookings, time window parameters, and reconciliation metadata in `wayfinder_itinerary_items`:

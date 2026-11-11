@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   DollarSign, Receipt, Plus, ArrowRight, CheckCircle2, Trash2, Edit2,
   RefreshCw, Users, CreditCard, Sparkles, Plane, Building, Train, 
-  Utensils, ShoppingBag, ShoppingCart, Globe, AlertCircle, ArrowUpRight, ArrowDownLeft, RotateCcw, ShieldCheck
+  Utensils, ShoppingBag, ShoppingCart, Globe, AlertCircle, ArrowUpRight, ArrowDownLeft, RotateCcw, ShieldCheck, X
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { getApiUrl } from '../../utils/api';
 import { resilientFetch } from '../../utils/mutationQueue';
 import { 
-  convertCurrency, formatCurrency, splitEqually, calculateSettleUp, DEFAULT_EXCHANGE_RATES 
+  convertCurrency, formatCurrency, splitEqually, calculateSettleUp, DEFAULT_EXCHANGE_RATES,
+  buildNetFormula 
 } from '../../utils/expenseLedger';
+import { PersonBreakdownPanel } from './PersonBreakdownPanel.jsx';
 
 // Map DB category values to display metadata (including legacy aliases)
 const CATEGORY_MAP = {
@@ -92,6 +94,10 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
   const [settleMethod, setSettleMethod] = useState('venmo');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Person-by-Person breakdown panel filter state
+  const [activePersonId, setActivePersonId] = useState(null);
+  const [personFilter, setPersonFilter] = useState(null); // null | 'paid_by' | 'owed_by' | 'settled'
+
   // Form state for new expense
   const [formDesc, setFormDesc] = useState('');
   const [formCategory, setFormCategory] = useState('dining');
@@ -101,6 +107,111 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
   const [formSplitType, setFormSplitType] = useState('equal'); // 'equal' or 'self'
   const [formSite, setFormSite] = useState('');
   const [formPaymentMethod, setFormPaymentMethod] = useState('');
+
+  // Persistent Trip Payment Methods Store
+  const [savedPaymentMethods, setSavedPaymentMethods] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`wf_payment_methods_${journeyId}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const saveTripPaymentMethod = useCallback((newMethod) => {
+    const trimmed = (newMethod || '').trim();
+    if (!trimmed) return;
+    setSavedPaymentMethods(prev => {
+      const exists = prev.some(m => m.toLowerCase() === trimmed.toLowerCase());
+      if (exists) return prev;
+      const updated = [...prev, trimmed];
+      try {
+        localStorage.setItem(`wf_payment_methods_${journeyId}`, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('[ExpenseLedger] failed to cache payment method:', e);
+      }
+      return updated;
+    });
+  }, [journeyId]);
+
+  const removeTripPaymentMethod = useCallback((methodToRemove, e) => {
+    if (e) e.stopPropagation();
+    setSavedPaymentMethods(prev => {
+      const updated = prev.filter(m => m.toLowerCase() !== methodToRemove.toLowerCase());
+      try {
+        localStorage.setItem(`wf_payment_methods_${journeyId}`, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('[ExpenseLedger] failed to update cached payment methods:', e);
+      }
+      return updated;
+    });
+    if (formPaymentMethod.toLowerCase() === methodToRemove.toLowerCase()) {
+      setFormPaymentMethod('');
+    }
+  }, [journeyId, formPaymentMethod]);
+
+  // Combined list of trip payment methods (expenses + saved custom methods + defaults)
+  const availablePaymentMethods = useMemo(() => {
+    const baseDefaults = ['Visa', 'Mastercard', 'Amex', 'Apple Pay', 'PayPal', 'Cash'];
+    const fromExpenses = (expenses || [])
+      .map(e => (e.payment_method || '').trim())
+      .filter(Boolean);
+
+    const merged = [];
+    const seen = new Set();
+    for (const m of [...savedPaymentMethods, ...fromExpenses, ...baseDefaults]) {
+      const lower = m.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        merged.push(m);
+      }
+    }
+    return merged;
+  }, [expenses, savedPaymentMethods]);
+
+  // Persistent Trip Booking Sites / Vendors Store
+  const [savedBookingSites, setSavedBookingSites] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`wf_booking_sites_${journeyId}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const saveTripBookingSite = useCallback((newSite) => {
+    const trimmed = (newSite || '').trim();
+    if (!trimmed) return;
+    setSavedBookingSites(prev => {
+      const exists = prev.some(s => s.toLowerCase() === trimmed.toLowerCase());
+      if (exists) return prev;
+      const updated = [...prev, trimmed];
+      try {
+        localStorage.setItem(`wf_booking_sites_${journeyId}`, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('[ExpenseLedger] failed to cache booking site:', e);
+      }
+      return updated;
+    });
+  }, [journeyId]);
+
+  const availableBookingSites = useMemo(() => {
+    const baseDefaults = ['Booking.com', 'Hotels.com', 'Delta.com', 'PKP Intercity', 'GetYourGuide', 'On-Site'];
+    const fromExpenses = (expenses || [])
+      .map(e => (e.purchase_site || '').trim())
+      .filter(Boolean);
+
+    const merged = [];
+    const seen = new Set();
+    for (const s of [...savedBookingSites, ...fromExpenses, ...baseDefaults]) {
+      const lower = s.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        merged.push(s);
+      }
+    }
+    return merged;
+  }, [expenses, savedBookingSites]);
 
   // Use real user.id (matches D1 stored user_id), with safe fallback
   const currentUserId = user?.id || user?.userId || 'usr-1785511589441-3fvgv';
@@ -171,9 +282,16 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
 
   // Filtered expenses
   const filteredExpenses = useMemo(() => {
-    if (selectedCategory === 'all') return expenses;
-    return expenses.filter(e => normalizeCategory(e.category) === selectedCategory);
-  }, [expenses, selectedCategory]);
+    let result = selectedCategory === 'all' ? expenses : expenses.filter(e => normalizeCategory(e.category) === selectedCategory);
+    if (personFilter === 'paid_by' && activePersonId) {
+      result = result.filter(e => (e.paid_by_user_id || e.user_id) === activePersonId);
+    } else if (personFilter === 'owed_by' && activePersonId) {
+      result = result.filter(e => e.splits?.some(s => s.user_id === activePersonId && !s.is_settled));
+    } else if (personFilter === 'settled') {
+      result = result.filter(e => e.splits?.length > 0 && e.splits.every(s => Boolean(s.is_settled)));
+    }
+    return result;
+  }, [expenses, selectedCategory, personFilter, activePersonId]);
 
   // Handle Preset Seed
   const handleSeedPresets = async () => {
@@ -295,6 +413,12 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
         if (res.status === 401) { setIsAuthModalOpen(true); throw new Error('Session expired. Please sign in again.'); }
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || `Server error (${res.status})`);
+      }
+      if (formPaymentMethod.trim()) {
+        saveTripPaymentMethod(formPaymentMethod.trim());
+      }
+      if (formSite.trim()) {
+        saveTripBookingSite(formSite.trim());
       }
       setIsAddModalOpen(false);
       setEditingExpense(null);
@@ -536,7 +660,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
           </div>
           <span className="text-[11px] text-slate-400">
             {userBalance.settlementsPaid > 0
-              ? `Direct bookings (+${formatCurrency(userBalance.settlementsPaid, displayCurrency)} settled)`
+              ? `Direct bookings (excl. ${formatCurrency(userBalance.settlementsPaid, displayCurrency)} sent)`
               : 'Direct bookings & purchases'
             }
           </span>
@@ -630,6 +754,22 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
           </div>
         </div>
       )}
+
+      {/* Person-by-Person Expedition Breakdown Panel */}
+      <PersonBreakdownPanel
+        participants={participants}
+        balances={balances}
+        expenses={expenses}
+        settlements={settlements}
+        displayCurrency={displayCurrency}
+        currentUserId={currentUserId}
+        isViewer={isViewer}
+        totalExpeditionInDisplay={totalExpeditionInDisplay}
+        onPersonFilterChange={(userId, filterMode) => {
+          setActivePersonId(userId);
+          setPersonFilter(filterMode);
+        }}
+      />
 
       {/* Filter Tabs & Empty State Presets */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
@@ -1022,19 +1162,27 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="block font-bold text-slate-300 mb-1 flex items-center space-x-1.5">
-                    <ShoppingCart className="w-3.5 h-3.5 text-sky-400" />
-                    <span>Where Purchased? (Site / Vendor)</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-300 flex items-center space-x-1.5 text-xs sm:text-sm">
+                      <ShoppingCart className="w-3.5 h-3.5 text-sky-400" />
+                      <span>Where Purchased? (Site / Vendor)</span>
+                    </label>
+                  </div>
                   <input
                     type="text"
+                    list="trip-booking-sites-list"
                     value={formSite}
                     onChange={(e) => setFormSite(e.target.value)}
                     placeholder="e.g. Booking.com, Hotels.com, Delta.com"
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs sm:text-sm"
                   />
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {['Booking.com', 'Hotels.com', 'Delta.com', 'PKP Intercity', 'GetYourGuide', 'On-Site'].map((site) => (
+                  <datalist id="trip-booking-sites-list">
+                    {availableBookingSites.map((site) => (
+                      <option key={site} value={site} />
+                    ))}
+                  </datalist>
+                  <div className="flex flex-wrap gap-1 mt-1.5 max-h-24 overflow-y-auto pr-1">
+                    {availableBookingSites.map((site) => (
                       <button
                         key={site}
                         type="button"
@@ -1052,32 +1200,69 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-300 mb-1 flex items-center space-x-1.5">
-                    <CreditCard className="w-3.5 h-3.5 text-amber-400" />
-                    <span>How was it paid? (Payment Method)</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-300 flex items-center space-x-1.5 text-xs sm:text-sm">
+                      <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                      <span>How was it paid? (Payment Method)</span>
+                    </label>
+                    {formPaymentMethod.trim() && !availablePaymentMethods.some(m => m.toLowerCase() === formPaymentMethod.trim().toLowerCase()) && (
+                      <button
+                        type="button"
+                        onClick={() => saveTripPaymentMethod(formPaymentMethod.trim())}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center space-x-1 cursor-pointer"
+                        title="Save to this trip's payment methods list"
+                      >
+                        <Plus className="w-2.5 h-2.5" />
+                        <span>Save to Trip</span>
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
+                    list="trip-payment-methods-list"
                     value={formPaymentMethod}
                     onChange={(e) => setFormPaymentMethod(e.target.value)}
-                    placeholder="e.g. Visa (*4123), Apple Pay, Mastercard"
+                    placeholder="e.g. US Bank VISA, Apple Pay, Mastercard"
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs sm:text-sm"
                   />
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {['Visa', 'Mastercard', 'Amex', 'Apple Pay', 'PayPal', 'Cash'].map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setFormPaymentMethod(m)}
-                        className={`px-1.5 py-0.5 rounded text-[10px] border transition-colors cursor-pointer ${
-                          formPaymentMethod === m 
-                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold' 
-                            : 'bg-white/5 text-slate-400 border-white/10 hover:text-slate-200'
-                        }`}
-                      >
-                        {m}
-                      </button>
+                  <datalist id="trip-payment-methods-list">
+                    {availablePaymentMethods.map((m) => (
+                      <option key={m} value={m} />
                     ))}
+                  </datalist>
+                  <div className="flex flex-wrap gap-1 mt-1.5 max-h-24 overflow-y-auto pr-1">
+                    {availablePaymentMethods.map((m) => {
+                      const isDefault = ['Visa', 'Mastercard', 'Amex', 'Apple Pay', 'PayPal', 'Cash'].some(d => d.toLowerCase() === m.toLowerCase());
+                      const isSelected = formPaymentMethod.toLowerCase() === m.toLowerCase();
+                      const isRemovable = !isDefault && savedPaymentMethods.some(s => s.toLowerCase() === m.toLowerCase());
+                      return (
+                        <span
+                          key={m}
+                          onClick={() => setFormPaymentMethod(m)}
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] border transition-all cursor-pointer ${
+                            isSelected 
+                              ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-sm' 
+                              : !isDefault
+                              ? 'bg-amber-500/15 text-amber-200 border-amber-500/40 hover:bg-amber-500/25 font-medium'
+                              : 'bg-white/5 text-slate-400 border-white/10 hover:text-slate-200 hover:bg-white/10'
+                          }`}
+                          title={!isDefault ? 'Saved for this trip' : m}
+                        >
+                          {!isDefault && <CreditCard className={`w-2.5 h-2.5 mr-1 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`} />}
+                          <span>{m}</span>
+                          {isRemovable && !isSelected && (
+                            <button
+                              type="button"
+                              onClick={(e) => removeTripPaymentMethod(m, e)}
+                              className="ml-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 rounded p-0.5 cursor-pointer"
+                              title={`Remove "${m}" from saved trip list`}
+                            >
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

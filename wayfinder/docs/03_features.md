@@ -843,6 +843,32 @@ Eliminates wrong-ticket modal fallbacks, mismatched schedule deep links, broken 
   - Updated `Layout.jsx` (`window.location.pathname + window.location.search`) and `BottomTabBar.jsx` (`!isSchedule` mutual exclusivity) so mobile bottom tab active indicators track query-based itinerary scrolling accurately.
   - Replaced retired links (`/route`, `/markets`, `/stays-and-food`, `/itinerary`) across `ItineraryView.jsx` and `RouteVisualization.jsx` with active `/wayfinder/poland-christmas-2026` city/private routes and added `stop-{city.id}` scroll fallback anchors in `PolandLanding.jsx` (`getDaysForCity('gdansk')` Day 7 filter restricted to `18:00`/`19:00`).
 
+## 42. Shared Expense Ledger - Person-by-Person Breakdown & Settle-Up Intelligence
+
+Provides a transparent, multi-participant financial overview with itemized person-by-person metrics, category footprints, payment method summaries, and ledger feed filtering:
+
+- Unified Full-Detail Expedition Breakdown Dashboard ([PersonBreakdownPanel.jsx](file:///e:/TechTrekGT/wayfinder/src/components/budget/PersonBreakdownPanel.jsx)):
+  - Mounted directly above the shared expense ledger in [ExpenseLedger.jsx](file:///e:/TechTrekGT/wayfinder/src/components/budget/ExpenseLedger.jsx).
+  - Displays a prominent **Total Trip Cost** header pill and full-width summary strip (`formatCurrency(totalExpeditionInDisplay)`) alongside booking counts right above the participant comparison grid.
+  - Collapsible container rendering all participant financial details simultaneously without tab switching or expand toggles, providing an unobstructed side-by-side comparison (`grid-cols-1 md:grid-cols-2`).
+  - Side-by-side participant summary cards rendering traveler initials avatars, identity roles ("Trip Organizer", "Expedition Co-Traveler"), out-of-pocket spend (`Direct bookings fronted` / `excl. reimbursed`), allocated liability share (`50/50 of total trip`), directional reimbursement tracking (`Reimbursements Settled (to [Recipient])` and `Reimbursements Received (from [Sender])`), dual visual progress bars comparing Cash Fronted % vs. Fair Share (Liability) % against the total trip cost, full 7-category breakdown, payment instruments used, and ledger feed filter triggers.
+  - Clear net position badges (+Owed in emerald / -Owes in amber / $0.00 Settled in slate).
+- Mathematical Precision & Net Formula Tooltip ([PersonBreakdownPanel.jsx](file:///e:/TechTrekGT/wayfinder/src/components/budget/PersonBreakdownPanel.jsx), [expenseLedger.js](file:///e:/TechTrekGT/wayfinder/src/utils/expenseLedger.js)):
+  - Interactive formula popover (`(i)` trigger) displaying the exact settle-up calculation: `(Out-of-Pocket Paid) - (Allocated Share) - (Reimbursements Received) + (Direct Sent Reimbursements) = Exact Net Position`.
+  - Accessible dismissal via click outside or `Escape` key handler, constrained by viewport width (`max-w-[calc(100vw-3rem)]`) to prevent mobile horizontal overflow.
+  - Strict 2-decimal EPSILON rounding preventing penny drift on odd-cent 50/50 splits.
+- Itemized Per-Person Category Drill-Down:
+  - Side-by-side category view displaying 7 canonical categories: Flights, Hotels, Rail/Trans, Activities, Dining, Markets, and Other.
+  - Dual proportional micro-meters comparing paid out-of-pocket vs. liability share per category for each traveler with exact percentages.
+- Payment Method Grouping & Trip-Persistent Instrument Store:
+  - Summarizes all payment instruments used by each payer (e.g., Visa, Apple Pay, Cash, US Bank VISA) with transaction counts and subtotal amounts for credit card statement reconciliation.
+  - Trip-Persistent Payment Methods & Booking Sites: When custom payment methods (e.g. `US Bank VISA`) or booking vendors are entered in the Add/Edit Expense modal, they are automatically saved into trip-scoped local storage (`wf_payment_methods_${journeyId}` and `wf_booking_sites_${journeyId}`) and auto-discovered from existing trip expenses, populating interactive quick-select pills and native `<datalist>` browser autocomplete options for reuse across future entries.
+  - Allows travelers to quickly save new methods on the fly via a "+ Save to Trip" button or dismiss obsolete custom cards via a subtle clear control.
+- Participant-Scoped Ledger Feed Filtering:
+  - 1-click filter pills: "Paid by [Person]", "Owed by [Person] (Unsettled)", and "Settled Items".
+  - Integrates with parent `filteredExpenses` memoized pipeline, featuring an active filter status banner with instant 1-click filter reset.
+
+
 
 
 

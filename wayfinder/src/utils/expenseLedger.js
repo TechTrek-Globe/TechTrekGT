@@ -215,3 +215,108 @@ export function calculateSettleUp(expenses = [], settlements = [], displayCurren
     totalSpendByCurrency
   };
 }
+
+/**
+ * Compute itemized category breakdown for a specific person.
+ * Returns map of canonical categories with out-of-pocket paid, fair share liability, and settled share.
+ */
+export function computePersonCategoryBreakdown(expenses = [], personId, displayCurrency = 'PLN') {
+  const categories = ['flight', 'lodging', 'transit', 'activity', 'dining', 'market', 'other'];
+  const breakdown = {};
+  for (const cat of categories) {
+    breakdown[cat] = { paidByPerson: 0, shareOwed: 0, settled: 0 };
+  }
+
+  const normalizeCat = (cat) => {
+    const c = (cat || 'other').toLowerCase();
+    if (c === 'hotel') return 'lodging';
+    if (c === 'train' || c === 'rail') return 'transit';
+    if (c === 'restaurant') return 'dining';
+    if (c === 'excursion' || c === 'tour') return 'activity';
+    return categories.includes(c) ? c : 'other';
+  };
+
+  for (const exp of expenses) {
+    const payerId = exp.paid_by_user_id || exp.user_id;
+    const cat = normalizeCat(exp.category);
+    const cur = exp.currency_original || exp.currency || 'PLN';
+    const amount = Number(exp.amount_original || exp.amount || 0);
+
+    if (payerId === personId) {
+      const inDisplay = convertCurrency(amount, cur, displayCurrency);
+      breakdown[cat].paidByPerson += inDisplay;
+    }
+
+    const splits = exp.splits || [];
+    for (const split of splits) {
+      if (split.user_id === personId) {
+        const splitOwed = Number(split.amount_owed || split.amount || 0);
+        const splitInDisplay = convertCurrency(splitOwed, cur, displayCurrency);
+        breakdown[cat].shareOwed += splitInDisplay;
+        if (split.is_settled) {
+          breakdown[cat].settled += splitInDisplay;
+        }
+      }
+    }
+  }
+
+  for (const cat of categories) {
+    breakdown[cat].paidByPerson = Math.round(breakdown[cat].paidByPerson * 100) / 100;
+    breakdown[cat].shareOwed = Math.round(breakdown[cat].shareOwed * 100) / 100;
+    breakdown[cat].settled = Math.round(breakdown[cat].settled * 100) / 100;
+  }
+
+  return breakdown;
+}
+
+/**
+ * Compute payment methods breakdown for expenses paid by a specific person.
+ */
+export function computePersonPaymentMethods(expenses = [], personId, displayCurrency = 'PLN') {
+  const methodMap = {};
+
+  for (const exp of expenses) {
+    const payerId = exp.paid_by_user_id || exp.user_id;
+    if (payerId !== personId) continue;
+
+    const rawMethod = (exp.payment_method || '').trim() || 'Unknown';
+    const cur = exp.currency_original || exp.currency || 'PLN';
+    const amount = Number(exp.amount_original || exp.amount || 0);
+    const inDisplay = convertCurrency(amount, cur, displayCurrency);
+
+    if (!methodMap[rawMethod]) {
+      methodMap[rawMethod] = { method: rawMethod, totalPaid: 0, count: 0 };
+    }
+    methodMap[rawMethod].totalPaid += inDisplay;
+    methodMap[rawMethod].count += 1;
+  }
+
+  return Object.values(methodMap)
+    .map(item => ({
+      ...item,
+      totalPaid: Math.round(item.totalPaid * 100) / 100
+    }))
+    .sort((a, b) => b.totalPaid - a.totalPaid);
+}
+
+/**
+ * Build mathematical summary strings for formula explanation tooltip.
+ */
+export function buildNetFormula(balance = {}, displayCurrency = 'PLN') {
+  const paid = balance.paid || 0;
+  const share = balance.owed || 0;
+  const sent = balance.settlementsPaid || 0;
+  const received = balance.settlementsReceived || 0;
+  const net = balance.net || 0;
+
+  return {
+    paid: formatCurrency(paid, displayCurrency),
+    share: formatCurrency(share, displayCurrency),
+    sent: formatCurrency(sent, displayCurrency),
+    received: formatCurrency(received, displayCurrency),
+    net: (net > 0 ? '+' : '') + formatCurrency(net, displayCurrency),
+    isPositive: net > 0.01,
+    isNegative: net < -0.01,
+    isZero: Math.abs(net) <= 0.01
+  };
+}

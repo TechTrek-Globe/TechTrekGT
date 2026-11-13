@@ -18,10 +18,13 @@ function cleanText(val, defaultVal = '') {
   return String(val).trim().replace(/[\r\n]+/g, ' ');
 }
 
+import { findMatchingBill } from './importerHelpers.js';
+export { findMatchingBill };
+
 /**
  * Tiered bill matcher ensuring exact name and alias matches precede fuzzy keyword fallbacks
  */
-export function findMatchingBill(desc, notes, bills) {
+function _localFindMatchingBill(desc, notes, bills) {
   if (!desc || !Array.isArray(bills) || bills.length === 0) return null;
   const lowerDesc = desc.toLowerCase().trim();
   const lowerNotes = (notes || '').toLowerCase().trim();

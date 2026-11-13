@@ -3,7 +3,7 @@
 // and transaction/dailyMatrix reconciliation.
 
 import { fmtMoney } from './formatters.js';
-import { matchCreditToEarner } from './importer.js';
+import { matchCreditToEarner } from './importerHelpers.js';
 
 /**
  * Format raw date strings into MM/DD/YYYY cleanly without timezone drift.

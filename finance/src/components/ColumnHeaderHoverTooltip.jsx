@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ReceiptText, Users, Tag, History, Calendar, Pencil, Plus, X } from 'lucide-react';
 import { fmtMoney } from '../utils/formatters';
-import { matchCreditToEarner } from '../utils/importer';
+import { matchCreditToEarner } from '../utils/importerHelpers';
 export { formatTxnDate, getColumnAliases, toYmd, getColumnRecentTransactions } from '../utils/columnTooltipUtils';
 import { formatTxnDate, getColumnAliases, toYmd, getColumnRecentTransactions } from '../utils/columnTooltipUtils';
 

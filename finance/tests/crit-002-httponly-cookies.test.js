@@ -70,14 +70,13 @@ describe('CRIT-002: HttpOnly Secure SameSite=Strict Cookies for Authentication',
     test('wayfinder login and register use HttpOnly, Secure, SameSite=Strict', () => {
       const loginSrc = fs.readFileSync(path.join(rootDir, 'wayfinder/functions/api/auth/login.js'), 'utf-8');
       const regSrc = fs.readFileSync(path.join(rootDir, 'wayfinder/functions/api/auth/register.js'), 'utf-8');
+      const authUtilSrc = fs.readFileSync(path.join(rootDir, 'wayfinder/functions/utils/auth.js'), 'utf-8');
 
-      assert.ok(loginSrc.includes("'HttpOnly'"), 'wayfinder login must specify HttpOnly');
-      assert.ok(loginSrc.includes("'Secure'"), 'wayfinder login must specify Secure');
-      assert.ok(loginSrc.includes("'SameSite=Strict'"), 'wayfinder login must specify SameSite=Strict');
-
-      assert.ok(regSrc.includes("'HttpOnly'"), 'wayfinder register must specify HttpOnly');
-      assert.ok(regSrc.includes("'Secure'"), 'wayfinder register must specify Secure');
-      assert.ok(regSrc.includes("'SameSite=Strict'"), 'wayfinder register must specify SameSite=Strict');
+      assert.ok(loginSrc.includes('buildAuthCookieHeader') || loginSrc.includes("'HttpOnly'"), 'wayfinder login must use secure cookie builder or specify HttpOnly');
+      assert.ok(regSrc.includes('buildAuthCookieHeader') || regSrc.includes("'HttpOnly'"), 'wayfinder register must use secure cookie builder or specify HttpOnly');
+      assert.ok(authUtilSrc.includes('HttpOnly'), 'wayfinder auth utils must specify HttpOnly');
+      assert.ok(authUtilSrc.includes('Secure'), 'wayfinder auth utils must specify Secure');
+      assert.ok(authUtilSrc.includes('SameSite=Strict'), 'wayfinder auth utils must specify SameSite=Strict');
     });
 
     test('bigworm login uses HttpOnly, Secure, SameSite=Strict', () => {

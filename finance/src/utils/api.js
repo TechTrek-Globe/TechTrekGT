@@ -50,12 +50,19 @@ export function getAuthHeaders(customHeaders = {}) {
   return headers;
 }
 
+const apiEtagCache = new Map();
+
+export function clearApiEtagCache() {
+  apiEtagCache.clear();
+}
+
 /**
  * Centralized API client wrapper that handles:
  * - URL path resolution via getApiUrl
  * - Automatic X-CSRF-Token attachment for state-changing requests
  * - Uniform credentials: 'include'
  * - Session expiry broadcast (401 with "Session expired")
+ * - ETag caching and transparent 304 handling for sync restore/versions
  */
 export async function apiFetch(endpoint, options = {}) {
   const url = getApiUrl(endpoint);
@@ -67,6 +74,17 @@ export async function apiFetch(endpoint, options = {}) {
     if (csrf && !headers['X-CSRF-Token']) {
       headers['X-CSRF-Token'] = csrf;
     }
+    if (endpoint.includes('/api/sync/')) {
+      apiEtagCache.clear();
+    }
+  }
+
+  const isEtagEligible = method === 'GET' && (endpoint.includes('/api/sync/restore') || endpoint.includes('/api/sync/versions'));
+  if (isEtagEligible && !headers['If-None-Match']) {
+    const cached = apiEtagCache.get(url);
+    if (cached?.etag) {
+      headers['If-None-Match'] = cached.etag;
+    }
   }
 
   const opts = {
@@ -77,6 +95,30 @@ export async function apiFetch(endpoint, options = {}) {
   };
 
   const res = await fetch(url, opts);
+
+  if (res.status === 304 && isEtagEligible) {
+    const cached = apiEtagCache.get(url);
+    if (cached?.body) {
+      return new Response(cached.body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'ETag': res.headers.get('ETag') || cached.etag,
+          'X-Cache-Status': '304-HIT'
+        }
+      });
+    }
+  }
+
+  if (res.ok && isEtagEligible) {
+    const etag = res.headers.get('ETag');
+    if (etag) {
+      const clone = res.clone();
+      clone.text().then(text => {
+        apiEtagCache.set(url, { etag, body: text, time: Date.now() });
+      }).catch(() => {});
+    }
+  }
 
   if ((res.status === 401 || res.status === 403) && typeof window !== 'undefined') {
     const clone = res.clone();

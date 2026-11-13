@@ -141,6 +141,9 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
   const {
     budget,
     isDbLoaded,
+    dbLoadError,
+    pullCloudRestore,
+    clearAllData,
     saveError,
     theme,
     setTheme,
@@ -465,10 +468,40 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
         {/* Page Content */}
         <main className={`flex-1 min-h-0 flex flex-col matrix-scrollbar ${activeView === 'ledger' ? 'p-2 sm:p-3 overflow-hidden' : 'overflow-auto px-3 sm:px-4 pt-0 pb-4'}`}>
           {!isDbLoaded ? (
-            <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
-              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs font-semibold">Loading budget database...</span>
-            </div>
+            dbLoadError ? (
+              <div className="flex flex-col items-center justify-center h-64 gap-4 text-slate-300 max-w-md mx-auto text-center p-6 bg-slate-900/60 border border-slate-800 rounded-2xl shadow-xl my-auto">
+                <AlertCircle className="w-10 h-10 text-rose-400" />
+                <div className="space-y-1">
+                  <h3 className="text-base font-semibold text-white">Local Database Error</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {dbLoadError || 'Could not load your local budget database. You can pull the latest backup from Cloud Vault or reset your local store.'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => pullCloudRestore && pullCloudRestore()}
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <Cloud className="w-3.5 h-3.5" />
+                    Pull from Cloud
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => clearAllData && clearAllData()}
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-700/50 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Reset Local Database
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
+                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs font-semibold">Loading budget database...</span>
+              </div>
+            )
           ) : (
             children
           )}

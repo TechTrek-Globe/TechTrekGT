@@ -175,3 +175,31 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
   - In `parseGenericFlat`, raw column indices are mapped directly against non-empty headers, preventing column data shifts when CSVs contain blank header cells.
   - In `matchCreditToEarner`, bi-weekly pay matching standardizes on exact annualized monthly math (`(amount * 26) / 12`), and `getBillCost` is wrapped in `round2()` to prevent penny drift.
 - **Migration Fixture Gating (`budgetMigrations.js`):** V7 and V8 migrations are guarded so historical fixture replacement only applies to designated fixture ledgers (`acc.id === 'acc-hoa'`) or explicit opt-in recovery requests (`options.enableHouseholdRecovery`), preventing unrequested data modification on user budgets. Remaining raw `Math.round` and `parseFloat` sums were replaced with `round2()`.
+
+## 8. Multi-Tenant Isolation, Viewer Enforcement & Performance (Phase 3 & 4 Audit)
+
+- **Multi-Tenant IndexedDB Partitioning (`src/utils/indexedDB.js`):**
+  - Scoped storage keys strictly to `(userId, ledgerId)` via `budgetRecordKey(userId, ledgerId)` (`budget:<userId>:<ledgerId>` or `budget:<userId>`), completely isolating multi-user and multi-ledger records within the same browser instance.
+  - Replaced bulk clear (`store.clear()`) with targeted single-key deletion on clear/reset, preserving unrelated user records.
+  - Maintained caller `budgetData.owner_id` immutability during save operations.
+  - Implemented connection caching with `closeDB()` and `db.onversionchange` listener, preventing database lockups during `indexedDB.deleteDatabase`.
+  - Surfaced `dbLoadError` state in `AppLayout.jsx` with actionable "Pull from Cloud" and "Reset Local Database" controls, eliminating indefinite loading spinners.
+  - Implemented `AbortController` in `LedgerDataContext.jsx` `switchLedger`, cleanly canceling in-flight ledger switches and verifying access before toggling `activeLedgerId`.
+- **Read-Only Viewer Enforcement & Cascading Deletes:**
+  - Evaluates `ledgerRole === 'viewer'` and `!ledgerPermissions.edit` across `BudgetMetadataContext` setters and `LedgerDataContext` mutators (`upsertLineItem`, `clearFutureMatrixCredits`, `pruneGhostMatrixDayKeys`, `clearAccountTransactions`, `importSpreadsheetSelective`, `resetToDefaults`, `clearAllData`, `restoreFromBackup`).
+  - Disabled and hid mutating UI controls across `LedgerView`, `DashboardView.handleAssignBill`, `AmortizationView`, `MainBudgetView`, `SpreadsheetImporter`, and Settings subpanels.
+  - Returned newly created loan ID from `addLoan` in `BudgetMetadataContext.jsx`, enabling atomic UI selection and schedule navigation in `AmortizationView`.
+  - Cascading deletes: removing an account cleans up dependent `fundingGoals`, `loans`, `saveExtraSplits`, and `overflowSplits`; removing a person cleans up dependent `fundingGoals`, `bills.splits`, `saveExtraSplits`, and `overflowSplits`.
+- **SheetJS Worker Separation & Bundle Optimization:**
+  - Dynamic `import('xlsx')` in main-thread fallback paths (`spreadsheetWorkerClient.js`, `ImportExportSubPanel.jsx`), preventing SheetJS from inflating the initial SPA vendor bundle.
+  - Decoupled spreadsheet/importer utilities into pure helper module `src/utils/importerHelpers.js`.
+  - JSON backup import validation strictly enforced against `ALLOWED_BUDGET_KEYS` whitelist schema (`budgetSchema.js`).
+  - Implemented ETag caching (`apiEtagCache` with `If-None-Match` and 304 Not Modified handling) for `/api/sync/restore` and `/api/sync/versions`.
+- **Zero-Dependency UX Enhancements:**
+  - Modal keyboard accessibility: Added `Escape` key close listeners and focus restoration to prior active elements in `SettingsModal.jsx`, `ShareLedgerModal.jsx`, and `AuthModal.jsx`.
+  - Amortization schedule pagination: Replaced hard `.slice(0, 36)` cap with responsive pagination (`SCHEDULE_PAGE_SIZE = 60`, period range indicator, and previous/next controls).
+  - `LedgerView` performance and navigation:
+    - Active month windowing (+/- 4 months rendered with lightweight placeholders and "Scroll into view" buttons for distant months).
+    - Instant text/status filters (`all`, `deficit`, `locked`, `payday` pills + search filter for payee/bill/note/date).
+    - `jumpToToday` shortcut via `Ctrl+J`, `Cmd+J`, or `T`.
+    - Arrow key and `Tab` grid cell navigation across matrix cells (`data-matrix-cell="true"`).

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { X, Copy, Check, Loader2, Send, Trash2, Users, Shield, ShieldAlert, Mail } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +27,8 @@ export function ShareLedgerModal({ isOpen, onClose, ledgerId, ledgerTitle }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  const previousActiveElementRef = useRef(null);
+
   const targetId = ledgerId || user?.id || 'default';
   const basePath = `/api/finance/ledgers/${encodeURIComponent(targetId)}`;
 
@@ -48,6 +50,24 @@ export function ShareLedgerModal({ isOpen, onClose, ledgerId, ledgerTitle }) {
       refresh();
     }
   }, [isOpen, refresh]);
+
+  useEffect(() => {
+    if (isOpen) {
+      previousActiveElementRef.current = document.activeElement;
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          onClose?.();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+          previousActiveElementRef.current.focus();
+        }
+      };
+    }
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

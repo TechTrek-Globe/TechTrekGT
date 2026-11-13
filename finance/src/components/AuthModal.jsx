@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { X, Lock, Mail, User, ShieldCheck, ArrowRight, Loader2, KeyRound, CheckCircle2, HelpCircle } from 'lucide-react';
 import { TurnstileWidget } from './TurnstileWidget';
@@ -64,6 +64,8 @@ export default function AuthModal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
+  const previousActiveElementRef = useRef(null);
+
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const interval = setInterval(() => {
@@ -71,6 +73,24 @@ export default function AuthModal() {
     }, 1000);
     return () => clearInterval(interval);
   }, [resendCooldown]);
+
+  useEffect(() => {
+    if (isAuthModalOpen) {
+      previousActiveElementRef.current = document.activeElement;
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          setIsAuthModalOpen(false);
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+          previousActiveElementRef.current.focus();
+        }
+      };
+    }
+  }, [isAuthModalOpen, setIsAuthModalOpen]);
 
   if (!isAuthModalOpen) return null;
 

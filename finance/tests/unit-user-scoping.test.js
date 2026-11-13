@@ -6,14 +6,14 @@ describe('FIN-AUDIT-004: User-Scoped Storage Partitioning & Isolation', () => {
 
   describe('1. IndexedDB Key Partitioning', () => {
     it('scopes budget storage keys strictly by user id', () => {
-      expect(budgetRecordKey('usr_alice_123')).toBe('current_budget:usr_alice_123');
-      expect(budgetRecordKey('usr_bob_456')).toBe('current_budget:usr_bob_456');
+      expect(budgetRecordKey('usr_alice_123')).toBe('budget:usr_alice_123');
+      expect(budgetRecordKey('usr_bob_456')).toBe('budget:usr_bob_456');
     });
 
     it('falls back to legacy scoped key when no user id is supplied', () => {
-      expect(budgetRecordKey(null)).toBe('current_budget:legacy');
-      expect(budgetRecordKey(undefined)).toBe('current_budget:legacy');
-      expect(budgetRecordKey('')).toBe('current_budget:legacy');
+      expect(budgetRecordKey(null)).toBe('budget:legacy');
+      expect(budgetRecordKey(undefined)).toBe('budget:legacy');
+      expect(budgetRecordKey('')).toBe('budget:legacy');
     });
 
     it('guarantees complete isolation between distinct user namespaces', () => {

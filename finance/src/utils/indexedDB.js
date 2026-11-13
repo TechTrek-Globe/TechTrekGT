@@ -13,14 +13,33 @@ const DB_VERSION = 1;
 const STORE_NAME = 'app_state';
 export const LEGACY_BUDGET_KEY = 'current_budget';
 
+let cachedDb = null;
+
+/**
+ * Explicitly closes any open IndexedDB database connection.
+ * Prevents blocking window.indexedDB.deleteDatabase calls.
+ */
+export function closeDB() {
+  if (cachedDb) {
+    try {
+      cachedDb.close();
+    } catch {}
+    cachedDb = null;
+  }
+}
+
 /**
  * Builds a user-scoped record key for budget persistence.
  * @param {string} userId
+ * @param {string|null} [ledgerId]
  * @returns {string}
  */
-export function budgetRecordKey(userId) {
+export function budgetRecordKey(userId, ledgerId = null) {
   const id = userId ? String(userId) : 'legacy';
-  return `current_budget:${id}`;
+  if (ledgerId && String(ledgerId) !== id) {
+    return `budget:${id}:${String(ledgerId)}`;
+  }
+  return `budget:${id}`;
 }
 
 /**
@@ -40,12 +59,16 @@ export function getCurrentUserId() {
 }
 
 /**
- * Opens and initializes the IndexedDB database.
+ * Opens and initializes the IndexedDB database, caching the connection
+ * and binding onversionchange so deleteDatabase is never blocked.
  * @returns {Promise<IDBDatabase>}
  */
 export function openDB() {
+  if (cachedDb) {
+    return Promise.resolve(cachedDb);
+  }
   return new Promise((resolve, reject) => {
-    if (!window.indexedDB) {
+    if (typeof window === 'undefined' || !window.indexedDB) {
       reject(new Error('IndexedDB is not supported by this browser.'));
       return;
     }
@@ -61,7 +84,18 @@ export function openDB() {
     };
 
     request.onsuccess = () => {
-      resolve(request.result);
+      const db = request.result;
+      cachedDb = db;
+      db.onversionchange = () => {
+        try {
+          db.close();
+        } catch {}
+        if (cachedDb === db) cachedDb = null;
+      };
+      db.onclose = () => {
+        if (cachedDb === db) cachedDb = null;
+      };
+      resolve(db);
     };
 
     request.onerror = () => {
@@ -72,15 +106,14 @@ export function openDB() {
 
 /**
  * Loads the application budget state from IndexedDB.
- * CRIT-002: Reads the user-scoped record `current_budget:<userId>`. If no user is
- * signed in, falls back to the legacy unkeyed `current_budget` record so existing
- * data remains visible until migration is confirmed.
+ * CRIT-002: Reads the user-scoped record `budget:<userId>:<ledgerId>` or `current_budget:<userId>`.
  * @param {string|null} [userId]
+ * @param {string|null} [ledgerId]
  * @returns {Promise<object|null>}
  */
-export async function getBudgetData(userId = null) {
+export async function getBudgetData(userId = null, ledgerId = null) {
   const db = await openDB();
-  const key = userId ? budgetRecordKey(userId) : LEGACY_BUDGET_KEY;
+  const key = budgetRecordKey(userId, ledgerId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
@@ -88,6 +121,15 @@ export async function getBudgetData(userId = null) {
 
     request.onsuccess = () => {
       const res = request.result || null;
+      if (!res && ledgerId && userId) {
+        // Fallback to legacy key if unmigrated
+        const fallbackReq = store.get(`current_budget:${userId}`);
+        fallbackReq.onsuccess = () => {
+          resolve(fallbackReq.result || null);
+        };
+        fallbackReq.onerror = () => resolve(null);
+        return;
+      }
       logState('INDEXEDDB_READ', 'Loaded budget state from IndexedDB', {
         recordKey: key,
         hasData: Boolean(res),
@@ -106,30 +148,29 @@ export async function getBudgetData(userId = null) {
 }
 
 /**
- * Silently saves the current application budget state to IndexedDB.
- * CRIT-002: Persists under the user-scoped record `current_budget:<userId>`.
+ * Silently saves the current application budget state to IndexedDB without mutating caller object.
  * @param {Object} budgetData
  * @param {string|null} [userId]
+ * @param {string|null} [ledgerId]
  * @returns {Promise<void>}
  */
-export async function saveBudgetData(budgetData, userId = null) {
-  // CRIT-002: Set owner_id on the budget data for ownership verification
-  if (budgetData && userId) {
-    budgetData.owner_id = userId;
-  }
+export async function saveBudgetData(budgetData, userId = null, ledgerId = null) {
+  const toSave = (budgetData && typeof budgetData === 'object')
+    ? { ...budgetData, owner_id: userId || budgetData.owner_id }
+    : budgetData;
   const db = await openDB();
-  const key = userId ? budgetRecordKey(userId) : LEGACY_BUDGET_KEY;
+  const key = budgetRecordKey(userId, ledgerId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    const request = store.put(budgetData, key);
+    const request = store.put(toSave, key);
 
     request.onsuccess = () => {
       logState('INDEXEDDB_WRITE', 'Successfully committed budget snapshot to IndexedDB', {
         recordKey: key,
-        accountsCount: budgetData?.accounts?.length || 0,
-        billsCount: budgetData?.bills?.length || 0,
-        matrixEntriesCount: Object.keys(budgetData?.dailyMatrix || {}).length
+        accountsCount: toSave?.accounts?.length || 0,
+        billsCount: toSave?.bills?.length || 0,
+        matrixEntriesCount: Object.keys(toSave?.dailyMatrix || {}).length
       });
       resolve();
     };
@@ -142,39 +183,37 @@ export async function saveBudgetData(budgetData, userId = null) {
 }
 
 /**
- * Clears current database state and saves new imported budget data.
- * CRIT-002: Clears the user-scoped record (or the legacy record when no user is
- * provided) and writes the new budget under the same scope.
+ * Clears current database record for single key and saves new imported budget data.
  * @param {Object} newBudgetData
  * @param {string|null} [userId]
+ * @param {string|null} [ledgerId]
  * @returns {Promise<void>}
  */
-export async function clearAndRestoreBudgetData(newBudgetData, userId = null) {
-  // CRIT-002: Set owner_id on the budget data for ownership verification
-  if (newBudgetData && userId) {
-    newBudgetData.owner_id = userId;
-  }
+export async function clearAndRestoreBudgetData(newBudgetData, userId = null, ledgerId = null) {
+  const toSave = (newBudgetData && typeof newBudgetData === 'object')
+    ? { ...newBudgetData, owner_id: userId || newBudgetData.owner_id }
+    : newBudgetData;
   const db = await openDB();
-  const key = userId ? budgetRecordKey(userId) : LEGACY_BUDGET_KEY;
+  const key = budgetRecordKey(userId, ledgerId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    const clearRequest = store.clear();
+    const deleteRequest = store.delete(key);
 
-    clearRequest.onsuccess = () => {
-      const putRequest = store.put(newBudgetData, key);
+    deleteRequest.onsuccess = () => {
+      const putRequest = store.put(toSave, key);
       putRequest.onsuccess = () => {
         logState('INDEXEDDB_RESTORE', 'Restored budget state into IndexedDB', {
           recordKey: key,
-          accountsCount: newBudgetData?.accounts?.length || 0,
-          billsCount: newBudgetData?.bills?.length || 0
+          accountsCount: toSave?.accounts?.length || 0,
+          billsCount: toSave?.bills?.length || 0
         });
         resolve();
       };
       putRequest.onerror = () => reject(putRequest.error);
     };
 
-    clearRequest.onerror = () => reject(clearRequest.error);
+    deleteRequest.onerror = () => reject(deleteRequest.error);
   });
 }
 
@@ -249,7 +288,7 @@ export async function listBudgetRecordKeys() {
     request.onsuccess = () => {
       /** @type {string[]} */
       const keys = (request.result || [])
-        .filter((k) => typeof k === 'string' && k.startsWith('current_budget'))
+        .filter((k) => typeof k === 'string' && (k.startsWith('current_budget') || k.startsWith('budget:')))
         .map((/** @type {string} */ k) => k);
       resolve(keys);
     };
@@ -258,15 +297,14 @@ export async function listBudgetRecordKeys() {
 }
 
 /**
- * Purges the budget record for the signed-in user (or the legacy record when no
- * user id is supplied). CRIT-002: scoped deletion so a second signed-in user
- * cannot erase another user's local data.
+ * Purges the budget record for the signed-in user and ledger.
  * @param {string|null} [userId]
+ * @param {string|null} [ledgerId]
  * @returns {Promise<void>}
  */
-export async function clearBudgetData(userId = null) {
+export async function clearBudgetData(userId = null, ledgerId = null) {
   const db = await openDB();
-  const key = userId ? budgetRecordKey(userId) : LEGACY_BUDGET_KEY;
+  const key = budgetRecordKey(userId, ledgerId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);

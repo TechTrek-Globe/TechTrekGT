@@ -293,4 +293,32 @@ For every existing user, their personal ledger ID is identical to their user ID 
 - **Importer Column Alignment & Bi-Weekly Math:** `parseGenericFlat` preserves raw column indices across blank headers, and `matchCreditToEarner` standardizes bi-weekly earner matching on `(amount * 26) / 12`.
 - **Migration Fixture Gating:** V7 and V8 migrations in `budgetMigrations.js` are strictly guarded by `hasHoaAcc` (`acc.id === 'acc-hoa'`) or `options.enableHouseholdRecovery`, ensuring non-fixture user budgets are never mutated by legacy fixture logic.
 
+## 13. Multi-Tenant State Isolation, Viewer Enforcement & Performance (Phase 3 & 4 Audit)
+
+### 13.1 Multi-Tenant IndexedDB Partitioning & Connection Lifecycle (`src/utils/indexedDB.js`)
+- **Key Scoping:** Storage keys are partitioned strictly by `(userId, ledgerId)` via `budgetRecordKey(userId, ledgerId)` (`budget:<userId>:<ledgerId>` or `budget:<userId>`), preventing cross-user data leakage on shared browser profiles.
+- **Targeted Storage Clears:** Reset operations execute single-key deletions instead of clearing the entire object store, preserving unrelated tenant records.
+- **Immutable Caller State:** State persistence treats `budgetData.owner_id` as immutable, preventing accidental object reference mutations during save passes.
+- **Connection Lifecycle Management:** The database connection is cached with an explicit `closeDB()` helper and `onversionchange` listener, preventing database lockups when executing `indexedDB.deleteDatabase`.
+- **Actionable Database Recovery:** `AppLayout.jsx` surfaces `dbLoadError` states with explicit "Pull from Cloud" and "Reset Local Database" actions, eliminating indefinite loading screens.
+- **Aborted Ledger Switches:** `switchLedger` in `LedgerDataContext.jsx` cancels in-flight requests using `AbortController` and validates data before switching `activeLedgerId`.
+
+### 13.2 Read-Only Viewer Enforcement & Cascading Model Invariants
+- **Context Mutator Guards:** `ledgerRole === 'viewer'` and `!ledgerPermissions.edit` are enforced across `BudgetMetadataContext` setters and `LedgerDataContext` mutators.
+- **UI Control Disabling:** Mutating controls across `LedgerView`, `DashboardView`, `AmortizationView`, `MainBudgetView`, `SpreadsheetImporter`, and Settings subpanels are disabled or hidden for viewers.
+- **Atomic Loan Creation:** `addLoan` in `BudgetMetadataContext.jsx` returns the generated loan ID for immediate selection and schedule inspection in `AmortizationView`.
+- **Cascading Metadata Deletion:** Deleting an account removes dependent `fundingGoals`, `loans`, `saveExtraSplits`, and `overflowSplits`; deleting a person removes dependent `fundingGoals`, `bills.splits`, `saveExtraSplits`, and `overflowSplits`.
+
+### 13.3 SheetJS Worker Decoupling & Backup Ingestion Whitelist
+- **Dynamic Vendor Loading:** Main-thread fallback paths in `spreadsheetWorkerClient.js` and `ImportExportSubPanel.jsx` load `xlsx` via dynamic `import('xlsx')`, keeping SheetJS out of the primary entry chunk.
+- **Decoupled Parser Utilities:** Spreadsheet parsing and transaction matching logic are isolated in `src/utils/importerHelpers.js`.
+- **Whitelist Backup Validation:** JSON backup files are validated against the `ALLOWED_BUDGET_KEYS` schema whitelist (`budgetSchema.js`) before restoration.
+- **Conditional ETag Caching:** Client-side caching (`apiEtagCache` with `If-None-Match` and 304 handling) optimizes `/api/sync/restore` and `/api/sync/versions` queries.
+
+### 13.4 Zero-Dependency UX & Navigation Enhancements
+- **Modal Accessibility:** Modals (`SettingsModal.jsx`, `ShareLedgerModal.jsx`, `AuthModal.jsx`) implement `Escape` key close listeners and restore focus to trigger elements.
+- **Amortization Schedule Pagination:** Replaced the hard `.slice(0, 36)` cap with 60-period interactive pagination, period ranges, and previous/next controls.
+- **Ledger Windowing & Navigation:** `LedgerView.jsx` features active month windowing (+/- 4 months rendered with distant month placeholders and "Scroll into view" triggers), instant text and status filters, `Ctrl+J`/`Cmd+J`/`T` Jump to Today, and cell keyboard navigation.
+
+
 

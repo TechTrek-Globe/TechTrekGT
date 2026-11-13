@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useBudgetMetadata } from '../context/BudgetContext';
 import { 
   X, 
@@ -28,6 +28,25 @@ export function SettingsModal() {
   } = useBudgetMetadata();
 
   const settingsModalRef = useRef(null);
+  const previousActiveElementRef = useRef(null);
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      previousActiveElementRef.current = document.activeElement;
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          setIsSettingsOpen(false);
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+          previousActiveElementRef.current.focus();
+        }
+      };
+    }
+  }, [isSettingsOpen, setIsSettingsOpen]);
 
   if (!isSettingsOpen) return null;
 

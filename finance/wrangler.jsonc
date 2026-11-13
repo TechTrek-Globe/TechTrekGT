@@ -61,10 +61,10 @@
       "new_sqlite_classes": ["RateLimiter"]
     }
   ],
-  "kv_namespaces": [
-    {
-      "binding": "USER_CACHE",
-      "id": "17a4f483c801496e92837c1b050c66e4"
-    }
-  ]
+  // "kv_namespaces": [
+  //   {
+  //     "binding": "USER_CACHE",
+  //     "id": "17a4f483c801496e92837c1b050c66e4"
+  //   }
+  // ]
 }

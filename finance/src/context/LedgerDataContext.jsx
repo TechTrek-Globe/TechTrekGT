@@ -14,7 +14,7 @@ import { round2, parseMoney } from '../utils/formatters';
 import { pruneInvalidMatrixDayKeys, runBudgetMigrations, CURRENT_BUDGET_SCHEMA_VERSION } from '../migrations/budgetMigrations';
 import { logSync, logTransaction, logMatrix, logLedger, logState } from '../utils/logger';
 import { AlertTriangle } from 'lucide-react';
-import { ALLOWED_BUDGET_KEYS } from '../worker.js';
+import { ALLOWED_BUDGET_KEYS } from '../utils/budgetSchema.js';
 
 export const LedgerDataContext = createContext(null);
 export const LedgerDataStateContext = createContext(null);
@@ -62,6 +62,7 @@ export function LedgerDataProvider({ children }) {
     isOwner: true,
     role: 'owner'
   });
+  const isReadOnly = ledgerRole === 'viewer' || !ledgerPermissions?.edit;
   const [availableLedgers, setAvailableLedgers] = useState([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
@@ -86,6 +87,15 @@ export function LedgerDataProvider({ children }) {
 
   // Track unsaved local changes to avoid losing data on tab close or navigation
   const isPendingSaveRef = useRef(false);
+  const switchLedgerAbortRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (switchLedgerAbortRef.current) {
+        switchLedgerAbortRef.current.abort();
+      }
+    };
+  }, []);
 
   const flushSaveToIndexedDB = useCallback(() => {
     if (!isPendingSaveRef.current || !budgetRef.current) return;
@@ -99,7 +109,7 @@ export function LedgerDataProvider({ children }) {
     }
     const savePayload = budgetRef.current;
     isPendingSaveRef.current = false;
-    saveBudgetData(savePayload, saveUid)
+    saveBudgetData(savePayload, saveUid, activeLedgerId)
       .then(() => {
         setSaveError(null);
         logState('INDEXEDDB_FLUSH', 'Flushed pending budget state to IndexedDB', {
@@ -280,11 +290,11 @@ export function LedgerDataProvider({ children }) {
     const timer = setTimeout(() => {
       if (isPendingSaveRef.current && budgetRef.current) {
         isPendingSaveRef.current = false;
-        saveBudgetData(budgetRef.current, saveUid)
+        saveBudgetData(budgetRef.current, saveUid, activeLedgerId)
           .then(() => {
             setSaveError(null);
             logState('INDEXEDDB_AUTO_SAVE', 'Debounced budget auto-save to IndexedDB complete', {
-              recordKey: budgetRecordKey(saveUid)
+              recordKey: budgetRecordKey(saveUid, activeLedgerId)
             });
           })
           .catch(err => {
@@ -294,7 +304,7 @@ export function LedgerDataProvider({ children }) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [budgetForUI, matrixVersion, isDbLoaded, dbLoadError, isAuthenticated, setSaveError, currentUserId, loadedRecordKeyRef]);
+  }, [budgetForUI, matrixVersion, isDbLoaded, dbLoadError, isAuthenticated, setSaveError, currentUserId, loadedRecordKeyRef, activeLedgerId]);
 
   // Flush pending save on tab close, page hide, or visibility change
   useEffect(() => {
@@ -425,9 +435,12 @@ export function LedgerDataProvider({ children }) {
 
 
   // Restore budget state from imported JSON backup
-  const restoreFromBackup = useCallback(async (parsedData) => {
+  const restoreFromBackup = useCallback(async (parsedData, isInternal = false) => {
     if (!parsedData || typeof parsedData !== 'object') {
       throw new Error('Invalid backup file format.');
+    }
+    if (!isInternal && (ledgerRole === 'viewer' || !ledgerPermissions?.edit)) {
+      throw new Error('Cannot restore backup to a shared ledger in read-only mode.');
     }
 
     const dataToRestore = {
@@ -475,7 +488,7 @@ export function LedgerDataProvider({ children }) {
 
     suppressDirtyUntilRef.current = Date.now() + 2000;
     autoPushPendingRef.current = false;
-    await clearAndRestoreBudgetData(fullMerged, currentUserId || getCurrentUserId());
+    await clearAndRestoreBudgetData(fullMerged, currentUserId || getCurrentUserId(), activeLedgerId);
     suppressDirtyUntilRef.current = Date.now() + 2000;
     autoPushPendingRef.current = false;
     dailyMatrixRef.current = newDailyMatrix;
@@ -495,7 +508,7 @@ export function LedgerDataProvider({ children }) {
     setLineItems(newLineItems);
     setTransactions(newTransactions);
     return true;
-  }, [setMetadataState, currentUserId, activeLedgerId, computePayloadFingerprint]);
+  }, [setMetadataState, currentUserId, activeLedgerId, ledgerRole, ledgerPermissions, computePayloadFingerprint]);
 
   const resolveConflictKeepLocal = useCallback(async () => {
     logSync('CONFLICT_RESOLVE', 'User chose to keep local data (force push to cloud)');
@@ -519,7 +532,7 @@ export function LedgerDataProvider({ children }) {
     if (!syncConflict || !syncConflict.serverData) return;
     logSync('CONFLICT_RESOLVE', 'User chose to use cloud data (restore cloud backup)');
     try {
-      await restoreFromBackup(syncConflict.serverData);
+      await restoreFromBackup(syncConflict.serverData, true);
       if (syncConflict.serverVersion) {
         setCloudVersion(syncConflict.serverVersion);
         const uid = currentUserId || getCurrentUserId();
@@ -560,10 +573,14 @@ export function LedgerDataProvider({ children }) {
       throw new Error(data.error || 'Failed to restore data from Cloud Vault.');
     }
     logSync('PULL_SUCCESS', 'Cloud restore payload received successfully', { updatedAt: data.updatedAt });
-    await restoreFromBackup(data.budget);
+    await restoreFromBackup(data.budget, true);
+    if (dbLoadError) {
+      if (metadata.setDbLoadError) metadata.setDbLoadError(null);
+      if (metadata.setIsDbLoaded) metadata.setIsDbLoaded(true);
+    }
     setLastCloudSyncTime(new Date().toLocaleTimeString());
     return data;
-  }, [syncPasscode, restoreFromBackup, setLastCloudSyncTime, activeLedgerId, currentUserId]);
+  }, [syncPasscode, restoreFromBackup, setLastCloudSyncTime, activeLedgerId, currentUserId, dbLoadError, metadata]);
 
   const fetchLedgerAccess = useCallback(async (targetId) => {
     const lid = targetId || activeLedgerId || currentUserId;
@@ -574,19 +591,22 @@ export function LedgerDataProvider({ children }) {
         const data = await res.json().catch(() => ({}));
         if (data?.role) {
           setLedgerRole(data.role);
-          setLedgerPermissions(data.permissions || {
+          const perms = data.permissions || {
             read: data.role !== 'none',
             edit: data.role === 'owner' || data.role === 'admin' || data.role === 'editor',
             manageShares: data.role === 'owner' || data.role === 'admin',
             isOwner: data.role === 'owner',
             role: data.role
-          });
+          };
+          setLedgerPermissions(perms);
+          if (metadata.setLedgerRole) metadata.setLedgerRole(data.role);
+          if (metadata.setLedgerPermissions) metadata.setLedgerPermissions(perms);
         }
       }
     } catch (e) {
       console.warn('[LedgerDataContext] Failed to fetch ledger access:', e);
     }
-  }, [isAuthenticated, activeLedgerId, currentUserId]);
+  }, [isAuthenticated, activeLedgerId, currentUserId, metadata]);
 
   const fetchAvailableLedgers = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -605,31 +625,85 @@ export function LedgerDataProvider({ children }) {
 
   const switchLedger = useCallback(async (newLedgerId) => {
     if (!newLedgerId || newLedgerId === activeLedgerId) return;
+    if (switchLedgerAbortRef.current) {
+      switchLedgerAbortRef.current.abort();
+    }
+    const abortController = new AbortController();
+    switchLedgerAbortRef.current = abortController;
+    const { signal } = abortController;
+
     logSync('SWITCH_LEDGER', `Switching active ledger to: ${newLedgerId}`);
-    setActiveLedgerId(newLedgerId);
-    try { sessionStorage.setItem('finance_active_ledger_id', newLedgerId); } catch {}
-    await fetchLedgerAccess(newLedgerId);
     try {
-      const res = await apiFetch(`/api/sync/restore?ledgerId=${encodeURIComponent(newLedgerId)}`);
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data?.budget) {
-          await restoreFromBackup(data.budget, false);
-          const cloudTime = data.version || (data.updatedAt ? new Date(data.updatedAt).getTime() : 0);
-          if (cloudTime > 0) {
-            cloudVersionRef.current = cloudTime;
-            setCloudVersion(cloudTime);
-            try {
-              localStorage.setItem(`tt_budget_cloud_version:${newLedgerId}`, String(cloudTime));
-              localStorage.setItem(`tt_budget_last_modified:${newLedgerId}`, String(cloudTime));
-            } catch {}
-          }
+      const accessRes = await apiFetch(`/api/finance/ledgers/${encodeURIComponent(newLedgerId)}/access`, { signal });
+      if (signal.aborted) return;
+      let accessRole = 'owner';
+      let accessPerms = { read: true, edit: true, manageShares: true, isOwner: true, role: 'owner' };
+      if (accessRes.ok) {
+        const accessData = await accessRes.json().catch(() => ({}));
+        if (accessData?.role) {
+          accessRole = accessData.role;
+          accessPerms = accessData.permissions || {
+            read: accessData.role !== 'none',
+            edit: accessData.role === 'owner' || accessData.role === 'admin' || accessData.role === 'editor',
+            manageShares: accessData.role === 'owner' || accessData.role === 'admin',
+            isOwner: accessData.role === 'owner',
+            role: accessData.role
+          };
         }
+      } else if (accessRes.status === 403 || accessRes.status === 404) {
+        console.warn(`[LedgerDataContext] Access denied or ledger not found: ${newLedgerId}`);
+        setSaveError('You do not have access to this ledger.');
+        return;
+      }
+
+      const res = await apiFetch(`/api/sync/restore?ledgerId=${encodeURIComponent(newLedgerId)}`, { signal });
+      if (signal.aborted) return;
+      if (!res.ok) {
+        console.error(`[LedgerDataContext] Failed to fetch data for ledger ${newLedgerId}: status ${res.status}`);
+        setSaveError(`Failed to load ledger data (status ${res.status}). Active ledger unchanged.`);
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      if (signal.aborted) return;
+
+      if (!data?.budget) {
+        console.warn(`[LedgerDataContext] No budget payload returned for ledger ${newLedgerId}`);
+        setSaveError('Ledger has no saved budget data.');
+        return;
+      }
+
+      setActiveLedgerId(newLedgerId);
+      setLedgerRole(accessRole);
+      setLedgerPermissions(accessPerms);
+      if (metadata.setLedgerRole) metadata.setLedgerRole(accessRole);
+      if (metadata.setLedgerPermissions) metadata.setLedgerPermissions(accessPerms);
+
+      try { sessionStorage.setItem('finance_active_ledger_id', newLedgerId); } catch {}
+
+      await restoreFromBackup(data.budget, true);
+      const cloudTime = data.version || (data.updatedAt ? new Date(data.updatedAt).getTime() : 0);
+      if (cloudTime > 0) {
+        cloudVersionRef.current = cloudTime;
+        setCloudVersion(cloudTime);
+        try {
+          localStorage.setItem(`tt_budget_cloud_version:${newLedgerId}`, String(cloudTime));
+          localStorage.setItem(`tt_budget_last_modified:${newLedgerId}`, String(cloudTime));
+        } catch {}
       }
     } catch (e) {
+      if (e?.name === 'AbortError') {
+        logSync('SWITCH_LEDGER', `Switch to ${newLedgerId} aborted by newer switch request`);
+        return;
+      }
       console.error('[LedgerDataContext] Failed to pull data for switched ledger:', e);
+      setSaveError('Failed to load shared ledger.');
+    } finally {
+      if (switchLedgerAbortRef.current === abortController) {
+        switchLedgerAbortRef.current = null;
+      }
     }
-  }, [activeLedgerId, fetchLedgerAccess, restoreFromBackup]);
+  }, [activeLedgerId, restoreFromBackup, setSaveError, metadata]);
 
   // Sync access and available ledgers on auth or ledger change
   useEffect(() => {
@@ -737,12 +811,12 @@ export function LedgerDataProvider({ children }) {
   }, [isAuthenticated, currentUserId]);
 
   useEffect(() => {
-    if (!isAuthenticated || !isDbLoaded || hasAutoPulledRef.current) return;
+    if (!isAuthenticated || (!isDbLoaded && !dbLoadError) || hasAutoPulledRef.current) return;
     if (!currentUserId || reconcileUserIdRef.current === currentUserId || reconcileInFlightRef.current) return;
     if (isSyncOnLoadEnabled === false) {
       const localData = budgetRef.current;
       const isLocalEmpty = !localData || (!localData.accounts?.length && !localData.bills?.length && !localData.fundingGoals?.length);
-      if (!isLocalEmpty) return;
+      if (!isLocalEmpty && !dbLoadError) return;
     }
 
     reconcileUserIdRef.current = currentUserId;
@@ -759,13 +833,19 @@ export function LedgerDataProvider({ children }) {
           }
           return JSON.stringify(o);
         };
-        const res = await apiFetch('/api/sync/restore', {
+        const targetLid = activeLedgerId || sessionStorage.getItem('finance_active_ledger_id') || currentUserId;
+        const queryParam = targetLid ? `?ledgerId=${encodeURIComponent(targetLid)}` : '';
+        const res = await apiFetch(`/api/sync/restore${queryParam}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
         });
         const cloudData = await res.json().catch(() => null);
 
         if (res.ok && cloudData && cloudData.success && cloudData.budget) {
+          if (dbLoadError) {
+            if (metadata.setDbLoadError) metadata.setDbLoadError(null);
+            if (metadata.setIsDbLoaded) metadata.setIsDbLoaded(true);
+          }
           // P3: scope version markers to userId
           const uid = currentUserId || getCurrentUserId();
           const vKey = uid ? `tt_budget_cloud_version:${uid}` : 'tt_budget_cloud_version';
@@ -788,7 +868,7 @@ export function LedgerDataProvider({ children }) {
           if (isLocalEmpty) {
             shouldFlushPending = false;
             clearPendingSync(uid);
-            await restoreFromBackup(cloudData.budget);
+            await restoreFromBackup(cloudData.budget, true);
             setCloudVersion(cloudTime);
             setLastCloudSyncTime(new Date().toLocaleTimeString());
             if (cloudTime > 0) {
@@ -818,7 +898,7 @@ export function LedgerDataProvider({ children }) {
             // Cloud is more recent than this login's last sync: use cloud without prompting
             shouldFlushPending = false;
             clearPendingSync(uid);
-            await restoreFromBackup(cloudData.budget);
+            await restoreFromBackup(cloudData.budget, true);
             cloudVersionRef.current = cloudTime;
             setCloudVersion(cloudTime);
             setLastCloudSyncTime(new Date().toLocaleTimeString());
@@ -849,7 +929,7 @@ export function LedgerDataProvider({ children }) {
         }
       }
     })();
-  }, [isAuthenticated, isDbLoaded, isSyncOnLoadEnabled, restoreFromBackup, pushCloudBackup, syncPasscode, setLastCloudSyncTime, currentUserId, computePayloadFingerprint]);
+  }, [isAuthenticated, isDbLoaded, dbLoadError, isSyncOnLoadEnabled, restoreFromBackup, pushCloudBackup, syncPasscode, setLastCloudSyncTime, currentUserId, computePayloadFingerprint, activeLedgerId, metadata]);
 
   // Debounced Auto Cloud Backup effect (5-second debounce on structural/non-matrix changes)
   // FIX-31: matrixVersion removed from deps - matrix changes are delta-synced via deltaQueue.
@@ -914,6 +994,10 @@ export function LedgerDataProvider({ children }) {
 
   // Reset to default budget data
   const resetToDefaults = useCallback(async () => {
+    if (ledgerRole === 'viewer' || !ledgerPermissions?.edit) {
+      console.warn('[LedgerDataContext] resetToDefaults blocked: read-only viewer role');
+      return;
+    }
     setMetadataState({
       accounts: initialBudgetData.accounts || [],
       people: initialBudgetData.people || [],
@@ -927,12 +1011,16 @@ export function LedgerDataProvider({ children }) {
     setDailyMatrix(initialBudgetData.dailyMatrix || {});
     setLineItems(initialBudgetData.lineItems || []);
     setTransactions(initialBudgetData.transactions || []);
-    await saveBudgetData(initialBudgetData, currentUserId || getCurrentUserId());
-  }, [setMetadataState, currentUserId]);
+    await saveBudgetData(initialBudgetData, currentUserId || getCurrentUserId(), activeLedgerId);
+  }, [setMetadataState, currentUserId, activeLedgerId, ledgerRole, ledgerPermissions]);
 
   // Clear all data (100% clean slate)
   const clearAllData = useCallback(async () => {
-    await clearBudgetData(currentUserId || getCurrentUserId());
+    if (ledgerRole === 'viewer' || !ledgerPermissions?.edit) {
+      console.warn('[LedgerDataContext] clearAllData blocked: read-only viewer role');
+      return;
+    }
+    await clearBudgetData(currentUserId || getCurrentUserId(), activeLedgerId);
     setMetadataState({
       accounts: [],
       people: [],
@@ -946,11 +1034,19 @@ export function LedgerDataProvider({ children }) {
     setDailyMatrix({});
     setLineItems([]);
     setTransactions([]);
-  }, [setMetadataState, currentUserId]);
+    if (dbLoadError) {
+      if (metadata.setDbLoadError) metadata.setDbLoadError(null);
+      if (metadata.setIsDbLoaded) metadata.setIsDbLoaded(true);
+    }
+  }, [setMetadataState, currentUserId, activeLedgerId, ledgerRole, ledgerPermissions, dbLoadError, metadata]);
 
   // Clear all transactions, matrix actuals, and imported balance history for a specific account
   const clearAccountTransactions = useCallback(async (accountId) => {
     if (!accountId) return { success: false, error: 'No account specified.' };
+    if (ledgerRole === 'viewer' || !ledgerPermissions?.edit) {
+      console.warn('[LedgerDataContext] clearAccountTransactions blocked: read-only viewer role');
+      return { success: false, error: 'Read-only viewer cannot clear account transactions.' };
+    }
 
     // 1. Remove all transactions for this account
     const remainingTransactions = (transactionsRef.current || []).filter(t => t.accountId !== accountId);
@@ -1005,10 +1101,14 @@ export function LedgerDataProvider({ children }) {
     });
 
     return { success: true };
-  }, [setMetadataState]);
+  }, [setMetadataState, ledgerRole, ledgerPermissions]);
 
   // Clears future matrix credit cells (> today) so live funding goals govern future months cleanly
   const clearFutureMatrixCredits = useCallback(async (asOfDate = new Date()) => {
+    if (ledgerRole === 'viewer' || !ledgerPermissions?.edit) {
+      console.warn('[LedgerDataContext] clearFutureMatrixCredits blocked: read-only viewer role');
+      return { success: false, removedCount: 0 };
+    }
     const todayMidnight = new Date(asOfDate.getFullYear(), asOfDate.getMonth(), asOfDate.getDate());
     const todayIso = `${todayMidnight.getFullYear()}-${String(todayMidnight.getMonth() + 1).padStart(2, '0')}-${String(todayMidnight.getDate()).padStart(2, '0')}`;
 
@@ -1040,7 +1140,7 @@ export function LedgerDataProvider({ children }) {
       if (budgetRef.current) {
         budgetRef.current.dailyMatrix = cleanMatrix;
         isPendingSaveRef.current = true;
-        await saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
+        await saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId(), activeLedgerId).catch(() => {});
         // FIX-02: Standard CAS push only - no force override. Cloud backup is
         // caller-initiated and must not bypass version conflict detection.
         if (isAuthenticated) {
@@ -1049,10 +1149,14 @@ export function LedgerDataProvider({ children }) {
       }
     }
     return { success: true, removedCount };
-  }, [currentUserId, isAuthenticated, pushCloudBackup, syncPasscode]);
+  }, [currentUserId, isAuthenticated, pushCloudBackup, syncPasscode, activeLedgerId, ledgerRole, ledgerPermissions]);
 
   // C8: Prunes ghost calendar day keys (e.g. Feb 30/31, Sep 31) from active matrix and syncs
   const pruneGhostMatrixDayKeys = useCallback(async () => {
+    if (ledgerRole === 'viewer' || !ledgerPermissions?.edit) {
+      console.warn('[LedgerDataContext] pruneGhostMatrixDayKeys blocked: read-only viewer role');
+      return { success: false, removedCount: 0, removedKeys: [] };
+    }
     const { cleanedMatrix, removedCount, removedKeys } = pruneInvalidMatrixDayKeys(dailyMatrixRef.current || {});
     if (removedCount > 0) {
       dailyMatrixRef.current = cleanedMatrix;
@@ -1062,7 +1166,7 @@ export function LedgerDataProvider({ children }) {
       if (budgetRef.current) {
         budgetRef.current.dailyMatrix = cleanedMatrix;
         isPendingSaveRef.current = true;
-        saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId()).catch(() => {});
+        saveBudgetData(budgetRef.current, currentUserId || getCurrentUserId(), activeLedgerId).catch(() => {});
         if (isAuthenticated) {
           // FIX-03: Standard CAS push - pruning ghost keys must not force-overwrite cloud.
           pushCloudBackup(syncPasscode, { auto: true }).catch(() => {});
@@ -1070,10 +1174,14 @@ export function LedgerDataProvider({ children }) {
       }
     }
     return { success: true, removedCount, removedKeys };
-  }, [currentUserId, isAuthenticated, pushCloudBackup, syncPasscode]);
+  }, [currentUserId, isAuthenticated, pushCloudBackup, syncPasscode, activeLedgerId, ledgerRole, ledgerPermissions]);
 
   // Selective per-namespace spreadsheet import
   const importSpreadsheetSelective = useCallback(({ namespaces, strategies, data, dryRun = false, resolutions = {} }) => {
+    if (ledgerRole === 'viewer' || !ledgerPermissions?.edit) {
+      console.warn('[LedgerDataContext] importSpreadsheetSelective blocked: read-only viewer role');
+      return { success: false, error: 'Read-only viewer cannot import data.' };
+    }
     const result = processSpreadsheetImport({
       namespaces,
       strategies,
@@ -1109,7 +1217,7 @@ export function LedgerDataProvider({ children }) {
     }
 
     return { success: true };
-  }, [setMetadataState]);
+  }, [setMetadataState, ledgerRole, ledgerPermissions]);
 
 
   // --- Line Item Operations ---
@@ -1118,6 +1226,10 @@ export function LedgerDataProvider({ children }) {
   }, []);
 
   const upsertLineItem = useCallback((billId, monthKey, actualAmount) => {
+    if (ledgerRole === 'viewer' || !ledgerPermissions?.edit) {
+      console.warn('[LedgerDataContext] upsertLineItem blocked: read-only viewer role');
+      return;
+    }
     logLedger('UPSERT_LINE_ITEM', `Recorded actual line item for bill ${billId} in ${monthKey}: $${actualAmount}`, { billId, monthKey, actualAmount });
     setLineItems(prev => {
       const existing = prev.findIndex(li => li.billId === billId && li.monthKey === monthKey);
@@ -1130,7 +1242,7 @@ export function LedgerDataProvider({ children }) {
       }
       return updated;
     });
-  }, []);
+  }, [ledgerRole, ledgerPermissions]);
 
   const getActualAmount = useCallback((billId, monthKey) => {
     const li = lineItemsRef.current.find(item => item.billId === billId && item.monthKey === monthKey);
@@ -1450,12 +1562,13 @@ export function LedgerDataProvider({ children }) {
     activeLedgerId,
     ledgerRole,
     ledgerPermissions,
+    isReadOnly,
     availableLedgers,
     isShareModalOpen
   }), [
     budgetForUI, lineItems, transactions, matrixVersion, syncPasscode,
     isSyncUnlocked, syncConflict, cloudVersion, activeLedgerId, ledgerRole,
-    ledgerPermissions, availableLedgers, isShareModalOpen
+    ledgerPermissions, isReadOnly, availableLedgers, isShareModalOpen
   ]);
 
   const actionsValue = useMemo(() => ({

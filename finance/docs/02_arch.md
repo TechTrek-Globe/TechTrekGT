@@ -10,7 +10,7 @@ Finance OS is architected as a pure JavaScript single-page application built on 
 - Auxiliary Visualization & Processing Libraries:
   - Recharts (^2.15.0): Composable charting library utilized in DashboardView for 365-day balance trajectories and cash flow velocity charts.
   - dnd-kit (^6.3.1): Drag-and-drop toolkit (@dnd-kit/core, @dnd-kit/sortable, @dnd-kit/utilities) powering custom dashboard widget reordering.
-  - SheetJS (xlsx 0.20.3 pinned via official distribution https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz): Spreadsheet parser executed in a dedicated Web Worker (spreadsheet.worker.js) to offload heavy CSV/XLSX parsing off the browser UI thread. Input constraints enforce a maximum file size of 15MB and a maximum sheet row count of 50,000.
+  - SheetJS (xlsx 0.20.3 pinned via official distribution https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz): Spreadsheet parser executed in a dedicated Web Worker (spreadsheet.worker.js) to offload heavy CSV/XLSX parsing off the browser UI thread. Input constraints enforce a maximum file size of 15MB and a maximum sheet row count of 50,000. Main-thread fallbacks and XLSX exports load dynamically via dynamic import('xlsx') to prevent vendor bundle inflation. Pure importer helpers are isolated in src/utils/importerHelpers.js.
   - Lucide React (^0.469.0): Platform-wide SVG iconography system.
 
 ## 2. Client-Side Routing & Navigation Model

@@ -5,8 +5,7 @@
  * off the main UI thread. Seamlessly falls back to synchronous in-thread processing in
  * Node.js / test environments where Web Workers are unavailable.
  */
-import { inspectWorkbookSheets, parseGenericFlat, MAX_SPREADSHEET_FILE_SIZE, MAX_SPREADSHEET_ROW_COUNT } from './importer.js';
-import { parseSpreadsheet, parseSingleSheet } from './spreadsheetParser.js';
+import { MAX_SPREADSHEET_FILE_SIZE, MAX_SPREADSHEET_ROW_COUNT } from './importerHelpers.js';
 
 let workerInstance = null;
 let reqId = 0;
@@ -71,20 +70,28 @@ function callWorker(type, payload) {
 
   const worker = getWorker();
   if (!worker) {
-    return Promise.resolve().then(() => {
+    return (async () => {
       switch (type) {
-        case 'INSPECT_WORKBOOK':
+        case 'INSPECT_WORKBOOK': {
+          const { inspectWorkbookSheets } = await import('./importer.js');
           return inspectWorkbookSheets(payload.arrayBuffer, payload.fileName, payload.existingAccounts);
-        case 'PARSE_SINGLE_SHEET':
+        }
+        case 'PARSE_SINGLE_SHEET': {
+          const { parseSingleSheet } = await import('./spreadsheetParser.js');
           return parseSingleSheet(payload);
-        case 'PARSE_SPREADSHEET':
+        }
+        case 'PARSE_SPREADSHEET': {
+          const { parseSpreadsheet } = await import('./spreadsheetParser.js');
           return parseSpreadsheet(payload.fileData, payload.fileName, payload.existingBills);
-        case 'PARSE_GENERIC_FLAT':
+        }
+        case 'PARSE_GENERIC_FLAT': {
+          const { parseGenericFlat } = await import('./importer.js');
           return parseGenericFlat(payload.arrayBuffer, payload.fileName, payload.options);
+        }
         default:
           throw new Error(`Unknown worker operation: ${type}`);
       }
-    });
+    })();
   }
 
   return new Promise((resolve, reject) => {

@@ -6,6 +6,7 @@ import { useBudget, useBudgetMetadataState } from './context/BudgetContext';
 import { AppLayout } from './components/AppLayout';
 import { LandingPage } from './components/LandingPage';
 import { logState } from './utils/logger';
+import { closeDB } from './utils/indexedDB';
 
 function lazyWithRetry(componentImport) {
   return React.lazy(async () => {
@@ -63,6 +64,7 @@ class ErrorBoundary extends React.Component {
     try {
       localStorage.removeItem('personal_budget_app_data_v1');
       sessionStorage.clear();
+      closeDB();
       if (typeof window !== 'undefined' && window.indexedDB) {
         const req = window.indexedDB.deleteDatabase('TechTrekFinanceDB');
         req.onsuccess = req.onerror = req.onblocked = () => {

@@ -46,7 +46,7 @@ export function LandingPage({ onNavigate }) {
     {
       icon: ShieldCheck,
       title: 'Local-First Security',
-      description: 'Native browser origin sandboxing, zero cloud footprint, and local IndexedDB database persistence.'
+      description: 'Offline-first client architecture with local IndexedDB storage and encrypted Cloudflare D1 backup synchronization.'
     }
   ];
 
@@ -56,7 +56,7 @@ export function LandingPage({ onNavigate }) {
       category: 'Persistence',
       badge: 'Active',
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      description: 'Native asynchronous IndexedDB database engine for 100% offline client-side storage.'
+      description: 'Native asynchronous IndexedDB database engine with multi-version Cloud Vault sync and optimistic CAS concurrency.'
     },
     {
       title: 'TechTrek Analytics',
@@ -70,7 +70,7 @@ export function LandingPage({ onNavigate }) {
       category: 'Protection',
       badge: 'Protected',
       badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-      description: 'Strict origin sandboxing ensuring all financial records remain exclusively on client device.'
+      description: 'Multi-user tenant isolation, role-based ledger sharing, and cryptographically verified session security.'
     }
   ];
 

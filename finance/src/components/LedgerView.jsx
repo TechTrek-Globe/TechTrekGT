@@ -20,7 +20,9 @@ import {
   Trash2,
   GripVertical,
   Upload,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Search,
+  X
 } from 'lucide-react';
 import { InlineEdit } from './InlineEdit';
 import { SpreadsheetImporter } from './SpreadsheetImporter';
@@ -533,6 +535,7 @@ const IsolatedTextInput = React.memo(function IsolatedTextInput({
 function DailySpreadsheetMatrix() {
   const {
     budget,
+    isReadOnly,
     transactions,
     getDailyMatrix,
     matrixVersion,
@@ -623,6 +626,7 @@ function DailySpreadsheetMatrix() {
 
   const handleDragEnd = useCallback((event) => {
     setActiveDragField(null);
+    if (isReadOnly) return;
     const { active, over } = event;
     const activeData = active?.data?.current;
     const overData = over?.data?.current;
@@ -651,7 +655,7 @@ function DailySpreadsheetMatrix() {
         );
       }
     }
-  }, [moveDailyMatrixCell, selectedAccountId]);
+  }, [isReadOnly, moveDailyMatrixCell, selectedAccountId]);
 
   const handleDragCancel = useCallback(() => {
     setActiveDragField(null);
@@ -659,6 +663,7 @@ function DailySpreadsheetMatrix() {
   }, []);
 
   const handleCellCommit = useCallback((monthKey, day, field, val, cellAccountId) => {
+    if (isReadOnly) return;
     const targetAccId = (cellAccountId && cellAccountId !== 'all') ? cellAccountId : (selectedAccountId === 'all' ? (budget.accounts[0]?.id || 'all') : selectedAccountId);
     const isTextField = field.endsWith('_desc');
     const cleanVal = isTextField ? (val || '') : round2(val);
@@ -670,10 +675,10 @@ function DailySpreadsheetMatrix() {
       updateDailyMatrixCell(targetAccId, monthKey, day, 'other_desc', '');
       updateDailyMatrixCell(targetAccId, monthKey, day, 'other_credit_desc', '');
     }
-  }, [updateDailyMatrixCell, selectedAccountId, budget.accounts]);
+  }, [isReadOnly, updateDailyMatrixCell, selectedAccountId, budget.accounts]);
 
   const handleStartBalanceCommit = useCallback((field, val, row) => {
-    if (selectedAccountId === 'all') return;
+    if (isReadOnly || selectedAccountId === 'all') return;
     const numVal = parseFloat(val) || 0;
     const targetAcc = budget.accounts.find(a => a.id === selectedAccountId);
     if (!targetAcc) return;
@@ -1217,11 +1222,49 @@ function DailySpreadsheetMatrix() {
     transactions
   ]);
 
+  // Filter state (Status & Search query)
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'deficit' | 'locked' | 'payday'
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredMatrixData = useMemo(() => {
+    const q = (searchQuery || '').trim().toLowerCase();
+    if (filterStatus === 'all' && !q) return matrixData;
+
+    return matrixData.filter(row => {
+      if (filterStatus === 'deficit' && !row.isDeficit) return false;
+      if (filterStatus === 'locked' && !row.isHistoricalLock) return false;
+      if (filterStatus === 'payday' && !row.isPayday) return false;
+
+      if (q) {
+        const matchesDate = row.dateFormatted?.includes(q) || row.dayOfWeekName?.toLowerCase().includes(q);
+        const matchesOther = row.otherDesc?.toLowerCase().includes(q);
+        const matchesBill = accountBills.some(b => {
+          const val = row.billValues?.[b.id];
+          if (val && val !== 0) {
+            return b.name.toLowerCase().includes(q) || (b.notes && b.notes.toLowerCase().includes(q));
+          }
+          return false;
+        });
+        const matchesPerson = (row.personCredits || []).some(pc => {
+          if (pc.amount && pc.amount !== 0) {
+            const person = people.find(p => p.id === pc.personId);
+            return person?.name?.toLowerCase().includes(q);
+          }
+          return false;
+        });
+        if (!matchesDate && !matchesOther && !matchesBill && !matchesPerson) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [matrixData, filterStatus, searchQuery, accountBills, people]);
+
   // Group matrix rows by month so each month gets its own tbody with a sticky month banner
   const monthGroups = useMemo(() => {
     const groups = [];
     let currentGroup = null;
-    matrixData.forEach(row => {
+    filteredMatrixData.forEach(row => {
       if (!currentGroup || currentGroup.monthKey !== row.monthKey) {
         currentGroup = {
           monthKey: row.monthKey,
@@ -1235,9 +1278,93 @@ function DailySpreadsheetMatrix() {
       currentGroup.rows.push(row);
     });
     return groups;
-  }, [matrixData]);
+  }, [filteredMatrixData]);
 
   const containerRef = useRef(null);
+
+  // Jump to Today action (called by button click or keyboard shortcut Ctrl/Cmd+J or T)
+  const jumpToToday = useCallback(() => {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+    setSelectedMonth(curMonth);
+    setSelectedYear(curYear);
+
+    if (curYear < yearRange.startYear || curYear > yearRange.endYear) {
+      pendingScrollTargetRef.current = 'today';
+      setYearRange({
+        startYear: Math.max(startDateObj.getFullYear(), curYear - 1),
+        endYear: curYear + 1
+      });
+    } else {
+      isProgrammaticScrollRef.current = true;
+      if (todayRowRef.current) {
+        todayRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      setTimeout(() => { isProgrammaticScrollRef.current = false; }, 400);
+    }
+  }, [yearRange, startDateObj]);
+
+  // Keyboard shortcut listener: Ctrl+J / Cmd+J or T (when outside inputs) to jump to today
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const isInput = e.target.closest('input, textarea, select, [contenteditable="true"]');
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'j' || e.key === 'J')) {
+        e.preventDefault();
+        jumpToToday();
+      } else if (!isInput && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        jumpToToday();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [jumpToToday]);
+
+  // Arrow & Tab cell navigation across the spreadsheet matrix
+  const handleGridKeyDown = useCallback((e) => {
+    const targetCell = e.target.closest('[data-matrix-cell="true"]');
+    if (!targetCell) return;
+    const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+
+    if (e.key === 'Tab' || (!isInput && (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'ArrowDown'))) {
+      const allCells = Array.from(containerRef.current?.querySelectorAll('[data-matrix-cell="true"]') || []);
+      const currentIndex = allCells.indexOf(targetCell);
+      if (currentIndex === -1) return;
+
+      let nextIndex = -1;
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        nextIndex = e.shiftKey ? currentIndex - 1 : currentIndex + 1;
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        nextIndex = currentIndex + 1;
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        nextIndex = currentIndex - 1;
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const currentRow = targetCell.closest('tr');
+        const nextRow = e.key === 'ArrowDown' ? currentRow?.nextElementSibling : currentRow?.previousElementSibling;
+        if (nextRow) {
+          const cellIndexInRow = Array.from(currentRow.children).indexOf(targetCell.closest('td'));
+          const targetTd = nextRow.children[cellIndexInRow];
+          const nextCell = targetTd?.querySelector('[data-matrix-cell="true"]');
+          if (nextCell) {
+            const focusable = nextCell.querySelector('input, button, [tabindex="0"]') || nextCell;
+            focusable.focus();
+            return;
+          }
+        }
+      }
+
+      if (nextIndex >= 0 && nextIndex < allCells.length) {
+        const nextCell = allCells[nextIndex];
+        const focusable = nextCell.querySelector('input, button, [tabindex="0"]') || nextCell;
+        focusable.focus();
+      }
+    }
+  }, []);
 
   // Sync toolbar Month & Year selector using IntersectionObserver on month headers (zero forced reflows)
   useEffect(() => {
@@ -1598,46 +1725,84 @@ function DailySpreadsheetMatrix() {
 
           {/* Today Quick-Jump Button */}
           <button
-            onClick={() => {
-              const now = new Date();
-              const curYear = now.getFullYear();
-              const curMonth = now.getMonth();
-              setSelectedMonth(curMonth);
-              setSelectedYear(curYear);
-
-              if (curYear < yearRange.startYear || curYear > yearRange.endYear) {
-                pendingScrollTargetRef.current = 'today';
-                setYearRange({
-                  startYear: Math.max(startDateObj.getFullYear(), curYear - 1),
-                  endYear: curYear + 1
-                });
-              } else {
-                isProgrammaticScrollRef.current = true;
-                if (todayRowRef.current) {
-                  todayRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-                setTimeout(() => { isProgrammaticScrollRef.current = false; }, 400);
-              }
-            }}
+            onClick={jumpToToday}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 hover:border-amber-400 font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95"
-            title="Jump to Today's Date"
+            title="Jump to Today's Date (Ctrl+J or T)"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>Today</span>
           </button>
+
+          {/* Status Filter Selector */}
+          <div className="flex items-center bg-slate-900 border border-slate-700/80 rounded-lg p-0.5 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setFilterStatus('all')}
+              className={`px-2 py-0.5 rounded font-semibold transition-colors ${filterStatus === 'all' ? 'bg-slate-800 text-blue-300' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('deficit')}
+              className={`px-2 py-0.5 rounded font-semibold transition-colors ${filterStatus === 'deficit' ? 'bg-rose-950 text-rose-300' : 'text-slate-400 hover:text-rose-300'}`}
+              title="Show only days with negative total balance"
+            >
+              Deficits
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('locked')}
+              className={`px-2 py-0.5 rounded font-semibold transition-colors ${filterStatus === 'locked' ? 'bg-indigo-950 text-indigo-300' : 'text-slate-400 hover:text-indigo-300'}`}
+              title="Show historical locked dates"
+            >
+              Locked
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('payday')}
+              className={`px-2 py-0.5 rounded font-semibold transition-colors ${filterStatus === 'payday' ? 'bg-emerald-950 text-emerald-300' : 'text-slate-400 hover:text-emerald-300'}`}
+              title="Show payday deposit dates"
+            >
+              Paydays
+            </button>
+          </div>
+
+          {/* Payee / Description Search */}
+          <div className="relative flex items-center">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search payee / bill / note..."
+              className="bg-slate-900 border border-slate-700/80 rounded-lg pl-7 pr-6 py-1 text-slate-100 placeholder-slate-500 text-[11px] focus:outline-none focus:border-blue-500 w-36 sm:w-44 transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-1.5 p-0.5 text-slate-400 hover:text-slate-200"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Account-Bound Import Button */}
-          <button
-            type="button"
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all cursor-pointer active:scale-95 flex-shrink-0"
-            title={selectedAccountId !== 'all' && selectedAccount ? `Import CSV or Spreadsheet directly into ${selectedAccount.name}` : 'Import CSV or Spreadsheet'}
-          >
-            <Upload className="w-3.5 h-3.5 text-indigo-200" />
-            <span>Import CSV/Spreadsheet</span>
-          </button>
+          {!isReadOnly && (
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all cursor-pointer active:scale-95 flex-shrink-0"
+              title={selectedAccountId !== 'all' && selectedAccount ? `Import CSV or Spreadsheet directly into ${selectedAccount.name}` : 'Import CSV or Spreadsheet'}
+            >
+              <Upload className="w-3.5 h-3.5 text-indigo-200" />
+              <span>Import CSV/Spreadsheet</span>
+            </button>
+          )}
 
           {/* Archived Bills Drawer Toggle */}
           {archivedBills.length > 0 && (
@@ -1687,6 +1852,7 @@ function DailySpreadsheetMatrix() {
       {/* SPREADSHEET MATRIX TABLE CONTAINER (Scrolls table vertically & horizontally) */}
       <div
         ref={containerRef}
+        onKeyDown={handleGridKeyDown}
         className="flex-1 min-h-0 overflow-auto matrix-scrollbar relative"
       >
         <table className="w-full text-left text-[10px] border-separate border-spacing-0">
@@ -1861,29 +2027,54 @@ function DailySpreadsheetMatrix() {
           </thead>
 
           {/* Matrix Rows (Continuous Multi-Month Stream with Natural In-Flow Month Banners) */}
-          {monthGroups.map(group => (
-            <tbody
-              key={group.monthKey}
-              data-month-group={`${group.year}-${group.month}`}
-              className="divide-y divide-slate-800/50 font-mono text-[10px]"
-            >
-              {/* Natural In-Flow Month Header Row (Non-sticky so it never obscures date rows) */}
-              <tr
-                className="bg-slate-950 border-b border-slate-800"
-                data-month-header={`${group.year}-${group.month}`}
-              >
-                <td
-                  colSpan={100}
-                  className="py-1 px-3 bg-slate-950 text-slate-300 border-b border-slate-800"
-                >
-                  <div className="inline-flex items-center gap-1.5 font-mono uppercase tracking-wider text-[11px] font-bold text-blue-400">
-                    <Calendar className="w-3.5 h-3.5 text-blue-400" />
-                    <span>{group.monthLabel}</span>
-                  </div>
-                </td>
-              </tr>
+          {monthGroups.map(group => {
+            const groupMonthIndex = group.year * 12 + group.month;
+            const activeMonthIndex = (selectedYear || todayObj.getFullYear()) * 12 + (selectedMonth !== undefined ? selectedMonth : todayObj.getMonth());
+            const isDistant = (filterStatus === 'all' && !searchQuery) && Math.abs(groupMonthIndex - activeMonthIndex) > 4;
 
-              {group.rows.map(row => {
+            return (
+              <tbody
+                key={group.monthKey}
+                data-month-group={`${group.year}-${group.month}`}
+                className="divide-y divide-slate-800/50 font-mono text-[10px]"
+              >
+                {/* Natural In-Flow Month Header Row (Non-sticky so it never obscures date rows) */}
+                <tr
+                  className="bg-slate-950 border-b border-slate-800"
+                  data-month-header={`${group.year}-${group.month}`}
+                >
+                  <td
+                    colSpan={100}
+                    className="py-1 px-3 bg-slate-950 text-slate-300 border-b border-slate-800"
+                  >
+                    <div className="inline-flex items-center gap-1.5 font-mono uppercase tracking-wider text-[11px] font-bold text-blue-400">
+                      <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                      <span>{group.monthLabel}</span>
+                    </div>
+                  </td>
+                </tr>
+
+                {isDistant ? (
+                  <tr style={{ height: `${Math.max(48, group.rows.length * 36)}px` }}>
+                    <td colSpan={100} className="text-center text-slate-500 font-mono py-6 bg-slate-950/40">
+                      <div className="flex items-center justify-center gap-2">
+                        <span>{group.monthLabel} ({group.rows.length} days)</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedMonth(group.month);
+                            setSelectedYear(group.year);
+                            handleMonthSelect(group.month);
+                          }}
+                          className="text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                        >
+                          Scroll into view
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  group.rows.map(row => {
                 const isFirstSelectedDay = row.month === selectedMonth && row.year === selectedYear && row.day === 1;
                 const rowRef = row.isToday ? todayRowRef : (isFirstSelectedDay ? firstSelectedMonthRowRef : null);
                 const isSelected = row.rowKey === selectedRowKey;
@@ -2195,9 +2386,10 @@ function DailySpreadsheetMatrix() {
                       </td>
                     </tr>
                 );
-              })}
+              }))}
             </tbody>
-          ))}
+          );
+        })}
 
           {/* Matrix Footers (Sticky Totals) */}
           <tfoot className="sticky bottom-0 z-30 bg-slate-900 font-extrabold text-[10px] text-slate-100 border-t-2 border-slate-700 shadow-lg">

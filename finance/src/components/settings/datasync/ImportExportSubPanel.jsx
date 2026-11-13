@@ -11,7 +11,7 @@ import {
   FileCode,
   Sparkles
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { ALLOWED_BUDGET_KEYS } from '../../../utils/budgetSchema.js';
 import { SpreadsheetImporter } from '../../SpreadsheetImporter';
 
 export function ImportExportSubPanel() {
@@ -43,6 +43,23 @@ export function ImportExportSubPanel() {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Invalid JSON backup file.');
+      }
+      const keys = Object.keys(parsed);
+      const invalidKeys = keys.filter(k => !ALLOWED_BUDGET_KEYS.has(k));
+      const validKeyCount = keys.filter(k => ALLOWED_BUDGET_KEYS.has(k)).length;
+      if (validKeyCount === 0) {
+        throw new Error('File contains no recognized budget configuration keys.');
+      }
+      const confirmMsg = invalidKeys.length > 0
+        ? `This backup file contains unrecognized properties (${invalidKeys.slice(0, 3).join(', ')}${invalidKeys.length > 3 ? '...' : ''}). Are you sure you want to restore it and overwrite current budget data?`
+        : 'Are you sure you want to restore this backup? This will replace your active local budget data with the backup contents.';
+      if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+        if (!window.confirm(confirmMsg)) {
+          return;
+        }
+      }
       await restoreFromBackup(parsed);
       setBackupStatus({ type: 'success', message: `Successfully restored backup from ${file.name}! UI state updated.` });
     } catch (err) {
@@ -52,8 +69,9 @@ export function ImportExportSubPanel() {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     try {
+      const XLSX = await import('xlsx');
       const wb = XLSX.utils.book_new();
 
       // Sheet 1: Accounts

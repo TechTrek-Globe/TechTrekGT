@@ -258,22 +258,8 @@ export const BUDGET_LIMITS = {
   MAX_DESC_LEN: 500
 };
 
-export const ALLOWED_BUDGET_KEYS = new Set([
-  'accounts',
-  'people',
-  'bills',
-  'transactions',
-  'lineItems',
-  'fundingGoals',
-  'loans',
-  'loan',
-  'dailyMatrix',
-  'dashboardWidgets',
-  'theme',
-  'hideDashboardHeader',
-  'categories',
-  'schemaVersion'
-]);
+import { ALLOWED_BUDGET_KEYS } from './utils/budgetSchema.js';
+export { ALLOWED_BUDGET_KEYS };
 
 function isObject(val) {
   return val !== null && typeof val === 'object' && !Array.isArray(val);

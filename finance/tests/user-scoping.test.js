@@ -13,15 +13,20 @@ class MemoryStorage {
 
 describe('CRIT-002: User-scoped storage keys', () => {
   test('budgetRecordKey scopes records by user id', () => {
-    assert.strictEqual(budgetRecordKey('user-1'), 'current_budget:user-1');
-    assert.strictEqual(budgetRecordKey('user-2'), 'current_budget:user-2');
+    assert.strictEqual(budgetRecordKey('user-1'), 'budget:user-1');
+    assert.strictEqual(budgetRecordKey('user-2'), 'budget:user-2');
     assert.notStrictEqual(budgetRecordKey('user-1'), budgetRecordKey('user-2'));
   });
 
   test('budgetRecordKey falls back to legacy key when no user id', () => {
-    assert.strictEqual(budgetRecordKey(null), 'current_budget:legacy');
-    assert.strictEqual(budgetRecordKey(undefined), 'current_budget:legacy');
-    assert.strictEqual(budgetRecordKey(''), 'current_budget:legacy');
+    assert.strictEqual(budgetRecordKey(null), 'budget:legacy');
+    assert.strictEqual(budgetRecordKey(undefined), 'budget:legacy');
+    assert.strictEqual(budgetRecordKey(''), 'budget:legacy');
+  });
+
+  test('budgetRecordKey handles ledgerId partitioning', () => {
+    assert.strictEqual(budgetRecordKey('user-1', 'ledger-99'), 'budget:user-1:ledger-99');
+    assert.strictEqual(budgetRecordKey('user-1', 'user-1'), 'budget:user-1');
   });
 
   test('pendingSyncKey scopes the offline queue by user id', () => {

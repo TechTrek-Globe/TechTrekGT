@@ -20,7 +20,7 @@ import { getApiUrl } from '../utils/api';
 import { round2, parseMoney } from '../utils/formatters';
 import { getBudgetData, getCurrentUserId, saveBudgetData } from '../utils/indexedDB';
 import { runBudgetMigrations, CURRENT_BUDGET_SCHEMA_VERSION, pruneInvalidMatrixDayKeys } from '../migrations/budgetMigrations';
-import { ALLOWED_BUDGET_KEYS } from '../worker.js';
+import { ALLOWED_BUDGET_KEYS } from '../utils/budgetSchema.js';
 import { 
   getDebugEnabled, 
   setDebugEnabled, 
@@ -123,6 +123,17 @@ export function BudgetMetadataProvider({ children }) {
   // FIX-04: Track the IndexedDB key used for the successful load so saves always
   // go to the same slot, even if auth state changes mid-session.
   const loadedRecordKeyRef = useRef(null);
+
+  // Shared Ledger RBAC Access State
+  const [ledgerRole, setLedgerRole] = useState('owner');
+  const [ledgerPermissions, setLedgerPermissions] = useState({
+    read: true,
+    edit: true,
+    manageShares: true,
+    isOwner: true,
+    role: 'owner'
+  });
+  const isReadOnly = ledgerRole === 'viewer' || (ledgerPermissions && !ledgerPermissions.edit);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('accounts');
@@ -242,13 +253,15 @@ export function BudgetMetadataProvider({ children }) {
         }
 
         // CRIT-002: Use user-scoped record key if user is authenticated
-        const storedRaw = await getBudgetData(userId);
+        const activeLid = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('finance_active_ledger_id')) || null;
+        const storedRaw = await getBudgetData(userId, activeLid);
         if (storedRaw && typeof storedRaw === 'object') {
           // Record found - track the exact key so saves always go here.
           loadedRecordKeyRef.current = userId;
+          setDbLoadError(null);
           const { budget: stored, wasMigrated } = runBudgetMigrations(storedRaw);
           if (wasMigrated) {
-            saveBudgetData(stored, userId).catch(err => {
+            saveBudgetData(stored, userId, activeLid).catch(err => {
               console.warn('Migration save failed:', err);
               setSaveError('Migration save failed.');
             });
@@ -404,6 +417,7 @@ export function BudgetMetadataProvider({ children }) {
 
   // Account Operations
   const addAccount = useCallback((accountData) => {
+    if (isReadOnly) return null;
     const newAcc = {
       id: accountData.id || `acc-${Date.now()}`,
       name: accountData.name || 'New Account',
@@ -423,27 +437,42 @@ export function BudgetMetadataProvider({ children }) {
       accounts: [...prev.accounts, newAcc]
     }));
     return newAcc;
-  }, []);
+  }, [isReadOnly]);
 
   const updateAccount = useCallback((id, updatedData) => {
+    if (isReadOnly) return;
     logLedger('UPDATE_ACCOUNT', `Updated account: ${id}`, { id, updatedData });
     setMetadataState(prev => ({
       ...prev,
       accounts: prev.accounts.map(acc => acc.id === id ? { ...acc, ...updatedData } : acc)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const deleteAccount = useCallback((id) => {
+    if (isReadOnly) return;
     logLedger('DELETE_ACCOUNT', `Deleted account: ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
       accounts: prev.accounts.filter(acc => acc.id !== id),
-      bills: prev.bills.map(b => b.accountId === id ? { ...b, accountId: prev.accounts.find(a => a.id !== id)?.id || '' } : b)
+      bills: prev.bills.map(b => b.accountId === id ? { ...b, accountId: prev.accounts.find(a => a.id !== id)?.id || '' } : b),
+      fundingGoals: (prev.fundingGoals || []).filter(g => g.accountId !== id),
+      loans: (prev.loans || []).map(l => l.accountId === id ? { ...l, accountId: '' } : l),
+      saveExtraSplits: (() => {
+        const next = { ...(prev.saveExtraSplits || {}) };
+        delete next[id];
+        return next;
+      })(),
+      overflowSplits: (() => {
+        const next = { ...(prev.overflowSplits || {}) };
+        delete next[id];
+        return next;
+      })()
     }));
-  }, []);
+  }, [isReadOnly]);
 
   // Person Operations
   const addPerson = useCallback((personData) => {
+    if (isReadOnly) return null;
     const newPersonId = `person-${Date.now()}`;
     const newPerson = {
       id: newPersonId,
@@ -467,17 +496,20 @@ export function BudgetMetadataProvider({ children }) {
         splits: { ...b.splits, [newPersonId]: 0 }
       }))
     }));
-  }, []);
+    return newPerson;
+  }, [isReadOnly]);
 
   const updatePerson = useCallback((id, updatedData) => {
+    if (isReadOnly) return;
     logMatrix('UPDATE_EARNER', `Updated earner: ${id}`, { id, updatedData });
     setMetadataState(prev => ({
       ...prev,
       people: prev.people.map(p => p.id === id ? { ...p, ...updatedData } : p)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const deletePerson = useCallback((id) => {
+    if (isReadOnly) return;
     logMatrix('DELETE_EARNER', `Deleted earner: ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
@@ -486,12 +518,32 @@ export function BudgetMetadataProvider({ children }) {
         const newSplits = { ...b.splits };
         delete newSplits[id];
         return { ...b, splits: newSplits };
-      })
+      }),
+      fundingGoals: (prev.fundingGoals || []).filter(g => g.contributorId !== id),
+      saveExtraSplits: (() => {
+        const next = {};
+        for (const [accId, splits] of Object.entries(prev.saveExtraSplits || {})) {
+          const s = { ...splits };
+          delete s[id];
+          next[accId] = s;
+        }
+        return next;
+      })(),
+      overflowSplits: (() => {
+        const next = {};
+        for (const [accId, splits] of Object.entries(prev.overflowSplits || {})) {
+          const s = { ...splits };
+          delete s[id];
+          next[accId] = s;
+        }
+        return next;
+      })()
     }));
-  }, []);
+  }, [isReadOnly]);
 
   // Bill Operations
   const addBill = useCallback((billData) => {
+    if (isReadOnly) return null;
     setMetadataState(prev => {
       const count = prev.people.length || 1;
       const initialSplits = {};
@@ -531,9 +583,10 @@ export function BudgetMetadataProvider({ children }) {
         bills: [...prev.bills, newBill]
       };
     });
-  }, []);
+  }, [isReadOnly]);
 
   const updateBill = useCallback((id, updatedData) => {
+    if (isReadOnly) return;
     if (updatedData.accountId) {
       logTransaction('REASSIGN_BILL_ACCOUNT', `Reassigned bill ${id} to account ${updatedData.accountId}`, { billId: id, newAccountId: updatedData.accountId });
     }
@@ -551,44 +604,50 @@ export function BudgetMetadataProvider({ children }) {
       ...prev,
       bills: prev.bills.map(b => b.id === id ? { ...b, ...syncedData } : b)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const deleteBill = useCallback((id) => {
+    if (isReadOnly) return;
     logMatrix('DELETE_BILL', `Deleted bill: ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.filter(b => b.id !== id)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const updateBillSplits = useCallback((billId, splitsMap) => {
+    if (isReadOnly) return;
     logTransaction('REASSIGN_BILL_SPLITS', `Direct splits update for bill ${billId}`, { billId, splitsMap });
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === billId ? { ...b, splits: splitsMap } : b)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const archiveBill = useCallback((id) => {
+    if (isReadOnly) return;
     logMatrix('ARCHIVE_BILL', `Archived bill: ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === id ? { ...b, isArchived: true } : b)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const unarchiveBill = useCallback((id) => {
+    if (isReadOnly) return;
     logMatrix('UNARCHIVE_BILL', `Unarchived bill: ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
       bills: prev.bills.map(b => b.id === id ? { ...b, isArchived: false } : b)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   // Loan Operations
   const addLoan = useCallback((loanData) => {
+    if (isReadOnly) return null;
+    const loanId = loanData?.id || `loan-${Date.now()}`;
     const newLoan = {
-      id: `loan-${Date.now()}`,
+      id: loanId,
       name: loanData?.name || 'New Loan',
       description: loanData?.description || 'Loan Amortization',
       principal: parseMoney(loanData?.principal, 250000),
@@ -598,44 +657,53 @@ export function BudgetMetadataProvider({ children }) {
       extraPayment: parseMoney(loanData?.extraPayment, 0),
       accountId: loanData?.accountId || '',
       isArchived: false,
-      startDate: loanData?.startDate || '2024-01-01'
+      startDate: loanData?.startDate || '2024-01-01',
+      interestCompounding: loanData?.interestCompounding || 'monthly',
+      paymentFrequency: loanData?.paymentFrequency || 'monthly',
+      paymentType: loanData?.paymentType || 'amortizing'
     };
     setMetadataState(prev => ({
       ...prev,
       loans: [...(prev.loans || []), newLoan]
     }));
-  }, []);
+    return loanId;
+  }, [isReadOnly]);
 
   const updateLoan = useCallback((id, loanData) => {
+    if (isReadOnly) return;
     setMetadataState(prev => ({
       ...prev,
       loans: (prev.loans || []).map(l => l.id === id ? { ...l, ...loanData } : l)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const archiveLoan = useCallback((id) => {
+    if (isReadOnly) return;
     setMetadataState(prev => ({
       ...prev,
       loans: (prev.loans || []).map(l => l.id === id ? { ...l, isArchived: true } : l)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const unarchiveLoan = useCallback((id) => {
+    if (isReadOnly) return;
     setMetadataState(prev => ({
       ...prev,
       loans: (prev.loans || []).map(l => l.id === id ? { ...l, isArchived: false } : l)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const deleteLoan = useCallback((id) => {
+    if (isReadOnly) return;
     setMetadataState(prev => ({
       ...prev,
       loans: (prev.loans || []).filter(l => l.id !== id)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   // Funding Goals Operations
   const addFundingGoal = useCallback((goalData) => {
+    if (isReadOnly) return null;
     const newGoal = {
       id: goalData?.id || `goal-${Date.now()}`,
       contributorId: goalData?.contributorId || '',
@@ -649,31 +717,34 @@ export function BudgetMetadataProvider({ children }) {
       fundingGoals: [...(prev.fundingGoals || []), newGoal]
     }));
     return newGoal;
-  }, []);
+  }, [isReadOnly]);
 
   const updateFundingGoal = useCallback((id, updatedData) => {
+    if (isReadOnly) return;
     logMatrix('UPDATE_FUNDING_GOAL', `Updated funding goal ${id}`, { id, updatedData });
     setMetadataState(prev => ({
       ...prev,
       fundingGoals: (prev.fundingGoals || []).map(g => g.id === id ? { ...g, ...updatedData } : g)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const deleteFundingGoal = useCallback((id) => {
+    if (isReadOnly) return;
     logMatrix('DELETE_FUNDING_GOAL', `Deleted funding goal ${id}`, { id });
     setMetadataState(prev => ({
       ...prev,
       fundingGoals: (prev.fundingGoals || []).filter(g => g.id !== id)
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const setFundingGoals = useCallback((newGoals) => {
+    if (isReadOnly) return;
     logMatrix('SET_FUNDING_GOALS', `Bulk set ${newGoals?.length || 0} funding goals`, { count: newGoals?.length });
     setMetadataState(prev => ({
       ...prev,
       fundingGoals: Array.isArray(newGoals) ? newGoals : []
     }));
-  }, []);
+  }, [isReadOnly]);
 
   // Dashboard Widgets & Theme
   const getDashboardWidgets = useCallback(() => {
@@ -684,14 +755,16 @@ export function BudgetMetadataProvider({ children }) {
   }, [metadataState.dashboardWidgets]);
 
   const updateDashboardWidgets = useCallback((newWidgets) => {
+    if (isReadOnly) return;
     logState('DISPATCH_WIDGETS', 'Updated dashboard widgets configuration', { count: newWidgets?.length });
     setMetadataState(prev => ({
       ...prev,
       dashboardWidgets: newWidgets
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const toggleDashboardWidgetVisibility = useCallback((id) => {
+    if (isReadOnly) return;
     setMetadataState(prev => {
       const current = (prev.dashboardWidgets && Array.isArray(prev.dashboardWidgets) && prev.dashboardWidgets.length > 0)
         ? prev.dashboardWidgets
@@ -699,9 +772,10 @@ export function BudgetMetadataProvider({ children }) {
       const updated = current.map(w => w.id === id ? { ...w, visible: !w.visible } : w);
       return { ...prev, dashboardWidgets: updated };
     });
-  }, []);
+  }, [isReadOnly]);
 
   const reorderDashboardWidgets = useCallback((fromIndex, toIndex) => {
+    if (isReadOnly) return;
     setMetadataState(prev => {
       const current = [...((prev.dashboardWidgets && Array.isArray(prev.dashboardWidgets) && prev.dashboardWidgets.length > 0)
         ? prev.dashboardWidgets
@@ -711,9 +785,10 @@ export function BudgetMetadataProvider({ children }) {
       current.splice(toIndex, 0, moved);
       return { ...prev, dashboardWidgets: current };
     });
-  }, []);
+  }, [isReadOnly]);
 
   const setDashboardWidgetWidth = useCallback((id, width) => {
+    if (isReadOnly) return;
     setMetadataState(prev => {
       const current = (prev.dashboardWidgets && Array.isArray(prev.dashboardWidgets) && prev.dashboardWidgets.length > 0)
         ? prev.dashboardWidgets
@@ -721,9 +796,10 @@ export function BudgetMetadataProvider({ children }) {
       const updated = current.map(w => w.id === id ? { ...w, width, customWidth: undefined, customHeight: undefined } : w);
       return { ...prev, dashboardWidgets: updated };
     });
-  }, []);
+  }, [isReadOnly]);
 
   const setDashboardWidgetCustomSize = useCallback((id, customSize) => {
+    if (isReadOnly) return;
     setMetadataState(prev => {
       const current = (prev.dashboardWidgets && Array.isArray(prev.dashboardWidgets) && prev.dashboardWidgets.length > 0)
         ? prev.dashboardWidgets
@@ -731,14 +807,15 @@ export function BudgetMetadataProvider({ children }) {
       const updated = current.map(w => w.id === id ? { ...w, customWidth: customSize?.customWidth, customHeight: customSize?.customHeight } : w);
       return { ...prev, dashboardWidgets: updated };
     });
-  }, []);
+  }, [isReadOnly]);
 
   const resetDashboardWidgets = useCallback(() => {
+    if (isReadOnly) return;
     setMetadataState(prev => ({
       ...prev,
       dashboardWidgets: DEFAULT_DASHBOARD_WIDGETS
     }));
-  }, []);
+  }, [isReadOnly]);
 
   const toggleHideDashboardHeader = useCallback((hideVal) => {
     setMetadataState(prev => ({
@@ -937,7 +1014,10 @@ export function BudgetMetadataProvider({ children }) {
     lastCloudSyncTime,
     isDebugMode,
     categoryStates,
-    debugLogs
+    debugLogs,
+    ledgerRole,
+    ledgerPermissions,
+    isReadOnly
   }), [
     metadataState,
     theme,
@@ -954,7 +1034,10 @@ export function BudgetMetadataProvider({ children }) {
     lastCloudSyncTime,
     isDebugMode,
     categoryStates,
-    debugLogs
+    debugLogs,
+    ledgerRole,
+    ledgerPermissions,
+    isReadOnly
   ]);
 
   const actionsValue = useMemo(() => ({
@@ -978,6 +1061,10 @@ export function BudgetMetadataProvider({ children }) {
     resetCategories,
     clearDebugLogs,
     addDebugLog,
+    setLedgerRole,
+    setLedgerPermissions,
+    setIsDbLoaded,
+    setDbLoadError,
     // actions
     addAccount,
     updateAccount,

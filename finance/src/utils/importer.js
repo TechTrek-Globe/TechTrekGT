@@ -10,100 +10,28 @@ import { logDebug, logWarn, logInfo } from './debugLogger.js';
 import { getPersonDepositAmountForAccount } from './paydayUtils.js';
 import { round2, parseMoney } from './formatters.js';
 
-// Enforce maximum file size (15 MB) and row count (50,000 rows) before parsing (FIX-11)
-export const MAX_SPREADSHEET_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
-export const MAX_SPREADSHEET_ROW_COUNT = 50000; // 50,000 rows
-
-// --- Internal Field Definitions ---
-
-export const INTERNAL_TRANSACTION_FIELDS = [
-  { key: 'date',        label: 'Date',            required: true  },
-  { key: 'description', label: 'Description',     required: true  },
-  { key: 'amount',      label: 'Amount ($)',      required: true  },
-  { key: 'balance',     label: 'Running Balance', required: false },
-  { key: 'accountId',   label: 'Account',         required: false },
-  { key: 'category',    label: 'Category',        required: false },
-  { key: 'notes',       label: 'Notes',           required: false },
-];
-
-export const INTERNAL_BILL_FIELDS = [
-  { key: 'name',          label: 'Bill Name',                  required: true  },
-  { key: 'amount',        label: 'Amount ($)',                 required: true  },
-  { key: 'accountId',    label: 'Account',                    required: false },
-  { key: 'period',        label: 'Period',                     required: false },
-  { key: 'dueDay',        label: 'Due Day',                    required: false },
-  { key: 'paymentSource', label: 'Payment Source',             required: false },
-  { key: 'matchingKey',   label: 'Bank Match Names (Aliases)', required: false },
-  { key: 'notes',         label: 'Notes',                      required: false },
-];
-
-// Synonym map for fuzzy column auto-match
-const TRANSACTION_SYNONYMS = {
-  date:        ['date', 'post date', 'posting date', 'transaction date', 'trans date', 'settled', 'value date', 'trans_date'],
-  description: ['description', 'desc', 'memo', 'payee', 'merchant', 'name', 'details', 'narrative', 'transaction description'],
-  amount:      ['amount', 'amt', 'debit', 'credit', 'charge', 'payment', 'withdrawal', 'deposit', 'value', 'transaction amount'],
-  balance:     ['balance', 'running balance', 'ending balance', 'total balance', 'current balance', 'bal', 'running bal', 'account balance'],
-  accountId:   ['account', 'account name', 'bank account', 'account number', 'acct'],
-  category:    ['category', 'cat', 'type', 'transaction type', 'trans type'],
-  notes:       ['notes', 'note', 'comment', 'reference', 'ref', 'remarks'],
-};
-
-const BILL_SYNONYMS = {
-  name:          ['name', 'bill name', 'payee', 'description', 'desc', 'bill', 'expense'],
-  amount:        ['amount', 'amt', 'cost', 'price', 'payment', 'value', 'monthly amount'],
-  accountId:     ['account', 'account name', 'bank account', 'acct', 'paid from', 'charged to'],
-  period:        ['period', 'frequency', 'recurrence', 'cycle'],
-  dueDay:        ['due day', 'day', 'due date', 'payment day'],
-  paymentSource: ['payment source', 'source', 'method', 'pay method', 'paid by'],
-  matchingKey:   ['matching key', 'matching_key', 'match key', 'bank key', 'bank match names', 'bank match', 'bank aliases', 'aliases', 'statement aliases', 'bank statement match', 'bank document key', 'bank desc', 'bank description', 'bank doc key', 'reconciliation key', 'statement descriptor', 'identifier', 'doc key'],
-  notes:         ['notes', 'note', 'comment', 'remarks'],
-};
-
-// Date normalization helper
-export function normalizeIsoDate(rawDate) {
-  if (rawDate === undefined || rawDate === null || rawDate === '') return null;
-  if (typeof rawDate === 'number' || (!isNaN(Number(rawDate)) && !String(rawDate).includes('-') && !String(rawDate).includes('/') && !String(rawDate).includes('.'))) {
-    const num = Number(rawDate);
-    if (num > 1000 && num < 100000) {
-      const date = new Date(Math.round((num - 25569) * 86400 * 1000));
-      if (!isNaN(date.getTime())) {
-        const y = date.getUTCFullYear();
-        const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const d = String(date.getUTCDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-      }
-    }
-  }
-  const str = String(rawDate).trim().replace(/^["']|["']$/g, '');
-  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(str)) {
-    const [y, m, d] = str.split('-');
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
-    const [m, d, y] = str.split('/');
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(str)) {
-    const [y, m, d] = str.split('/');
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(str)) {
-    const [m, d, y] = str.split('-');
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(str)) {
-    const [d, m, y] = str.split('.');
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  const parsed = new Date(str);
-  if (!isNaN(parsed.getTime()) && !/^\d+$/.test(str)) {
-    const y = parsed.getUTCFullYear();
-    const m = String(parsed.getUTCMonth() + 1).padStart(2, '0');
-    const d = String(parsed.getUTCDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-  return null;
-}
+export {
+  MAX_SPREADSHEET_FILE_SIZE,
+  MAX_SPREADSHEET_ROW_COUNT,
+  INTERNAL_TRANSACTION_FIELDS,
+  INTERNAL_BILL_FIELDS,
+  TRANSACTION_SYNONYMS,
+  BILL_SYNONYMS,
+  normalizeIsoDate,
+  findMatchingBill,
+  matchCreditToEarner
+} from './importerHelpers.js';
+import {
+  MAX_SPREADSHEET_FILE_SIZE,
+  MAX_SPREADSHEET_ROW_COUNT,
+  INTERNAL_TRANSACTION_FIELDS,
+  INTERNAL_BILL_FIELDS,
+  TRANSACTION_SYNONYMS,
+  BILL_SYNONYMS,
+  normalizeIsoDate,
+  findMatchingBill,
+  matchCreditToEarner
+} from './importerHelpers.js';
 
 // --- File Type Detection ---
 
@@ -687,7 +615,7 @@ export function mergeTransactions(existing = [], incoming = [], resolutions = {}
  * @param {Array} [params.accounts]
  * @returns {{ person: object, reason: string }|null}
  */
-export function matchCreditToEarner({
+function _internalMatchCreditToEarner({
   amount,
   description = '',
   notes = '',

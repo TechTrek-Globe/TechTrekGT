@@ -486,7 +486,7 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
       targetItemsMap.set(cleanSingleId, singleItem);
     } else {
       for (const [k, v] of itemsByListingId.entries()) {
-        if (v.status === 'Sold' || v.status === 'Returned / Refunded') continue;
+        if (v.status === 'Sold' || v.status === 'Returned' || v.status === 'Returned / Refunded') continue;
         targetItemsMap.set(k, v);
       }
       const allListingIds = Array.from(targetItemsMap.keys()).slice(0, 200);

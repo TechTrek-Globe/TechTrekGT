@@ -15,7 +15,11 @@ import { normalizeSaleInput, upsertSale } from './sales.js';
 // Number(null) === 0. Use it for display formatting only. For any value
 // persisted into a database column, use round2Nullable instead, so that a
 // genuine NULL is not silently rewritten as 0.
-export const round2 = (val) => Math.round((Number(val) || 0) * 100) / 100;
+export const round2 = (val) => {
+  const n = Number(val);
+  if (!n || isNaN(n)) return 0;
+  return Math.round((n + Math.sign(n) * 1e-9) * 100) / 100;
+};
 
 /**
  * round2Nullable - rounding helper SAFE FOR PERSISTENCE.
@@ -168,7 +172,35 @@ export function computeItemProration(item, invoice, itemCount = 0) {
 }
 
 /**
+ * Distributes total dollars into exact integer cents across an array of weights
+ * using the Hamilton largest-remainder method.
+ *
+ * @param {number} totalDollars
+ * @param {number[]} weights
+ * @returns {number[]}
+ */
+export function distributeCents(totalDollars, weights) {
+  const totalCents = Math.round((Number(totalDollars) || 0) * 100);
+  if (totalCents === 0 || !weights || weights.length === 0) {
+    return (weights || []).map(() => 0);
+  }
+  const exact = weights.map(w => (Number(w) || 0) * totalCents);
+  const floors = exact.map(Math.floor);
+  const allocated = floors.reduce((a, b) => a + b, 0);
+  const remainder = totalCents - allocated;
+
+  const remainders = exact.map((e, i) => ({ index: i, rem: e - floors[i] }));
+  remainders.sort((a, b) => b.rem - a.rem);
+
+  for (let k = 0; k < remainder; k++) {
+    floors[remainders[k % weights.length].index] += 1;
+  }
+  return floors.map(cents => cents / 100);
+}
+
+/**
  * Recomputes all item proration fields when an invoice is updated.
+ * Distributes discount, shipping, and tax cents across items via largest remainder.
  * Returns array of updated item records ready for D1 batch upsert.
  *
  * @param {Array<{ id: string, unit_price: number }>} items
@@ -176,11 +208,31 @@ export function computeItemProration(item, invoice, itemCount = 0) {
  * @returns {Array<Object>}
  */
 export function reprorateBatch(items, invoice) {
-  // Pass the roster size so a zero-base invoice still splits evenly.
-  return items.map(item => ({
-    ...item,
-    ...computeItemProration(item, invoice, items.length)
-  }));
+  if (!items || items.length === 0) return [];
+  const base = invoice.base_total || 0;
+  const weights = items.map(item => {
+    if (base > 0) return (item.unit_price || 0) / base;
+    return 1 / items.length;
+  });
+
+  const discounts = distributeCents(invoice.discount || 0, weights);
+  const shippings = distributeCents(invoice.shipping || 0, weights);
+  const taxes = distributeCents(invoice.tax || 0, weights);
+
+  return items.map((item, idx) => {
+    const prorated_discount = discounts[idx];
+    const prorated_shipping = shippings[idx];
+    const prorated_tax = taxes[idx];
+    const true_total_cost = round2((item.unit_price || 0) - prorated_discount + prorated_shipping + prorated_tax);
+    return {
+      ...item,
+      proration_weight: weights[idx],
+      prorated_discount,
+      prorated_shipping,
+      prorated_tax,
+      true_total_cost
+    };
+  });
 }
 
 /**

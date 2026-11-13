@@ -232,6 +232,10 @@ export async function onRequestPost(context) {
       true_total_cost: item.true_total_cost
     }, item);
 
+    const priorSale = await env.DB.prepare(
+      'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
+    ).bind(item_id, payload.userId).first();
+
     const savedSale = await upsertSale(env, payload.userId, record);
     const saleId = savedSale.id;
 
@@ -259,7 +263,9 @@ export async function onRequestPost(context) {
       ).run();
     } catch (itemErr) {
       console.error('[sales] Failed to update item status, rolling back sale:', itemErr);
-      await env.DB.prepare('DELETE FROM auction_sales WHERE id = ? AND user_id = ?').bind(saleId, payload.userId).run().catch(() => {});
+      if (!priorSale) {
+        await env.DB.prepare('DELETE FROM auction_sales WHERE id = ? AND user_id = ?').bind(saleId, payload.userId).run().catch(() => {});
+      }
       return err('Failed to finalize sale recording. Database state rolled back.', 500);
     }
 

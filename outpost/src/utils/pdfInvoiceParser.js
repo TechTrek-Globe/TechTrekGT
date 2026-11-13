@@ -1,5 +1,5 @@
 import { parseCleanNumber, formatExcelDate, extractMetadataFromTitle, cleanItemName } from './spreadsheetParser.js';
-import { computePricingFloors } from './formulaPreview.js';
+import { computePricingFloors, round2 } from './formulaPreview.js';
 import {
   DEFAULT_PLATFORM_FEE_PCT,
   DEFAULT_PLATFORM_FLAT_FEE,
@@ -309,13 +309,15 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
   // 3. Build Invoices & Items Structure with full proration
   const baseTotal = rawWonItems.reduce((sum, it) => sum + it.finalPrice, 0);
 
+  const totalTaxAndFees = round2((adjustments.tax || 0) + (adjustments.buyersPremium || 0));
+
   const invoice = {
     invoice_ref: invoiceRef,
     description: `Pristine Auction - Invoice #${invoiceRef}`,
     base_total: baseTotal,
     discount: adjustments.discount,
     shipping: adjustments.shipping,
-    tax: adjustments.tax,
+    tax: totalTaxAndFees,
     date_acquired: dateAcquired,
     item_count: rawWonItems.length
   };
@@ -325,11 +327,11 @@ export function parsePristineAuctionInvoiceText(rawText, fallbackDate = null) {
     const unitPrice = won.finalPrice;
 
     // Proration weights
-    const weight = baseTotal > 0 ? unitPrice / baseTotal : 0;
-    const proratedDiscount = weight * invoice.discount;
-    const proratedShipping = weight * invoice.shipping;
-    const proratedTax = weight * invoice.tax;
-    const trueTotalCost = unitPrice - proratedDiscount + proratedShipping + proratedTax;
+    const weight = baseTotal > 0 ? unitPrice / baseTotal : (rawWonItems.length > 0 ? 1 / rawWonItems.length : 0);
+    const proratedDiscount = round2(weight * invoice.discount);
+    const proratedShipping = round2(weight * invoice.shipping);
+    const proratedTax = round2(weight * invoice.tax);
+    const trueTotalCost = round2(unitPrice - proratedDiscount + proratedShipping + proratedTax);
 
     const defaultPlatform = { fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE, est_shipping: DEFAULT_EST_SHIPPING_COST };
     const floors = computePricingFloors({

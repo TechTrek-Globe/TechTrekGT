@@ -181,10 +181,14 @@ export async function onRequestPost(context) {
       newStatus = item.status;
     } else if (liveListing?.status === 'Unsold' || liveListing?.raw_status === 'Completed' || liveListing?.raw_status === 'Ended') {
       newStatus = 'Unsold';
+    } else if (!targetListingId && !liveListing && !item.ebay_listing_id) {
+      newStatus = item.status || 'Available';
     } else {
       // Connecting or syncing an active eBay listing transitions Available and Draft items to Listed
       newStatus = 'Listed';
     }
+
+    const nextPlatform = (targetListingId || liveListing || item.ebay_listing_id) ? 'eBay' : (item.platform || 'eBay');
 
     const nextActualSellPrice = isSold ? item.actual_sell_price : (item.status === 'Sold' ? null : item.actual_sell_price);
     const nextDateSold = isSold ? item.date_sold : (item.status === 'Sold' ? null : item.date_sold);
@@ -242,7 +246,7 @@ export async function onRequestPost(context) {
           actual_sell_price = ?,
           date_sold = ?,
           days_on_market = ?,
-          platform = 'eBay',
+          platform = ?,
           platform_fee_pct = ?,
           platform_flat_fee = ?,
           ebay_promoted_rate = ?,
@@ -267,6 +271,7 @@ export async function onRequestPost(context) {
         nextActualSellPrice,
         nextDateSold,
         nextDaysOnMarket,
+        nextPlatform,
         platformFeePct,
         platformFlatFee,
         promotedRate,

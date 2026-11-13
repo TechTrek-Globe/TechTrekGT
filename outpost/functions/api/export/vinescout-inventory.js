@@ -1,6 +1,7 @@
 import { resolveIntegrationUserId, checkOutpostSecretKey } from '../../utils/apiIntegrations.js';
 import { getAllTokensFromRequest, hashTokenForLog } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
+import { DEFAULT_PLATFORM_FEE_PCT, DEFAULT_PLATFORM_FLAT_FEE } from '../../utils/constants.js';
 
 export async function onRequestGet({ request, env }) {
   try {
@@ -64,7 +65,7 @@ export async function onRequestGet({ request, env }) {
         v.invoice_ref
       FROM auction_items i
       LEFT JOIN auction_invoices v ON i.invoice_id = v.id
-      WHERE i.status IN ('Selling', 'Listed', 'Available')
+      WHERE i.status IN ('Listed', 'Available')
         AND i.user_id = ?
     `;
 
@@ -124,8 +125,8 @@ export async function onRequestGet({ request, env }) {
         status: row.status || 'Available',
         isListed: isListed,
         platform: row.platform || 'eBay',
-        feePct: (row.platform_fee_pct !== null && row.platform_fee_pct !== undefined) ? (parseFloat(row.platform_fee_pct) > 1 ? parseFloat(row.platform_fee_pct) : parseFloat(row.platform_fee_pct) * 100) : 13.6,
-        flatFee: (row.platform_flat_fee !== null && row.platform_flat_fee !== undefined) ? parseFloat(row.platform_flat_fee) : 0.40,
+        feePct: (row.platform_fee_pct !== null && row.platform_fee_pct !== undefined) ? (parseFloat(row.platform_fee_pct) > 1 ? parseFloat(row.platform_fee_pct) : parseFloat(row.platform_fee_pct) * 100) : (DEFAULT_PLATFORM_FEE_PCT * 100),
+        flatFee: (row.platform_flat_fee !== null && row.platform_flat_fee !== undefined) ? parseFloat(row.platform_flat_fee) : DEFAULT_PLATFORM_FLAT_FEE,
         shippingCost: (row.est_shipping_cost !== null && row.est_shipping_cost !== undefined) ? parseFloat(row.est_shipping_cost) : 0,
         boostPct: (row.boost_pct !== null && row.boost_pct !== undefined) ? parseFloat(row.boost_pct) : 0,
         currentListPrice: (row.current_list_price !== null && row.current_list_price !== undefined) ? parseFloat(row.current_list_price) : null,

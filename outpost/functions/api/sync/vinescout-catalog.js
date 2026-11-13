@@ -156,7 +156,7 @@ export async function onRequestPost(context) {
     }
 
     const finalSaleDate = sale_date ? String(sale_date) : (row.date_sold || new Date().toISOString().split('T')[0]);
-    const daysOnMarket = daysBetween(row.date_listed || row.date_acquired, finalSaleDate) ?? 0;
+    const daysOnMarket = daysBetween(row.date_listed || row.date_acquired, finalSaleDate);
 
     // Merge sale metadata
     attrs.outpost_liquidated = 1;

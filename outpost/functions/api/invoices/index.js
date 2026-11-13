@@ -1,7 +1,7 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computeItemProration, computePricingFloors, validateNonNegativeMoney } from '../../utils/auction.js';
+import { computeItemProration, computePricingFloors, validateNonNegativeMoney, validatePercentage, round2 } from '../../utils/auction.js';
 import { generateSku, generateUniqueSku } from '../utils/sku.js';
-import { CHUNK_SIZE, DEFAULT_TARGET_MARGIN_PCT } from '../../utils/constants.js';
+import { CHUNK_SIZE, DEFAULT_TARGET_MARGIN_PCT, normalizeItemStatus } from '../../utils/constants.js';
 
 // ============================================================
 // GET /api/invoices  - list all invoices for authenticated user
@@ -57,23 +57,23 @@ export async function onRequestPost(context) {
         const it = items[i];
         if (!it.item_name || !it.item_name.trim()) return err('Each item must have a name', 400);
         const up = validateNonNegativeMoney(it.unit_price, `items[${i}].unit_price`);
-        if (up === null || up <= 0) return err(`Item "${it.item_name}" must have a positive unit_price`, 400);
+        if (up === null || up < 0) return err(`Item "${it.item_name}" must have a valid unit_price`, 400);
         it.unit_price = up;
 
         if (it.platform_fee_pct !== undefined) {
-          it.platform_fee_pct = validateNonNegativeMoney(it.platform_fee_pct, `items[${i}].platform_fee_pct`);
+          it.platform_fee_pct = validatePercentage(it.platform_fee_pct, `items[${i}].platform_fee_pct`);
         }
         if (it.platform_flat_fee !== undefined) {
-          it.platform_flat_fee = validateNonNegativeMoney(it.platform_flat_fee, `items[${i}].platform_flat_fee`);
+          it.platform_flat_fee = validateNonNegativeMoney(it.platform_flat_fee, `items[${i}].platform_flat_fee`, 1000);
         }
         if (it.est_shipping_cost !== undefined) {
           it.est_shipping_cost = validateNonNegativeMoney(it.est_shipping_cost, `items[${i}].est_shipping_cost`);
         }
         if (it.boost_pct !== undefined) {
-          it.boost_pct = validateNonNegativeMoney(it.boost_pct, `items[${i}].boost_pct`);
+          it.boost_pct = validatePercentage(it.boost_pct, `items[${i}].boost_pct`);
         }
         if (it.target_margin_pct !== undefined) {
-          it.target_margin_pct = validateNonNegativeMoney(it.target_margin_pct, `items[${i}].target_margin_pct`);
+          it.target_margin_pct = validatePercentage(it.target_margin_pct, `items[${i}].target_margin_pct`);
         }
       }
     } catch (e) {
@@ -106,7 +106,7 @@ export async function onRequestPost(context) {
     const platformMap = new Map();
     const neededPlatforms = [...new Set(
       items
-        .filter(it => it.platform && !it.platform_fee_pct)
+        .filter(it => it.platform && (it.platform_fee_pct === undefined || it.platform_fee_pct === null))
         .map(it => it.platform.trim())
         .filter(Boolean)
     )];
@@ -131,9 +131,9 @@ export async function onRequestPost(context) {
       const proration = computeItemProration({ unit_price: it.unit_price }, invoicePayload, items.length);
 
       // Fetch platform fee defaults if platform name provided
-      let feePct = it.platform_fee_pct || 0;
-      let flatFee = it.platform_flat_fee || 0;
-      if (it.platform && (!it.platform_fee_pct)) {
+      let feePct = it.platform_fee_pct != null ? it.platform_fee_pct : 0;
+      let flatFee = it.platform_flat_fee != null ? it.platform_flat_fee : 0;
+      if (it.platform && (it.platform_fee_pct === undefined || it.platform_fee_pct === null)) {
         const plat = platformMap.get(it.platform.trim()) || platformMap.get(it.platform);
         if (plat) { feePct = plat.fee_pct; flatFee = plat.flat_fee; }
       }
@@ -185,7 +185,7 @@ export async function onRequestPost(context) {
           it.unit_price, it.unit_price,
           proration.proration_weight, proration.prorated_discount,
           proration.prorated_shipping, proration.prorated_tax, proration.true_total_cost,
-          it.status || 'Available',
+          normalizeItemStatus(it.status) || 'Available',
           it.platform || null, feePct, flatFee,
           estShipping, boostPct, pricing.min_sell_price, pricing.suggested_list_price,
           it.current_list_price || null, targetMarginPct,

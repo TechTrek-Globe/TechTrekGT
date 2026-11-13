@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { computeSaleMetrics } from '../../utils/auction.js';
+import { computeSaleMetrics, computePricingFloors, round2 } from '../../utils/auction.js';
 import { normalizeSaleInput, upsertSale } from '../../utils/sales.js';
 import {
   DEFAULT_PLATFORM_FEE_PCT,
@@ -138,7 +138,26 @@ export async function onRequestPost(context) {
         statements.push(env.DB.prepare(`INSERT INTO auction_invoices (id,user_id,invoice_ref,description,base_total,date_acquired,import_batch_id) VALUES (?,?,?,'Imported batch',?,?,?)`).bind(invId,userId,invRef||'Imported',Number(it.unit_price)||0,it.date_acquired||null,importBatchId));
       }
       const up=Number(it.unit_price)||0;const bt=Number(it.item_base_total||up);const tc=Number(it.true_total_cost||bt);
-      statements.push(env.DB.prepare(`INSERT INTO auction_items (id,user_id,invoice_id,item_name,category,unit_price,item_base_total,proration_weight,prorated_discount,prorated_shipping,prorated_tax,true_total_cost,status,platform,platform_fee_pct,platform_flat_fee,est_shipping_cost,boost_pct,min_sell_price,suggested_list_price,current_list_price,actual_sell_price,target_margin_pct,date_acquired,notes,sku,quantity,created_at,updated_at,import_batch_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'),?) ON CONFLICT(id) DO UPDATE SET item_name=excluded.item_name,unit_price=excluded.unit_price,true_total_cost=excluded.true_total_cost,status=excluded.status,updated_at=datetime('now'),import_batch_id=excluded.import_batch_id`).bind(itemId,userId,invId,it.item_name||it.title||'Unknown','Memorabilia',up,bt,1,0,0,0,tc,it.status||'Available',it.platform||'eBay',Number(it.platform_fee_pct)||DEFAULT_PLATFORM_FEE_PCT,Number(it.platform_flat_fee)||DEFAULT_PLATFORM_FLAT_FEE,Number(it.est_shipping_cost)||DEFAULT_EST_SHIPPING_COST,Number(it.boost_pct)||0,Number(it.min_sell_price)||0,Number(it.suggested_list_price)||0,it.current_list_price!==undefined?Number(it.current_list_price):null,it.actual_sell_price!==undefined?Number(it.actual_sell_price):null,Number(it.target_margin_pct)||DEFAULT_TARGET_MARGIN_PCT,it.date_acquired||null,it.notes||null,itemSku,Number(it.quantity)||1,importBatchId));
+      const feePct = Number.isFinite(Number(it.platform_fee_pct)) ? Number(it.platform_fee_pct) : DEFAULT_PLATFORM_FEE_PCT;
+      const flatFee = Number.isFinite(Number(it.platform_flat_fee)) ? Number(it.platform_flat_fee) : DEFAULT_PLATFORM_FLAT_FEE;
+      const estShip = Number.isFinite(Number(it.est_shipping_cost)) ? Number(it.est_shipping_cost) : DEFAULT_EST_SHIPPING_COST;
+      const boost = Number(it.boost_pct) || 0;
+      const targetMargin = Number.isFinite(Number(it.target_margin_pct)) ? Number(it.target_margin_pct) : DEFAULT_TARGET_MARGIN_PCT;
+      let minSell = Number(it.min_sell_price) || 0;
+      let sugList = Number(it.suggested_list_price) || 0;
+      if (minSell === 0) {
+        const floors = computePricingFloors({
+          true_total_cost: tc,
+          est_shipping_cost: estShip,
+          platform_flat_fee: flatFee,
+          platform_fee_pct: feePct,
+          boost_pct: boost,
+          target_margin_pct: targetMargin
+        });
+        minSell = floors.min_sell_price || 0;
+        sugList = floors.suggested_list_price || 0;
+      }
+      statements.push(env.DB.prepare(`INSERT INTO auction_items (id,user_id,invoice_id,item_name,category,unit_price,item_base_total,proration_weight,prorated_discount,prorated_shipping,prorated_tax,true_total_cost,status,platform,platform_fee_pct,platform_flat_fee,est_shipping_cost,boost_pct,min_sell_price,suggested_list_price,current_list_price,actual_sell_price,target_margin_pct,date_acquired,notes,sku,quantity,created_at,updated_at,import_batch_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'),?) ON CONFLICT(id) DO UPDATE SET item_name=excluded.item_name,unit_price=excluded.unit_price,true_total_cost=excluded.true_total_cost,status=excluded.status,updated_at=datetime('now'),import_batch_id=excluded.import_batch_id`).bind(itemId,userId,invId,it.item_name||it.title||'Unknown','Memorabilia',up,bt,1,0,0,0,tc,it.status||'Available',it.platform||'eBay',feePct,flatFee,estShip,boost,minSell,sugList,it.current_list_price!==undefined?Number(it.current_list_price):null,it.actual_sell_price!==undefined?Number(it.actual_sell_price):null,targetMargin,it.date_acquired||null,it.notes||null,itemSku,Number(it.quantity)||1,importBatchId));
     }
 
     for(const sale of sales){
@@ -146,7 +165,7 @@ export async function onRequestPost(context) {
       if(!itemId&&sale.item_name&&itemMap.has(sale.item_name))itemId=itemMap.get(sale.item_name);
       if(!itemId)continue;
       const saleId=sale.id||'sale-'+crypto.randomUUID();
-      const gross=Number(sale.gross_sale_price)||0;const bs=Number(sale.buyer_shipping_paid)||0;const as=Number(sale.actual_shipping_cost)||0;const fp=Number(sale.platform_fee_pct)||DEFAULT_PLATFORM_FEE_PCT;const ff=Number(sale.platform_flat_fee)||DEFAULT_PLATFORM_FLAT_FEE;const pr=Number(sale.payment_processing_amt)||0;const pl=Number(sale.promoted_listing_fee)||0;const tc=Number(sale.true_total_cost)||0;
+      const gross=Number(sale.gross_sale_price)||0;const bs=Number(sale.buyer_shipping_paid)||0;const as=Number(sale.actual_shipping_cost)||0;const fp=Number.isFinite(Number(sale.platform_fee_pct))?Number(sale.platform_fee_pct):DEFAULT_PLATFORM_FEE_PCT;const ff=Number.isFinite(Number(sale.platform_flat_fee))?Number(sale.platform_flat_fee):DEFAULT_PLATFORM_FLAT_FEE;const pr=Number(sale.payment_processing_amt)||0;const pl=Number(sale.promoted_listing_fee)||0;const tc=Number(sale.true_total_cost)||0;
       const m=computeSaleMetrics({gross_sale_price:gross,buyer_shipping_paid:bs,actual_shipping_cost:as,platform_fee_pct:fp,platform_flat_fee:ff,payment_processing_amt:pr,promoted_listing_fee:pl,true_total_cost:tc});
       statements.push(env.DB.prepare(`INSERT INTO auction_sales (id,user_id,item_id,sale_date,platform,buyer_handle,gross_sale_price,buyer_shipping_paid,actual_shipping_cost,platform_fee_pct,platform_flat_fee,platform_fees_amt,payment_processing_amt,promoted_listing_fee,net_proceeds,true_total_cost,net_profit,roi_pct,days_to_sell,created_at,import_batch_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),?) ON CONFLICT(item_id) DO UPDATE SET sale_date=excluded.sale_date,platform=excluded.platform,gross_sale_price=excluded.gross_sale_price,buyer_shipping_paid=excluded.buyer_shipping_paid,actual_shipping_cost=excluded.actual_shipping_cost,platform_fee_pct=excluded.platform_fee_pct,platform_flat_fee=excluded.platform_flat_fee,platform_fees_amt=excluded.platform_fees_amt,payment_processing_amt=excluded.payment_processing_amt,promoted_listing_fee=excluded.promoted_listing_fee,net_proceeds=excluded.net_proceeds,true_total_cost=excluded.true_total_cost,net_profit=excluded.net_profit,roi_pct=excluded.roi_pct,days_to_sell=excluded.days_to_sell,import_batch_id=excluded.import_batch_id`).bind(saleId,userId,itemId,sale.sale_date||new Date().toISOString().split('T')[0],sale.platform||'eBay',sale.buyer_handle||null,gross,bs,as,fp,ff,m.platform_fees_amt,pr,pl,m.net_proceeds,tc,m.net_profit,m.roi_pct,sale.days_to_sell!==undefined?Number(sale.days_to_sell):null,importBatchId));
       statements.push(env.DB.prepare(`UPDATE auction_items SET status='Sold',date_sold=?,actual_sell_price=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).bind(sale.sale_date||new Date().toISOString().split('T')[0],gross,itemId,userId));
@@ -158,7 +177,7 @@ export async function onRequestPost(context) {
       if(!itemId)continue;
       const compId=comp.id||'comp-'+crypto.randomUUID();
       const c1=comp.comp_1!==undefined&&comp.comp_1!==null?Number(comp.comp_1):null;const c2=comp.comp_2!==undefined&&comp.comp_2!==null?Number(comp.comp_2):null;const c3=comp.comp_3!==undefined&&comp.comp_3!==null?Number(comp.comp_3):null;
-      const valid=[c1,c2,c3].filter(v=>v!==null&&!isNaN(v)&&v>0);const ma=valid.length>0?valid.reduce((a,b)=>a+b,0)/valid.length:null;
+      const valid=[c1,c2,c3].filter(v=>v!==null&&!isNaN(v)&&v>0);const ma=valid.length>0?round2(valid.reduce((a,b)=>a+b,0)/valid.length):null;
       statements.push(env.DB.prepare(`INSERT INTO auction_comps (id,item_id,user_id,comp_1,comp_2,comp_3,manual_avg,live_avg,ebay_search_url,recommended_list_price,updated_at,import_batch_id) VALUES (?,?,?,?,?,?,?,?,?,?,datetime('now'),?) ON CONFLICT(item_id) DO UPDATE SET comp_1=excluded.comp_1,comp_2=excluded.comp_2,comp_3=excluded.comp_3,manual_avg=excluded.manual_avg,live_avg=excluded.live_avg,ebay_search_url=excluded.ebay_search_url,recommended_list_price=excluded.recommended_list_price,updated_at=datetime('now'),import_batch_id=excluded.import_batch_id`).bind(compId,itemId,userId,c1,c2,c3,ma,comp.live_avg!==undefined&&comp.live_avg!==null?Number(comp.live_avg):null,comp.ebay_search_url||null,comp.recommended_list_price!==undefined?Number(comp.recommended_list_price):ma,importBatchId));
     }
 

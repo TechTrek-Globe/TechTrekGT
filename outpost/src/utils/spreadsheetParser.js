@@ -1,7 +1,8 @@
-import { round2 } from './formulaPreview.js';
+import { round2, computePricingFloors } from './formulaPreview.js';
 import {
   DEFAULT_PLATFORM_FEE_PCT,
   DEFAULT_PLATFORM_FLAT_FEE,
+  DEFAULT_EST_SHIPPING_COST,
   DEFAULT_TARGET_MARGIN_PCT
 } from '../../functions/utils/constants.js';
 
@@ -443,8 +444,8 @@ export async function parseAuctionWorkbook(buffer, onProgress = null) {
         status: String(rawStatus || 'Available').trim(),
         platform: String(rawPlatform || 'eBay').trim(),
         platform_fee_pct: parseCleanNumber(getRowValue(row, invHeaderMap, ['platformfeepct', 'platformfee']), DEFAULT_PLATFORM_FEE_PCT),
-        platform_flat_fee: parseCleanNumber(getRowValue(row, invHeaderMap, ['platformflatfee']), 0.40),
-        est_shipping_cost: parseCleanNumber(getRowValue(row, invHeaderMap, ['estshippingcost', 'estshipping']), 6.50),
+        platform_flat_fee: parseCleanNumber(getRowValue(row, invHeaderMap, ['platformflatfee']), DEFAULT_PLATFORM_FLAT_FEE),
+        est_shipping_cost: parseCleanNumber(getRowValue(row, invHeaderMap, ['estshippingcost', 'estshipping']), DEFAULT_EST_SHIPPING_COST),
         boost_pct: parseCleanNumber(getRowValue(row, invHeaderMap, ['boostpct', 'boost']), 0),
         min_sell_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['minsellprice']), 0),
         suggested_list_price: parseCleanNumber(getRowValue(row, invHeaderMap, ['suggestedlistprice']), 0),
@@ -471,25 +472,30 @@ export async function parseAuctionWorkbook(buffer, onProgress = null) {
         item.proration_weight = item.unit_price / inv.base_total;
       }
       if (item.prorated_discount === 0 && inv.discount > 0) {
-        item.prorated_discount = item.proration_weight * inv.discount;
+        item.prorated_discount = round2(item.proration_weight * inv.discount);
       }
       if (item.prorated_shipping === 0 && inv.shipping > 0) {
-        item.prorated_shipping = item.proration_weight * inv.shipping;
+        item.prorated_shipping = round2(item.proration_weight * inv.shipping);
       }
       if (item.prorated_tax === 0 && inv.tax > 0) {
-        item.prorated_tax = item.proration_weight * inv.tax;
+        item.prorated_tax = round2(item.proration_weight * inv.tax);
       }
       if (item.true_total_cost === item.unit_price && (inv.discount > 0 || inv.shipping > 0 || inv.tax > 0)) {
         item.true_total_cost = round2(item.unit_price - item.prorated_discount + item.prorated_shipping + item.prorated_tax);
       }
     }
     // Compute pricing floors if not present
-    if (item.min_sell_price === 0 && item.true_total_cost > 0) {
-      const divisor = 1 - item.platform_fee_pct - item.boost_pct;
-      item.min_sell_price = divisor > 0
-        ? round2((item.true_total_cost + item.est_shipping_cost + item.platform_flat_fee) / divisor)
-        : 0;
-      item.suggested_list_price = round2(item.min_sell_price * (1 + item.target_margin_pct));
+    if (item.min_sell_price === 0) {
+      const floors = computePricingFloors({
+        true_total_cost: item.true_total_cost || 0,
+        est_shipping_cost: item.est_shipping_cost || 0,
+        platform_flat_fee: item.platform_flat_fee || 0,
+        platform_fee_pct: item.platform_fee_pct || 0,
+        boost_pct: item.boost_pct || 0,
+        target_margin_pct: item.target_margin_pct || 0
+      });
+      item.min_sell_price = floors.min_sell_price || 0;
+      item.suggested_list_price = floors.suggested_list_price || 0;
     }
   });
 

@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { validateNonNegativeMoney } from '../../utils/auction.js';
+import { validateNonNegativeMoney, daysBetween } from '../../utils/auction.js';
 import { normalizeSaleInput, upsertSale } from '../../utils/sales.js';
 import {
   DEFAULT_PLATFORM_FEE_PCT,
@@ -207,8 +207,9 @@ export async function onRequestGet(context) {
     // 5. Build Suggested Matches & Categorize
     const suggestedMatches = [];
     const alreadyMatched = [];
-    const matchedOrderIds = new Set();
+    const matchedLineKeys = new Set();
     const matchedItemIds = new Set();
+    const getLineKey = (line) => `${line.order_id}:${line.line_item_id || line.legacy_item_id || '0'}`;
 
     // Identify already matched pairs
     for (const line of soldLineItems) {
@@ -218,7 +219,7 @@ export async function onRequestGet(context) {
           ebay_order: line,
           vinescout_item: matchedItem || { id: line.matched_item_id, item_name: 'Matched Item' }
         });
-        matchedOrderIds.add(line.order_id);
+        matchedLineKeys.add(getLineKey(line));
         matchedItemIds.add(line.matched_item_id);
       }
     }
@@ -227,19 +228,19 @@ export async function onRequestGet(context) {
     for (const it of parsedVScoutItems) {
       if (it.linked_ebay_order_id && !matchedItemIds.has(it.id)) {
         const matchingLine = soldLineItems.find(l => l.order_id === it.linked_ebay_order_id);
-        if (matchingLine && !matchedOrderIds.has(matchingLine.order_id)) {
+        if (matchingLine && !matchedLineKeys.has(getLineKey(matchingLine))) {
           alreadyMatched.push({
             ebay_order: matchingLine,
             vinescout_item: it
           });
-          matchedOrderIds.add(matchingLine.order_id);
+          matchedLineKeys.add(getLineKey(matchingLine));
           matchedItemIds.add(it.id);
         }
       }
     }
 
     // Find suggested matches for unmatched eBay lines
-    const unmatchedSoldEbay = soldLineItems.filter(l => !matchedOrderIds.has(l.order_id));
+    const unmatchedSoldEbay = soldLineItems.filter(l => !matchedLineKeys.has(getLineKey(l)));
     const availableVScoutItems = parsedVScoutItems.filter(it => !matchedItemIds.has(it.id));
 
     for (const ebayItem of unmatchedSoldEbay) {
@@ -367,6 +368,7 @@ export async function onRequestPost(context) {
 
     const finalSaleDate = sale_date || new Date().toISOString().split('T')[0];
     const buyer = buyer_handle || body.buyerHandle || '';
+    const daysOnMarket = daysBetween(item.date_listed || item.date_acquired, finalSaleDate);
 
     // 2. Update auction_items status and attributes
     let attrs = {};
@@ -385,11 +387,17 @@ export async function onRequestPost(context) {
     await env.DB.prepare(`
       UPDATE auction_items
       SET status = 'Sold',
+          actual_sell_price = ?,
+          date_sold = ?,
+          days_on_market = ?,
           ebay_listing_id = COALESCE(?, ebay_listing_id),
           attributes = ?,
           updated_at = datetime('now')
       WHERE id = ? AND user_id = ?
     `).bind(
+      price,
+      finalSaleDate,
+      daysOnMarket,
       ebay_listing_id ? String(ebay_listing_id) : null,
       JSON.stringify(attrs),
       item.id,

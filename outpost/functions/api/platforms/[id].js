@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err, isValidPrefixedId } from '../../utils/guard.js';
-import { validateNonNegativeMoney } from '../../utils/auction.js';
+import { validateNonNegativeMoney, validatePercentage } from '../../utils/auction.js';
 
 function extractId(request, params) {
   let candidate = null;
@@ -42,7 +42,7 @@ export async function onRequestPut(context) {
 
     try {
       if (body.fee_pct !== undefined) {
-        parsedFeePct = validateNonNegativeMoney(body.fee_pct, 'fee_pct') ?? existing.fee_pct;
+        parsedFeePct = validatePercentage(body.fee_pct, 'fee_pct') ?? existing.fee_pct;
       }
       if (body.flat_fee !== undefined) {
         parsedFlatFee = validateNonNegativeMoney(body.flat_fee, 'flat_fee') ?? existing.flat_fee;

@@ -34,96 +34,102 @@ import { resolveIntegrationUserId, checkOutpostSecretKey } from '../../utils/api
  */
 export async function onRequestPost(context) {
   const { request, env } = context;
-  if (!env.DB) return err('Database binding unavailable', 500);
+  return withAuth(async () => {
+    if (!env.DB) return err('Database binding unavailable', 500);
 
-  // Alert if deprecated shared secret is still bound
-  checkOutpostSecretKey(env);
+    // Alert if deprecated shared secret is still bound
+    checkOutpostSecretKey(env);
 
-  // --- Auth via Webhook Secret or Bearer API token ---
-  const vineScoutAuth = (request.headers.get('X-VineScout-Auth') || '').trim();
-  const authHeader = (request.headers.get('Authorization') || '').trim();
-  let token = (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : vineScoutAuth).trim();
+    // --- Auth via Webhook Secret or Bearer API token ---
+    const vineScoutAuth = (request.headers.get('X-VineScout-Auth') || '').trim();
+    const authHeader = (request.headers.get('Authorization') || '').trim();
+    let token = (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : vineScoutAuth).trim();
 
-  if (!token) {
-    const tokens = getAllTokensFromRequest(request);
-    if (tokens.length > 0) token = tokens[0];
-  }
+    if (!token) {
+      const tokens = getAllTokensFromRequest(request);
+      if (tokens.length > 0) token = tokens[0];
+    }
 
-  if (!token) {
-    return err('Unauthorized: missing Bearer token or valid X-VineScout-Auth', 401);
-  }
+    if (!token) {
+      return err('Unauthorized: missing Bearer token or valid X-VineScout-Auth', 401);
+    }
 
-  const userId = await resolveIntegrationUserId(token, env);
+    const userId = await resolveIntegrationUserId(token, env);
 
-  if (!userId) {
-    return err('Unauthorized: invalid API token. Create an integration secret in Settings, API Integrations.', 401);
-  }
+    if (!userId) {
+      return err('Unauthorized: invalid API token. Create an integration secret in Settings, API Integrations.', 401);
+    }
 
-  // --- Parse body ---
-  const body = await request.json().catch(() => ({}));
-  const {
-    asin, title, category, sellingCategory, amazonCategory,
-    vine_value, etv, tax_value, taxCost, tax_cost, cost,
-    order_id,
-    image_urls, images, image_url, imageUrl,
-    page_url,
-    specs,
-    condition = 'New',
-    notes
-  } = body;
+    // --- Parse body ---
+    const body = await request.json().catch(() => ({}));
+    const {
+      asin, title, category, sellingCategory, amazonCategory,
+      vine_value, etv, tax_value, taxCost, tax_cost, cost,
+      order_id,
+      image_urls, images, image_url, imageUrl,
+      page_url,
+      specs,
+      condition = 'New',
+      notes
+    } = body;
 
-  if (!asin || !asin.trim()) return err('asin is required');
-  if (!title || !title.trim()) return err('title is required');
+    if (!asin || !asin.trim()) return err('asin is required');
+    if (!title || !title.trim()) return err('title is required');
 
-  const cleanAsin   = asin.toUpperCase().trim();
-  let etvAmt = 0;
-  let taxCostAmt = 0;
-  try {
-    const rawEtv = etv !== undefined ? etv : (vine_value !== undefined ? vine_value : 0);
-    etvAmt = validateNonNegativeMoney(rawEtv, 'etv') ?? 0;
-    const rawTaxCost = taxCost !== undefined ? taxCost : (tax_cost !== undefined ? tax_cost : (tax_value !== undefined ? tax_value : (cost !== undefined ? cost : etvAmt)));
-    taxCostAmt = validateNonNegativeMoney(rawTaxCost, 'tax_cost') ?? 0;
-  } catch (e) {
-    return err(e.message, 400);
-  }
-  // MED-10: $0 ETV and $0 tax cost are legitimate defaults for Vine items (e.g. food/beauty categories).
-  // Upstream validation guarantees non-negative bounds.
-  const unitPrice   = taxCostAmt; // Outpost inventory item cost basis
-  const taxAmt      = 0;
-  const resolvedCat = sellingCategory || amazonCategory || category || 'Other';
-  const today       = new Date().toISOString().split('T')[0];
-  const rawOrderId = body.order_id ?? body.orderId ?? body.item?.order_id ?? body.item?.orderId;
-  const cleanOrderId = (rawOrderId !== undefined && rawOrderId !== null)
-    ? String(rawOrderId).trim()
-    : null;
-  const normalizedOrderId = cleanOrderId && cleanOrderId.length > 0 ? cleanOrderId : null;
+    const cleanAsin   = asin.toUpperCase().trim();
+    let etvAmt = 0;
+    let taxCostAmt = 0;
+    try {
+      const rawEtv = etv !== undefined ? etv : (vine_value !== undefined ? vine_value : 0);
+      etvAmt = validateNonNegativeMoney(rawEtv, 'etv') ?? 0;
+      const rawTaxCost = taxCost !== undefined ? taxCost : (tax_cost !== undefined ? tax_cost : (tax_value !== undefined ? tax_value : (cost !== undefined ? cost : etvAmt)));
+      taxCostAmt = validateNonNegativeMoney(rawTaxCost, 'tax_cost') ?? 0;
+    } catch (e) {
+      return err(e.message, 400);
+    }
+    // MED-10: $0 ETV and $0 tax cost are legitimate defaults for Vine items (e.g. food/beauty categories).
+    // Upstream validation guarantees non-negative bounds.
+    const unitPrice   = taxCostAmt; // Outpost inventory item cost basis
+    const taxAmt      = taxCostAmt;
+    const resolvedCat = sellingCategory || amazonCategory || category || 'Other';
+    const today       = new Date().toISOString().split('T')[0];
+    const rawOrderId = body.order_id ?? body.orderId ?? body.item?.order_id ?? body.item?.orderId;
+    const cleanOrderId = (rawOrderId !== undefined && rawOrderId !== null)
+      ? String(rawOrderId).trim()
+      : null;
+    const normalizedOrderId = cleanOrderId && cleanOrderId.length > 0 ? cleanOrderId : null;
 
-  // Resolve image URL array - prefer arrays, fall back to single strings
-  const resolvedImageUrls = Array.isArray(images) && images.length > 0
-    ? images
-    : (Array.isArray(image_urls) && image_urls.length > 0
-        ? image_urls
-        : (image_url ? [image_url] : (imageUrl ? [imageUrl] : [])));
+    // Resolve image URL array - prefer arrays, fall back to single strings
+    const resolvedImageUrls = Array.isArray(images) && images.length > 0
+      ? images
+      : (Array.isArray(image_urls) && image_urls.length > 0
+          ? image_urls
+          : (image_url ? [image_url] : (imageUrl ? [imageUrl] : [])));
 
-  // Check user default platform
-  const plat = await env.DB.prepare(
-    `SELECT fee_pct, flat_fee, name FROM auction_platforms WHERE user_id = ? AND is_default = 1 LIMIT 1`
-  ).bind(userId).first() || { name: 'eBay', fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE };
+    // Check user default platform
+    const plat = await env.DB.prepare(
+      `SELECT fee_pct, flat_fee, name FROM auction_platforms WHERE user_id = ? AND is_default = 1 LIMIT 1`
+    ).bind(userId).first() || { name: 'eBay', fee_pct: DEFAULT_PLATFORM_FEE_PCT, flat_fee: DEFAULT_PLATFORM_FLAT_FEE };
 
-  // Check whether an inventory item with this order_id already exists in D1.
-  // When order_id is absent, each import generates a distinct item and unique SKU.
-  let existingItem = null;
-  if (normalizedOrderId) {
-    existingItem = await env.DB.prepare(`
-      SELECT i.id, i.sku, i.invoice_id, i.attributes, i.notes 
-      FROM auction_items i
-      WHERE i.user_id = ? AND (
-        json_extract(i.attributes, '$.order_id') = ? 
-        OR i.notes LIKE ?
-      )
-      LIMIT 1
-    `).bind(userId, normalizedOrderId, `%Order ID: ${normalizedOrderId}%`).first();
-  }
+    // Check whether an inventory item with this order_id already exists in D1.
+    // When order_id is absent, each import generates a distinct item and unique SKU.
+    let existingItem = null;
+    if (normalizedOrderId) {
+      existingItem = await env.DB.prepare(`
+        SELECT i.id, i.sku, i.invoice_id, i.attributes, i.notes, i.status
+        FROM auction_items i
+        WHERE i.user_id = ? AND (
+          i.order_id = ?
+          OR json_extract(i.attributes, '$.order_id') = ? 
+          OR i.notes LIKE ?
+        )
+        LIMIT 1
+      `).bind(userId, normalizedOrderId, normalizedOrderId, `%Order ID: ${normalizedOrderId}%`).first();
+    }
+
+    if (existingItem?.status === 'Sold') {
+      return err('Cannot re-import or overwrite an item that has already been sold', 400);
+    }
 
   // Build structured attributes JSON blob
   let existingAttrs = {};
@@ -287,4 +293,5 @@ export async function onRequestPost(context) {
   }
 
   return ok({ success: true, item_id: itemId, sku: itemSku, invoice_ref: invoiceRef }, 201);
+  });
 }

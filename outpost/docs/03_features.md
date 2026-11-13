@@ -699,6 +699,36 @@ Comprehensive edge router hardening, fail-closed authentication lifecycle govern
    - Utility `escapeCsvCell(value)` neutralizes spreadsheet formula execution triggers (leading `=`, `+`, `-`, `@`, `\t`, `\r`) by prepending a single quote (`'`) and escaping double quotes.
    - Applied across export workflows in `TaxReportModal.jsx` (sales and supplies ledgers) and `SettingsView.jsx` (inventory items and sales logs).
 
+## Phase 2 Financial Math, Inventory Lifecycle & Ingestion Hardening [ACTION ID: FIN-002 / AUDIT-006]
+
+Unification of pricing and margin calculation engines, exact integer-cent largest-remainder proration, non-destructive transactional rollbacks, lifecycle state guardrails, and hardened invoice and marketplace ingestion pipelines.
+
+### Financial Math & Lifecycle Capabilities
+
+1. **Unified Pricing Engine & Tooltip Concordance (`src/utils/pricingMetrics.js`, `src/utils/feeEngine.js`)**:
+   - Engine Delegation: `getItemFloorMetrics` delegates fee breakdown and target price calculations directly to `computeFeeBreakdown` and `computeTargetPriceFromMargin` from `feeEngine.js`.
+   - Synchronized Metric Contracts: Returns both percentage and decimal representation (`marginPct`, `marginDecimal`, `roiPct`, `roiDecimal`) alongside full `breakdown` metadata, resolving conflicting profit and target floor numbers between `InventoryPricingTooltip`, `FeeBreakdownPanel`, and `EditItemModal`.
+   - Canonical Floor Guarantee: Honors canonical `min_sell_price` from `computePricingFloors` and explicit floor overrides with zero drift between tooltip display and database storage.
+2. **Epsilon-Corrected Currency Rounding & Integer-Cent Proration (`functions/utils/auction.js`)**:
+   - IEEE-754 Half-Cent Correction: Enhanced `round2` with sign-aware epsilon (`Math.round((n + Math.sign(n) * 1e-9) * 100) / 100`) to eliminate floating-point half-cent truncation (e.g. `1.005` correctly rounding to `1.01`).
+   - Hamilton Largest-Remainder Distribution (`distributeCents`): Upgraded `reprorateBatch` to distribute invoice discount, shipping, and tax dollars into exact integer cents weighted by item base costs, guaranteeing that item landed costs sum strictly to the invoice total down to $0.01 without penny loss.
+3. **Lifecycle State Guardrails & Non-Destructive Rollbacks**:
+   - Exact-Match Gating (`sync-all.js`): Prevents items from prematurely transitioning to `'Sold'` status when eBay order matches are low-confidence or deferred to `PENDING_SALE_MATCH` alerts, keeping items in active `'Listed'` status.
+   - Non-Destructive Rollback (`sales/index.js`, `tokenHelper.js`): Pre-checks for existing sale records prior to upsert mutations; if downstream item updates fail, only newly created sales are purged while pre-existing sales remain intact.
+   - Sold Field Population (`match-sold-vinescout.js`): Automatically sets `actual_sell_price`, `date_sold`, and `days_on_market` (via `daysBetween`) on `auction_items` when marked sold via VineScout matching.
+   - Multi-Line Order Handling: Keys matched lines by `order_id:line_item_id` in `match-sold-vinescout.js` to prevent sibling line items within a multi-item order from being hidden.
+   - Unlinked Listing Protection (`sync-item.js`): Preserves item `status` and `platform` when target listing ID and live listing are null, preventing accidental overwriting.
+   - Status Normalization (`sync-all.js`, `analytics.js`): Excludes canonical `'Returned'` status alongside `'Sold'` from automated sync and traffic ingestion queries.
+4. **Fee Reconciliation Isolation & Platform Input Validation**:
+   - Independent Fee Variance (`reconcile.js`): Separates actual platform fees (`finalValueFee + promotedListingFee + paymentProcessingFee + regulatoryFee`) from `shippingLabelCost`, ensuring `feeDelta` compares platform fees apples-to-apples against `estimatedFees` without label cost distortion.
+   - Percentage Range Guard (`platforms/[id].js`): Enforces `validatePercentage` (`0 <= fee_pct < 1`) on platform updates to prevent multi-hundred percent rate inputs.
+5. **Tax Valuation & Ingestion Parser Hardening**:
+   - Asset Valuation Compliance (`reports/tax.js`): Applies `round2` across all revenue and cost aggregations, and excludes non-sellable inventory statuses (`'Kept for Self'`, `'Returned'`) from beginning and ending Schedule C / Form 1125-A inventory calculations.
+   - Buyer's Premium Recovery (`pdfInvoiceParser.js`): Captures `adjustments.buyersPremium` from auction invoice text and incorporates it into invoice tax and item landed cost basis, rounding all prorated lines with `round2`.
+   - Spreadsheet Parser Hardening (`spreadsheetParser.js`): Imports default fees and shipping costs from `constants.js`, applies `round2` on prorations, and computes pricing floors via `computePricingFloors` even for $0 acquisition items.
+   - Amazon / VineScout Ingestion Hardening (`import/amazon.js`, `export/vinescout-inventory.js`): Wraps Amazon import in `withAuth`, queries indexed `order_id`, prevents overwriting already sold items, preserves `taxCostAmt`, and cleans non-canonical statuses from export endpoints.
+   - Batch Import Guardrails (`import/batch.js`): Uses `Number.isFinite` to preserve valid 0% fees, rounds manual comp averages with `round2`, and auto-computes pricing floors for unpriced imports.
+
 
 
 

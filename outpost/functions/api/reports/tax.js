@@ -1,4 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
+import { round2 } from '../../utils/auction.js';
 
 /**
  * GET /api/reports/tax - Generates IRS Schedule C & Inventory Asset Valuation report
@@ -42,17 +43,25 @@ export async function onRequestGet(context) {
     let netProfitRealized = 0;
 
     for (const s of sales) {
-      grossItemSales += s.gross_sale_price || 0;
-      buyerShippingPaid += s.buyer_shipping_paid || 0;
-      cogs += s.true_total_cost || 0;
-      platformFees += (s.platform_fees_amt || 0) + (s.payment_processing_amt || 0) + (s.promoted_listing_fee || 0);
-      actualShippingPaid += s.actual_shipping_cost || 0;
-      netProceeds += s.net_proceeds || 0;
-      netProfitRealized += s.net_profit || 0;
+      grossItemSales += Number(s.gross_sale_price) || 0;
+      buyerShippingPaid += Number(s.buyer_shipping_paid) || 0;
+      cogs += Number(s.true_total_cost) || 0;
+      platformFees += (Number(s.platform_fees_amt) || 0) + (Number(s.payment_processing_amt) || 0) + (Number(s.promoted_listing_fee) || 0);
+      actualShippingPaid += Number(s.actual_shipping_cost) || 0;
+      netProceeds += Number(s.net_proceeds) || 0;
+      netProfitRealized += Number(s.net_profit) || 0;
     }
 
-    const totalGrossRevenue = grossItemSales + buyerShippingPaid;
-    const grossProfit = totalGrossRevenue - cogs;
+    grossItemSales = round2(grossItemSales);
+    buyerShippingPaid = round2(buyerShippingPaid);
+    cogs = round2(cogs);
+    platformFees = round2(platformFees);
+    actualShippingPaid = round2(actualShippingPaid);
+    netProceeds = round2(netProceeds);
+    netProfitRealized = round2(netProfitRealized);
+
+    const totalGrossRevenue = round2(grossItemSales + buyerShippingPaid);
+    const grossProfit = round2(totalGrossRevenue - cogs);
 
     // 2. Fetch Supplies Data
     let suppliesQuery = `SELECT * FROM auction_supplies WHERE user_id = ?`;
@@ -69,8 +78,9 @@ export async function onRequestGet(context) {
 
     let totalSuppliesCost = 0;
     for (const sup of supplies) {
-      totalSuppliesCost += sup.cost || 0;
+      totalSuppliesCost += Number(sup.cost) || 0;
     }
+    totalSuppliesCost = round2(totalSuppliesCost);
 
     // 3. Inventory Asset Valuation (Beginning vs Ending Inventory)
     // OPT-C: Executed via direct SQL aggregation on D1 instead of loading all items into JS memory
@@ -81,9 +91,9 @@ export async function onRequestGet(context) {
     const curActiveRow = await env.DB.prepare(
       `SELECT COALESCE(SUM(true_total_cost), 0) AS val
        FROM auction_items
-       WHERE user_id = ? AND status != 'Sold'`
+       WHERE user_id = ? AND status NOT IN ('Sold', 'Kept for Self', 'Returned')`
     ).bind(userId).first();
-    currentActiveInventoryValue = Number(curActiveRow?.val || 0);
+    currentActiveInventoryValue = round2(curActiveRow?.val || 0);
 
     if (!isAllYears) {
       const yearInt = parseInt(requestedYear, 10);
@@ -92,22 +102,22 @@ export async function onRequestGet(context) {
 
       const valuationRow = await env.DB.prepare(
         `SELECT
-           COALESCE(SUM(CASE WHEN COALESCE(date_acquired, '1970-01-01') < ? AND (date_sold IS NULL OR date_sold >= ?) THEN true_total_cost ELSE 0 END), 0) AS beg_val,
-           COALESCE(SUM(CASE WHEN COALESCE(date_acquired, '1970-01-01') <= ? AND (date_sold IS NULL OR date_sold > ?) THEN true_total_cost ELSE 0 END), 0) AS end_val
+           COALESCE(SUM(CASE WHEN COALESCE(date_acquired, '1970-01-01') < ? AND (date_sold IS NULL OR date_sold >= ?) AND status NOT IN ('Kept for Self', 'Returned') THEN true_total_cost ELSE 0 END), 0) AS beg_val,
+           COALESCE(SUM(CASE WHEN COALESCE(date_acquired, '1970-01-01') <= ? AND (date_sold IS NULL OR date_sold > ?) AND status NOT IN ('Kept for Self', 'Returned') THEN true_total_cost ELSE 0 END), 0) AS end_val
          FROM auction_items
          WHERE user_id = ?`
       ).bind(startOfYearDate, startOfYearDate, endOfYearDate, endOfYearDate, userId).first();
 
-      beginningInventoryValue = Number(valuationRow?.beg_val || 0);
-      endingInventoryValue = Number(valuationRow?.end_val || 0);
+      beginningInventoryValue = round2(valuationRow?.beg_val || 0);
+      endingInventoryValue = round2(valuationRow?.end_val || 0);
     } else {
       beginningInventoryValue = 0;
       endingInventoryValue = currentActiveInventoryValue;
     }
 
     // Schedule C Line Calculations
-    const totalOperatingExpenses = platformFees + actualShippingPaid + totalSuppliesCost;
-    const scheduleC_netIncome = grossProfit - totalOperatingExpenses;
+    const totalOperatingExpenses = round2(platformFees + actualShippingPaid + totalSuppliesCost);
+    const scheduleC_netIncome = round2(grossProfit - totalOperatingExpenses);
 
     // Available Tax Years list for dropdown
     const yearsResult = await env.DB.prepare(`

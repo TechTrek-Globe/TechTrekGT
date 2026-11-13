@@ -14,12 +14,13 @@
  *    (landedCost + estShippingCost + platformFlatFee) / (1 - platformFeePct - adFeePct - targetMarginPct)
  */
 
-import { round2 } from '../../functions/utils/auction.js';
+import { round2, computePricingFloors } from '../../functions/utils/auction.js';
 import {
   DEFAULT_PLATFORM_FEE_PCT,
   DEFAULT_PLATFORM_FLAT_FEE,
   DEFAULT_TARGET_MARGIN_PCT
 } from '../../functions/utils/constants.js';
+import { computeFeeBreakdown, computeTargetPriceFromMargin, normalizeRateDecimal } from './feeEngine.js';
 
 export function getItemFloorMetrics(item) {
   if (!item) {
@@ -37,13 +38,16 @@ export function getItemFloorMetrics(item) {
       adFees: 0,
       trueNetProfit: 0,
       marginPct: 0,
+      marginDecimal: 0,
       roiPct: 0,
+      roiDecimal: 0,
       breakEven: 0,
       breakEvenFloor: 0,
       targetDecimal: DEFAULT_TARGET_MARGIN_PCT,
       targetMarginPct: DEFAULT_TARGET_MARGIN_PCT,
       targetFloor: 0,
-      targetMarginFloor: 0
+      targetMarginFloor: 0,
+      breakdown: null
     };
   }
 
@@ -71,7 +75,7 @@ export function getItemFloorMetrics(item) {
   const rawPlatformFeePct = item.platform_fee_pct != null && item.platform_fee_pct !== ''
     ? Number(item.platform_fee_pct)
     : DEFAULT_PLATFORM_FEE_PCT;
-  const platformFeePct = rawPlatformFeePct > 1 ? rawPlatformFeePct / 100 : (rawPlatformFeePct || 0);
+  const platformFeePct = normalizeRateDecimal(rawPlatformFeePct);
 
   // Platform Flat Fee
   const platformFlatFee = round2(
@@ -82,21 +86,19 @@ export function getItemFloorMetrics(item) {
 
   // Promoted Ad Fee % (normalized decimal)
   const rawBoost = item.ebay_promoted_rate ?? item.boost_pct ?? 0;
-  const numBoost = Number(rawBoost);
-  const adFeePct = numBoost > 1 ? numBoost / 100 : (numBoost || 0);
+  const adFeePct = normalizeRateDecimal(rawBoost);
 
   // Target Margin % (normalized decimal)
   const rawTarget = item.target_margin_pct != null && item.target_margin_pct !== ''
     ? Number(item.target_margin_pct)
     : DEFAULT_TARGET_MARGIN_PCT;
-  const targetMarginPct = rawTarget > 1 ? rawTarget / 100 : (rawTarget || 0);
+  const targetMarginPct = normalizeRateDecimal(rawTarget);
 
   // Buyer shipping paid
   const buyerShipping = Math.max(
     0,
     Number(item.buyer_shipping_cost ?? item.shipping_charged ?? item.buyer_shipping_paid ?? 0) || 0
   );
-  const buyerShippingBurden = round2(buyerShipping * platformFeePct);
 
   // 1. Platform & Ad Fees at listPrice
   // Final Value Fee applies to (listPrice + buyerShipping) plus flat fee
@@ -113,21 +115,42 @@ export function getItemFloorMetrics(item) {
   const roiPct = (hasPrice && landedCost > 0) ? round2((trueNetProfit / landedCost) * 100) : 0;
 
   // 4. Break-even Floor Price (0% profit):
-  //    Matches canonical computePricingFloors from functions/utils/auction.js:
-  //    (landedCost + estShippingCost + platformFlatFee) / (1 - platformFeePct - adFeePct)
-  //    Business rule: buyer-paid shipping does NOT offset or burden the item floor (T-10 item 1).
+  //    Matches canonical computePricingFloors from functions/utils/auction.js (T-10 item 1).
+  //    Business rule: buyer-paid shipping does NOT offset or burden the item floor.
   const estShippingCost = Math.max(0, Number(item.est_shipping_cost) || 0);
-  const costBasis = round2(landedCost + platformFlatFee + estShippingCost);
-  const breakEvenDivisor = 1 - platformFeePct - adFeePct;
-  const computedBreakEven = breakEvenDivisor > 0 ? round2(costBasis / breakEvenDivisor) : 0;
+  const floorCalc = computePricingFloors({
+    true_total_cost: landedCost,
+    est_shipping_cost: estShippingCost,
+    platform_flat_fee: platformFlatFee,
+    platform_fee_pct: platformFeePct,
+    boost_pct: adFeePct,
+    target_margin_pct: 0
+  });
+  const computedBreakEven = floorCalc.min_sell_price ?? 0;
   const breakEvenFloor = Number(item.floor_price || item.min_sell_price) > 0
     ? round2(Number(item.floor_price || item.min_sell_price))
     : computedBreakEven;
 
-  // 5. Min Target Margin Floor:
-  //    (landedCost + estShippingCost + platformFlatFee) / (1 - platformFeePct - adFeePct - targetMarginPct)
-  const targetMarginDivisor = 1 - platformFeePct - adFeePct - targetMarginPct;
-  const targetMarginFloor = targetMarginDivisor > 0 ? round2(costBasis / targetMarginDivisor) : 0;
+  // 5. Min Target Margin Floor via unified feeEngine calculation
+  const targetMarginFloor = computeTargetPriceFromMargin(
+    landedCost,
+    targetMarginPct,
+    platformFeePct,
+    adFeePct,
+    estShippingCost,
+    platformFlatFee,
+    buyerShipping
+  );
+
+  const breakdown = computeFeeBreakdown({
+    sellPrice: listPrice,
+    cogs: landedCost,
+    platform_fee_pct: platformFeePct,
+    platform_flat_fee: platformFlatFee,
+    ebay_promoted_rate: adFeePct,
+    buyer_shipping_cost: buyerShipping,
+    est_shipping_cost: estShippingCost
+  });
 
   return {
     hasPrice,
@@ -143,13 +166,16 @@ export function getItemFloorMetrics(item) {
     adFees,
     trueNetProfit,
     marginPct,
+    marginDecimal: breakdown.marginPct,
     roiPct,
+    roiDecimal: breakdown.roiPct,
     breakEven: breakEvenFloor,
     breakEvenFloor,
     targetDecimal: targetMarginPct,
     targetMarginPct,
     targetFloor: targetMarginFloor,
-    targetMarginFloor
+    targetMarginFloor,
+    breakdown
   };
 }
 

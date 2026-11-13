@@ -71,9 +71,10 @@ export async function onRequestPost(context) {
     const promotedListingActive = finData.promoted_listing_active || false;
     const transactions = finData.raw || [];
 
-    const actualFees = parseFloat((finalValueFee + promotedListingFee + shippingLabelCost + paymentProcessingFee + regulatoryFee).toFixed(2));
+    const actualPlatformFees = parseFloat((finalValueFee + promotedListingFee + paymentProcessingFee + regulatoryFee).toFixed(2));
+    const actualFees = parseFloat((actualPlatformFees + shippingLabelCost).toFixed(2));
     const estimatedFees = parseFloat(sale.platform_fees_amt || 0);
-    const feeDelta = parseFloat((actualFees - estimatedFees).toFixed(4));
+    const feeDelta = parseFloat((actualPlatformFees - estimatedFees).toFixed(4));
 
     // Reconciled net profit = gross - shipping - true_cost - actual_fees
     const gross = parseFloat(sale.gross_sale_price || finData.gross_sale_amount || 0);

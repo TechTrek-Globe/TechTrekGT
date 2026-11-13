@@ -91,8 +91,9 @@ export async function onRequestPut(context) {
     const updatedInvoice = { ...invoice, discount: newDiscount, shipping: newShipping, tax: newTax };
     const updateStatements = [];
 
-    for (const item of (existing.results || [])) {
-      const proration = computeItemProration({ unit_price: item.unit_price }, updatedInvoice);
+    const itemsList = existing.results || [];
+    for (const item of itemsList) {
+      const proration = computeItemProration({ unit_price: item.unit_price }, updatedInvoice, itemsList.length);
       const pricing   = computePricingFloors({
         true_total_cost:  proration.true_total_cost,
         est_shipping_cost: item.est_shipping_cost || 0,

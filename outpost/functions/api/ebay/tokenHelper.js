@@ -1680,6 +1680,10 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
   const startDate = item.date_listed || item.date_acquired;
   const daysToSell = daysBetween(startDate, saleDate);
 
+  const priorSale = await env.DB.prepare(
+    'SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?'
+  ).bind(item.id, userId).first();
+
   let savedSale = await markItemSold(env, userId, item, {
     sale_date: saleDate,
     platform: 'eBay',
@@ -1794,7 +1798,9 @@ export async function reconcileAndSaveEbaySale(env, userId, item, orderData = nu
   } catch (postSaleErr) {
     console.error(`[reconcileAndSaveEbaySale] Error updating reconciliations or item for item ${item.id}:`, postSaleErr);
     await env.DB.prepare('DELETE FROM ebay_fee_reconciliations WHERE sale_id = ? AND user_id = ?').bind(saleId, userId).run().catch(() => {});
-    await env.DB.prepare('DELETE FROM auction_sales WHERE id = ? AND user_id = ?').bind(saleId, userId).run().catch(() => {});
+    if (!priorSale) {
+      await env.DB.prepare('DELETE FROM auction_sales WHERE id = ? AND user_id = ?').bind(saleId, userId).run().catch(() => {});
+    }
     await env.DB.prepare(`
       UPDATE auction_items SET
         status = ?, actual_sell_price = ?, date_sold = ?, days_on_market = ?, updated_at = datetime('now')

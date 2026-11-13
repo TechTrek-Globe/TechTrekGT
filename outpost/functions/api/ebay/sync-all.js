@@ -323,7 +323,8 @@ export async function onRequestPost(context) {
                 const orderData = await fetchEbayOrderForListing(env, accessToken, item.ebay_listing_id, item.sku || match.sku, item.item_name || match.title);
                 if (orderData && orderData.isExactMatch === false) {
                   // MED-2: Title similarity match only - do NOT call reconcileAndSaveEbaySale automatically.
-                  // Insert into auction_market_alerts for human confirmation.
+                  // Hold item in active status until human confirms the sale match to prevent orphaned 'Sold' items.
+                  newStatus = item.status && item.status !== 'Sold' ? item.status : 'Listed';
                   const alertId = `alt_${crypto.randomUUID()}`;
                   const salePrice = orderData.salePrice || orderData.lineItemCost || 0;
                   const currentPrice = item.current_list_price || 0;
@@ -532,7 +533,7 @@ export async function onRequestPost(context) {
       const nowMs = Date.now();
       const activeLinkedItems = items.filter(
         it => it.ebay_listing_id && String(it.ebay_listing_id).trim() &&
-              it.status !== 'Sold' && it.status !== 'Returned / Refunded'
+              it.status !== 'Sold' && it.status !== 'Returned' && it.status !== 'Returned / Refunded'
       );
       const needsStoreTrafficSync = forceAnalytics || activeLinkedItems.some(it => {
         if (!it.analytics_fetched_at) return true;

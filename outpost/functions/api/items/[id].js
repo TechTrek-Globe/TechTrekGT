@@ -213,23 +213,29 @@ export async function onRequestPut(context) {
     // Guard against unique constraint collision on ebay_listing_id
     if (updated.ebay_listing_id && updated.ebay_listing_id !== item.ebay_listing_id) {
       const existingListing = await env.DB.prepare(
-        'SELECT id, sku, item_name, status FROM auction_items WHERE ebay_listing_id = ? AND id != ? LIMIT 1'
+        'SELECT id, sku, item_name, status, user_id FROM auction_items WHERE ebay_listing_id = ? AND id != ? LIMIT 1'
       ).bind(updated.ebay_listing_id, id).first();
       if (existingListing) {
-        return err(
-          `eBay listing #${updated.ebay_listing_id} is already linked to item "${existingListing.item_name}" (${existingListing.sku || existingListing.id}, status: ${existingListing.status}). Please unlink it first.`,
-          400
-        );
+        if (existingListing.user_id === payload.userId) {
+          return err(
+            `eBay listing #${updated.ebay_listing_id} is already linked to item "${existingListing.item_name}" (${existingListing.sku || existingListing.id}, status: ${existingListing.status}). Please unlink it first.`,
+            400
+          );
+        }
+        return err(`eBay listing #${updated.ebay_listing_id} is already linked to another item.`, 400);
       }
     }
 
     // Guard against unique constraint collision on sku
     if (updated.sku && updated.sku !== item.sku) {
       const existingSku = await env.DB.prepare(
-        'SELECT id, sku, item_name FROM auction_items WHERE sku = ? AND id != ? LIMIT 1'
+        'SELECT id, sku, item_name, user_id FROM auction_items WHERE sku = ? AND id != ? LIMIT 1'
       ).bind(updated.sku, id).first();
       if (existingSku) {
-        return err(`SKU "${updated.sku}" is already assigned to item "${existingSku.item_name}".`, 400);
+        if (existingSku.user_id === payload.userId) {
+          return err(`SKU "${updated.sku}" is already assigned to item "${existingSku.item_name}".`, 400);
+        }
+        return err(`SKU "${updated.sku}" is already in use.`, 400);
       }
     }
 
@@ -463,12 +469,19 @@ export async function onRequestPut(context) {
         });
       } else if (wasSold && !isSold) {
         // Reverted away from Sold - remove corresponding sale record to keep Sold Tracker clean
-        await env.DB.prepare(
+        const deleteReconStmt = env.DB.prepare(
           'DELETE FROM ebay_fee_reconciliations WHERE user_id = ? AND sale_id IN (SELECT id FROM auction_sales WHERE item_id = ? AND user_id = ?)'
-        ).bind(payload.userId, id, payload.userId).run().catch(() => {});
-        await env.DB.prepare(
+        ).bind(payload.userId, id, payload.userId);
+        const deleteSaleStmt = env.DB.prepare(
           'DELETE FROM auction_sales WHERE item_id = ? AND user_id = ?'
-        ).bind(id, payload.userId).run();
+        ).bind(id, payload.userId);
+
+        if (typeof env.DB.batch === 'function') {
+          await env.DB.batch([deleteReconStmt, deleteSaleStmt]);
+        } else {
+          await deleteReconStmt.run().catch(() => {});
+          await deleteSaleStmt.run();
+        }
       }
     } catch (syncErr) {
       console.error('[items] Failed to synchronize Sold Tracker status, reverting item:', syncErr);
@@ -519,12 +532,16 @@ export async function onRequestDelete(context) {
       return err('Cannot delete an item that has recorded sales. Set status to "Returned" instead.', 409);
     }
 
+    const deleteAnalyticsStmt = env.DB.prepare('DELETE FROM auction_item_analytics WHERE item_id = ? AND user_id = ?').bind(id, payload.userId);
+    const deleteTrafficStmt = env.DB.prepare('DELETE FROM listing_traffic WHERE item_id = ? AND user_id = ?').bind(id, payload.userId);
     const deleteCompsStmt = env.DB.prepare('DELETE FROM auction_comps WHERE item_id = ? AND user_id = ?').bind(id, payload.userId);
     const deleteItemStmt = env.DB.prepare('DELETE FROM auction_items WHERE id = ? AND user_id = ?').bind(id, payload.userId);
 
     if (typeof env.DB.batch === 'function') {
-      await env.DB.batch([deleteCompsStmt, deleteItemStmt]);
+      await env.DB.batch([deleteAnalyticsStmt, deleteTrafficStmt, deleteCompsStmt, deleteItemStmt]);
     } else {
+      await deleteAnalyticsStmt.run().catch(() => {});
+      await deleteTrafficStmt.run().catch(() => {});
       await deleteCompsStmt.run();
       await deleteItemStmt.run();
     }

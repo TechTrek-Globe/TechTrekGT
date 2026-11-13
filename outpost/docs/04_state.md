@@ -263,6 +263,13 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
     - In-Engine SQL Aggregations: `functions/api/reports/tax.js` calculates IRS Schedule C beginning/ending inventory values via conditional `SUM()` queries directly on SQLite.
     - Chunked Ingestions & Decoupled Polling: `functions/api/ebay/listingsCache.js` and `functions/api/ebay/sync-all.js` apply 50-statement chunking. `src/context/InventoryContext.jsx` stabilizes sync callbacks with `useRef` to eliminate interval churn.
     - Indexes: Added `idx_auction_items_user_status_created` on `(user_id, status, created_at DESC)` and `idx_market_alerts_user_unread` on `(user_id, is_read, created_at DESC)`. Dropped redundant duplicate index `idx_auction_sales_item`.
+  - **Phase 1 Security & Authentication State Hardening [ACTION ID: SEC-001 / AUDIT-005]**:
+    - Central Edge Auth Dispatch: `src/worker.js` inspects `routeMatch.route.auth` prior to handler execution. Unauthenticated requests fail before reaching business logic.
+    - Stale Cookie Cleansing: All 401 and 403 responses emit `Set-Cookie: auth_token=; Max-Age=0; HttpOnly; Secure; SameSite=Strict; Path=/` to immediately terminate invalid client sessions and prevent automated background request thrashing.
+    - Multi-Tenant Isolation & Anti-Takeover: `functions/api/items/[id].js`, `functions/api/ebay/sync-item.js`, and `functions/api/import/batch.js` scope `ebay_listing_id` and `sku` uniqueness checks to `user_id = ?`, returning sanitized 400 responses that hide foreign tenant row existence. `functions/api/ebay/listingsCache.js` enforces `WHERE ebay_active_listings.user_id = excluded.user_id` on conflict updates to block tenant listing takeovers.
+    - Token Version Invalidation: `functions/utils/guard.js` evaluates `tokenTv < currentTv` to invalidate sessions immediately upon `token_version` increment (triggered on password change or email update in `auth/verify-email.js`).
+    - Dynamic Alarm Window State: `functions/utils/RateLimitCounter.js` stores `windowMs` and schedules storage alarm TTL dynamically derived from the active rate-limit window with a 60-second floor.
+    - CSV Formula Neutralization: `src/utils/csvExport.js` sanitizes export fields across `TaxReportModal.jsx` and `SettingsView.jsx`, neutralizing cell prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) to protect users from formula injection attacks during spreadsheet opens.
 
 
 

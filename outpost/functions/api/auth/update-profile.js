@@ -10,44 +10,24 @@ import {
   sendEmailChangeConfirmation,
   sendEmailChangeNotification
 } from '../../utils/auth.js';
+import { requireAuth } from '../../utils/guard.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    let tokens = [];
+    let payload;
     try {
-      tokens = getAllTokensFromRequest(request);
-    } catch (err) {
-      if (err instanceof Response) return err;
-      throw err;
-    }
-
-    if (tokens.length === 0) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Missing token' }), {
-        status: 401, headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    let payload = null;
-    for (const t of tokens) {
-      const p = await verifyToken(t, env.JWT_SECRET);
-      if (p && p.userId) {
-        payload = p;
-        break;
-      }
-    }
-
-    if (!payload || !payload.userId) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
-        status: 401, headers: { 'Content-Type': 'application/json' }
-      });
+      payload = await requireAuth(request, env);
+    } catch (authErr) {
+      if (authErr instanceof Response) return authErr;
+      throw authErr;
     }
 
     // Rate limit update-profile by userId to prevent currentPassword brute-force (HIGH-3)
     const rlKey = `profile:${payload.userId}`;
-    const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 5, 300);
+    const { allowed, retryAfter } = await checkRateLimit(env.RATE_LIMIT_KV, rlKey, 5, 300, false, env.RATE_LIMIT_DO);
     if (!allowed) {
       return new Response(JSON.stringify({ error: 'Too many profile update attempts. Please wait.' }), {
         status: 429,
@@ -79,14 +59,7 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Token version check (T-14 / SEC-020)
     const currentTv = user.token_version ?? 1;
-    const tokenTv = payload.tv ?? payload.token_version ?? 1;
-    if (tokenTv < currentTv) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Token has been invalidated. Please sign in again.' }), {
-        status: 401, headers: { 'Content-Type': 'application/json' }
-      });
-    }
 
     let updatedName         = user.name;
     let updatedQuestion     = user.security_question;

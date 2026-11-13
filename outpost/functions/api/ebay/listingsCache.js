@@ -5,6 +5,7 @@
  */
 
 import { LISTINGS_CACHE_TTL_MINUTES, CHUNK_SIZE } from '../../utils/constants.js';
+import { chunkedBatch } from '../../utils/d1Batch.js';
 
 // T-10 item 2: one cache TTL definition. Re-exported here so existing importers
 // of this module keep working.
@@ -135,7 +136,6 @@ export async function setCachedEbayListings(db, userId, listings) {
           listing_url, synced_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(ebay_listing_id) DO UPDATE SET
-          user_id = excluded.user_id,
           sku = excluded.sku,
           title = excluded.title,
           price = excluded.price,
@@ -148,6 +148,7 @@ export async function setCachedEbayListings(db, userId, listings) {
           image_url = excluded.image_url,
           listing_url = excluded.listing_url,
           synced_at = excluded.synced_at
+        WHERE ebay_active_listings.user_id = excluded.user_id
       `).bind(
         listingId,
         userId,
@@ -168,21 +169,25 @@ export async function setCachedEbayListings(db, userId, listings) {
 
     const activeIds = listings.map(l => String(l.listing_id || l.ebay_listing_id || '').trim()).filter(Boolean);
     if (activeIds.length > 0) {
-      const placeholders = activeIds.map(() => '?').join(',');
-      const pruneSql = 'DELETE FROM ebay_active_listings WHERE user_id = ? AND ebay_listing_id NOT IN (' + placeholders + ')';
-      stmts.push(db.prepare(pruneSql).bind(userId, ...activeIds));
+      if (activeIds.length <= 80) {
+        const placeholders = activeIds.map(() => '?').join(',');
+        const pruneSql = 'DELETE FROM ebay_active_listings WHERE user_id = ? AND ebay_listing_id NOT IN (' + placeholders + ')';
+        stmts.push(db.prepare(pruneSql).bind(userId, ...activeIds));
+      } else {
+        const activeIdSet = new Set(activeIds);
+        const existingRows = await db.prepare('SELECT ebay_listing_id FROM ebay_active_listings WHERE user_id = ?').bind(userId).all();
+        const idsToDelete = (existingRows?.results || []).map(r => r.ebay_listing_id).filter(id => !activeIdSet.has(id));
+        for (let i = 0; i < idsToDelete.length; i += 80) {
+          const chunk = idsToDelete.slice(i, i + 80);
+          const placeholders = chunk.map(() => '?').join(',');
+          const pruneChunkSql = 'DELETE FROM ebay_active_listings WHERE user_id = ? AND ebay_listing_id IN (' + placeholders + ')';
+          stmts.push(db.prepare(pruneChunkSql).bind(userId, ...chunk));
+        }
+      }
     }
 
     if (stmts.length > 0) {
-      if (typeof db.batch === 'function') {
-        for (let i = 0; i < stmts.length; i += CHUNK_SIZE) {
-          await db.batch(stmts.slice(i, i + CHUNK_SIZE));
-        }
-      } else {
-        for (const s of stmts) {
-          await s.run();
-        }
-      }
+      await chunkedBatch(db, stmts, CHUNK_SIZE);
     }
   } catch (err) {
     console.warn('[listingsCache] Normalized write attempt info:', err.message);

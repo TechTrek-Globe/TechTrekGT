@@ -58,13 +58,16 @@ export async function onRequestPost(context) {
     let targetListingId = body.ebay_listing_id || item.ebay_listing_id;
     if (targetListingId && targetListingId !== item.ebay_listing_id) {
       const existingListing = await env.DB.prepare(
-        'SELECT id, sku, item_name, status FROM auction_items WHERE ebay_listing_id = ? AND id != ? LIMIT 1'
+        'SELECT id, sku, item_name, status, user_id FROM auction_items WHERE ebay_listing_id = ? AND id != ? LIMIT 1'
       ).bind(targetListingId, itemId).first();
       if (existingListing) {
-        return err(
-          `eBay listing #${targetListingId} is already linked to item "${existingListing.item_name}" (${existingListing.sku || existingListing.id}, status: ${existingListing.status}). Please unlink it first.`,
-          400
-        );
+        if (existingListing.user_id === payload.userId) {
+          return err(
+            `eBay listing #${targetListingId} is already linked to item "${existingListing.item_name}" (${existingListing.sku || existingListing.id}, status: ${existingListing.status}). Please unlink it first.`,
+            400
+          );
+        }
+        return err(`eBay listing #${targetListingId} is already linked to another item.`, 400);
       }
     }
     

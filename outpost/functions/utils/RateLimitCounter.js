@@ -61,6 +61,7 @@ export class RateLimitCounter {
     // Allow: record this request
     this.timestamps.push(now);
     await this.state.storage.put('ts', this.timestamps);
+    await this.state.storage.put('windowMs', windowMs);
 
     // Schedule eviction of the oldest entry after the window expires so the DO
     // eventually becomes idle and Cloudflare can reclaim it.
@@ -81,11 +82,13 @@ export class RateLimitCounter {
     }
     // Re-read from storage for accuracy across isolate restarts
     const stored = (await this.state.storage.get('ts')) || [];
-    const windowMs = 900 * 1000; // use max possible window (15 min) as safe upper bound
+    const storedWindowMs = (await this.state.storage.get('windowMs')) || (60 * 1000);
+    const windowMs = Math.max(storedWindowMs, 60 * 1000);
     this.timestamps = stored.filter(t => t > now - windowMs);
 
     if (this.timestamps.length === 0) {
       await this.state.storage.delete('ts');
+      await this.state.storage.delete('windowMs');
     } else {
       await this.state.storage.put('ts', this.timestamps);
       const nextEvictMs = this.timestamps[0] + windowMs - now;

@@ -95,18 +95,25 @@ export async function onRequestPost(context) {
     const securityAnswerHash = await hashPassword(cleanSecurityAnswer);
 
     await env.DB.prepare(
-      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, email_verified, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, 0, NULL)'
-    ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash).run();
+      'INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, email_verified, email_verified_at, created_app) VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?)'
+    ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash, 'outpost').run();
 
-    // Seed default platform fee records for new user
-    for (const p of DEFAULT_PLATFORMS) {
-      const pid = `plat-${crypto.randomUUID()}`;
-      try {
-        await env.DB.prepare(
+    // Seed default platform fee records for new user atomically via env.DB.batch()
+    try {
+      const platformStmts = DEFAULT_PLATFORMS.map(p => {
+        const pid = `plat-${crypto.randomUUID()}`;
+        return env.DB.prepare(
           'INSERT INTO auction_platforms (id, user_id, name, fee_pct, flat_fee, notes, is_default) VALUES (?, ?, ?, ?, ?, ?, ?)'
-        ).bind(pid, userId, p.name, p.fee_pct, p.flat_fee, p.notes, p.is_default).run();
-      } catch (e) { /* skip if table not yet migrated */ }
-    }
+        ).bind(pid, userId, p.name, p.fee_pct, p.flat_fee, p.notes, p.is_default);
+      });
+      if (platformStmts.length > 0) {
+        if (typeof env.DB.batch === 'function') {
+          await env.DB.batch(platformStmts);
+        } else {
+          for (const s of platformStmts) await s.run();
+        }
+      }
+    } catch (e) { /* skip if table not yet migrated */ }
 
     // Issue single-use email verification token (MED-3)
     const verifId = `vfy-${crypto.randomUUID()}`;
@@ -120,8 +127,16 @@ export async function onRequestPost(context) {
       ).bind(verifId, userId, cleanEmail, verificationToken, expiresAt, now).run();
     } catch (verifErr) {
       console.error('[register] Failed to create email verification record, rolling back user registration:', verifErr);
-      await env.DB.prepare('DELETE FROM auction_platforms WHERE user_id = ?').bind(userId).run().catch(() => {});
-      await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run().catch(() => {});
+      const rollbackStmts = [
+        env.DB.prepare('DELETE FROM auction_platforms WHERE user_id = ?').bind(userId),
+        env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId)
+      ];
+      if (typeof env.DB.batch === 'function') {
+        await env.DB.batch(rollbackStmts).catch(() => {});
+      } else {
+        await env.DB.prepare('DELETE FROM auction_platforms WHERE user_id = ?').bind(userId).run().catch(() => {});
+        await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run().catch(() => {});
+      }
       return new Response(JSON.stringify({ error: 'Registration failed during verification token issuance. Database state rolled back.' }), {
         status: 500, headers: { 'Content-Type': 'application/json' }
       });

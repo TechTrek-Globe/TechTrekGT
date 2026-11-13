@@ -73,16 +73,22 @@ export async function resolveIntegrationUserId(rawToken, env) {
         if (env?.DB) {
           try {
             const user = await env.DB.prepare(
-              'SELECT token_version FROM users WHERE id = ?'
+              'SELECT id, status, token_version FROM users WHERE id = ?'
             ).bind(payload.userId).first();
-            if (user && user.token_version != null) {
-              const currentTv = user.token_version ?? 1;
-              const tokenTv = payload.tv ?? payload.token_version ?? 1;
+            if (!user || user.status === 'Suspended') {
+              return null;
+            }
+            if (user.token_version != null) {
+              const currentTv = Number(user.token_version ?? 1);
+              const tokenTv = Number(payload.tv ?? payload.token_version ?? 1);
               if (tokenTv < currentTv) {
                 return null;
               }
             }
-          } catch (_) {}
+          } catch (dbErr) {
+            console.error('[resolveIntegrationUserId] D1 read error during JWT check:', dbErr);
+            return null;
+          }
         }
         return payload.userId;
       }
@@ -103,15 +109,22 @@ export async function resolveIntegrationUserId(rawToken, env) {
           return null;
         }
         if (integration.user_id) {
-          const user = await env.DB.prepare(
-            'SELECT id FROM users WHERE id = ?'
-          ).bind(integration.user_id).first();
-          if (!user) {
-            // User was deleted/purged; mark integration revoked to clean up dead credentials
-            await env.DB.prepare("UPDATE api_integrations SET revoked_at = datetime('now') WHERE id = ?").bind(integration.id).run();
+          try {
+            const user = await env.DB.prepare(
+              'SELECT id, status FROM users WHERE id = ?'
+            ).bind(integration.user_id).first();
+            if (!user || user.status === 'Suspended') {
+              if (!user) {
+                // User was deleted/purged; mark integration revoked to clean up dead credentials
+                await env.DB.prepare("UPDATE api_integrations SET revoked_at = datetime('now') WHERE id = ?").bind(integration.id).run();
+              }
+              return null;
+            }
+            return integration.user_id;
+          } catch (dbErr) {
+            console.error('[resolveIntegrationUserId] D1 read error during integration check:', dbErr);
             return null;
           }
-          return integration.user_id;
         }
       }
     }
@@ -120,7 +133,7 @@ export async function resolveIntegrationUserId(rawToken, env) {
     if (secretHash) {
       try {
         const user = await env.DB.prepare(
-          'SELECT id FROM users WHERE amazon_api_token_hash = ? LIMIT 1'
+          "SELECT id, status FROM users WHERE amazon_api_token_hash = ? AND status != 'Suspended' LIMIT 1"
         ).bind(secretHash).first();
 
         if (user?.id) {
@@ -133,14 +146,19 @@ export async function resolveIntegrationUserId(rawToken, env) {
   }
 
   // 3. Migration fallback: OUTPOST_SECRET_KEY [DEPRECATED: Scheduled for removal on 2026-11-30]
-  if (env?.OUTPOST_SECRET_KEY && token === env.OUTPOST_SECRET_KEY) {
+  if (!env?.DISABLE_OUTPOST_SECRET_KEY && env?.OUTPOST_SECRET_KEY && token === env.OUTPOST_SECRET_KEY) {
     console.warn('[DEPRECATION WARNING] Request authenticated using legacy shared OUTPOST_SECRET_KEY resolving to oldest user. This fallback is deprecated and scheduled for removal on 2026-11-30. Please migrate to a per-installation secret via POST /api/integrations.');
     if (env.DB) {
-      const primaryUser = await env.DB.prepare(
-        'SELECT id FROM users ORDER BY created_at ASC LIMIT 1'
-      ).first();
-      if (primaryUser?.id) {
-        return primaryUser.id;
+      try {
+        const primaryUser = await env.DB.prepare(
+          "SELECT id, status FROM users WHERE status != 'Suspended' ORDER BY created_at ASC LIMIT 1"
+        ).first();
+        if (primaryUser?.id) {
+          return primaryUser.id;
+        }
+      } catch (dbErr) {
+        console.error('[resolveIntegrationUserId] D1 read error during OUTPOST_SECRET_KEY fallback:', dbErr);
+        return null;
       }
     }
   }

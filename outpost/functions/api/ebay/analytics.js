@@ -2,6 +2,7 @@ import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { getEbayUserToken, getEbayApiBase, fetchWithTimeout } from './tokenHelper.js';
 import { ANALYTICS_CACHE_TTL_HOURS } from '../../utils/constants.js';
 import { recordSyncRun, ensureSyncHistoryTable } from '../../utils/syncLogger.js';
+import { chunkedBatch } from '../../utils/d1Batch.js';
 
 /**
  * Calculates start of current Pacific day in UTC ISO format (midnight America/Los_Angeles).
@@ -603,8 +604,8 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
           nowIso
         ));
       }
-      if (statements.length > 0 && typeof env.DB.batch === 'function') {
-        await env.DB.batch(statements).catch(() => {});
+      if (statements.length > 0) {
+        await chunkedBatch(env.DB, statements, 80);
       }
       return {
         success: true,
@@ -793,12 +794,9 @@ export function ingestListingTraffic(env, userId, itemId, listingId, rangeDays =
       }
     }
 
-    // Commit statements in chunks of 90 (D1 batch statement limit)
-    if (typeof env.DB.batch === 'function') {
-      const CHUNK_SIZE = 90;
-      for (let c = 0; c < statements.length; c += CHUNK_SIZE) {
-        await env.DB.batch(statements.slice(c, c + CHUNK_SIZE)).catch(() => {});
-      }
+    // Commit statements in chunks of 80 (D1 batch statement limit)
+    if (statements.length > 0) {
+      await chunkedBatch(env.DB, statements, 80);
     }
 
     return {
@@ -926,8 +924,8 @@ export async function onRequestGet(context) {
               ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 0, ?)
             `).bind(rowId, itemId, payload.userId, cleanListingId, ymd, nowIso));
           }
-          if (fallbackStatements.length > 0 && typeof env.DB.batch === 'function') {
-            await env.DB.batch(fallbackStatements).catch(() => {});
+          if (fallbackStatements.length > 0) {
+            await chunkedBatch(env.DB, fallbackStatements, 80);
           }
         } else if (rows.length > 0) {
           console.warn('[analytics] Upstream refresh failed; serving cached telemetry:', ingestRes.error);
@@ -1048,7 +1046,7 @@ export async function onRequestGet(context) {
         salesConversionRate,
         itemId,
         payload.userId
-      ).run().catch(() => {});
+      ).run();
     }
 
     const quota = await getEbayAnalyticsQuota(env, payload.userId);

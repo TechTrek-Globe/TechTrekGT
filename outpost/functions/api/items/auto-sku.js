@@ -1,5 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { generateSku, generateUniqueSku } from '../utils/sku.js';
+import { chunkedBatch } from '../../utils/d1Batch.js';
 
 /**
  * POST /api/items/auto-sku
@@ -42,9 +43,9 @@ export async function onRequestPost(context) {
       assigned.push({ id: it.id, item_name: it.item_name, sku: newSku });
     }
 
-    // Execute in D1 batch
+    // Execute in chunked D1 batch
     if (statements.length > 0) {
-      await env.DB.batch(statements);
+      await chunkedBatch(env.DB, statements, 80);
     }
 
     return ok({

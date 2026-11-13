@@ -7,6 +7,9 @@ import { onRequestPost as resetPasswordHandler }  from '../functions/api/auth/re
 import { onRequestPost as securityQuestionHandler } from '../functions/api/auth/security-question.js';
 import { onRequestPost as updateProfileHandler }  from '../functions/api/auth/update-profile.js';
 import { onRequestGet as verifyEmailGetHandler, onRequestPost as verifyEmailPostHandler } from '../functions/api/auth/verify-email.js';
+import { requireAuth }                           from '../functions/utils/guard.js';
+import { getAllTokensFromRequest }               from '../functions/utils/auth.js';
+import { resolveIntegrationUserId }              from '../functions/utils/apiIntegrations.js';
 import { onRequestGet as invoicesListHandler, onRequestPost as invoicesCreateHandler } from '../functions/api/invoices/index.js';
 import { onRequestGet as invoiceGetHandler, onRequestPut as invoicePutHandler, onRequestDelete as invoiceDeleteHandler } from '../functions/api/invoices/[id].js';
 import { onRequestGet as itemsListHandler } from '../functions/api/items/index.js';
@@ -128,6 +131,14 @@ function addSecurityHeaders(response, isLocalhostOrOptions = false, maybeRequest
   // Read origin from the request (not the response) - LOW-3 fix
   if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
     newHeaders.set('Access-Control-Allow-Origin', requestOrigin);
+    const existingVary = newHeaders.get('Vary');
+    if (existingVary) {
+      if (!existingVary.toLowerCase().includes('origin')) {
+        newHeaders.set('Vary', `${existingVary}, Origin`);
+      }
+    } else {
+      newHeaders.set('Vary', 'Origin');
+    }
   } else {
     newHeaders.set('Access-Control-Allow-Origin', 'https://techtrekgt.com');
   }
@@ -421,38 +432,102 @@ export default {
       return Response.redirect(url.toString(), 301);
     }
 
-    // Redirect non-canonical case (/Outpost, /OUTPOST, /auction) to lowercase /outpost
-    if (/^\/(outpost|auction)($|\/|\?)/i.test(url.pathname)) {
-      if (!url.pathname.startsWith('/outpost')) {
-        const canonicalUrl = new URL(request.url);
-        canonicalUrl.pathname = canonicalUrl.pathname.replace(/^\/(outpost|auction)/i, '/outpost');
-        return Response.redirect(canonicalUrl.toString(), 301);
-      }
+    // Normalize /outpost/api/* or /auction/api/* -> /api/*
+    let apiPath = url.pathname;
+    if (apiPath.startsWith('/outpost/api/')) {
+      apiPath = apiPath.slice('/outpost'.length);
+    } else if (apiPath === '/outpost/api') {
+      apiPath = '/api';
+    } else if (apiPath.startsWith('/auction/api/')) {
+      apiPath = apiPath.slice('/auction'.length);
+    } else if (apiPath === '/auction/api') {
+      apiPath = '/api';
+    } else if (/^\/(outpost|auction)\/api(\/|$)/i.test(apiPath)) {
+      apiPath = apiPath.replace(/^\/(outpost|auction)/i, '');
     }
+
+    const isApiRequest = apiPath === '/api' || apiPath.startsWith('/api/');
 
     if (request.method === 'OPTIONS') {
       return addSecurityHeaders(new Response(null, { status: 204 }), isLocalhost, requestOrigin, nonce);
     }
 
+    // Redirect non-canonical case (/Outpost, /OUTPOST, /auction) to lowercase /outpost for non-API routes (HTTP 308 preserves method)
+    if (!isApiRequest && /^\/(outpost|auction)($|\/|\?)/i.test(url.pathname)) {
+      if (!url.pathname.startsWith('/outpost')) {
+        const canonicalUrl = new URL(request.url);
+        canonicalUrl.pathname = canonicalUrl.pathname.replace(/^\/(outpost|auction)/i, '/outpost');
+        return Response.redirect(canonicalUrl.toString(), 308);
+      }
+    }
+
     let response;
     try {
-      // Normalize /outpost/api/* or /auction/api/* -> /api/*
-      let apiPath = url.pathname;
-      if (apiPath.startsWith('/outpost/api/')) {
-        apiPath = apiPath.slice('/outpost'.length);
-      } else if (apiPath === '/outpost/api') {
-        apiPath = '/api';
-      } else if (apiPath.startsWith('/auction/api/')) {
-        apiPath = apiPath.slice('/auction'.length);
-      } else if (apiPath === '/auction/api') {
-        apiPath = '/api';
-      }
-
-      if (apiPath === '/api' || apiPath.startsWith('/api/')) {
+      if (isApiRequest) {
         const routeMatch = matchRoute(request.method, apiPath);
         if (routeMatch.handler) {
           context.params = routeMatch.params;
-          response = await routeMatch.handler(context);
+          const authMode = routeMatch.route?.auth || 'session';
+
+          // Enforce routeMatch.route.auth centrally before calling route handler
+          if (authMode === 'session' || authMode === 'session_admin') {
+            try {
+              const payload = await requireAuth(request, env);
+              context.payload = payload;
+              if (authMode === 'session_admin') {
+                const userRec = await env.DB?.prepare('SELECT is_admin FROM users WHERE id = ?').bind(payload.userId).first();
+                if (!userRec || Number(userRec.is_admin) !== 1) {
+                  response = new Response(JSON.stringify({ error: 'Forbidden: Admin access only' }), {
+                    status: 403,
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Set-Cookie': 'auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
+                    }
+                  });
+                }
+              }
+            } catch (authErr) {
+              if (authErr instanceof Response) {
+                response = authErr;
+              } else {
+                throw authErr;
+              }
+            }
+          } else if (authMode === 'bearer_or_secret') {
+            const authHeader = (request.headers.get('Authorization') || '').trim();
+            const vineScoutAuth = (request.headers.get('X-VineScout-Auth') || '').trim();
+            let token = (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : vineScoutAuth).trim();
+            if (!token) {
+              const tokens = getAllTokensFromRequest(request);
+              if (tokens.length > 0) token = tokens[0];
+            }
+            if (!token) {
+              response = new Response(JSON.stringify({ error: 'Unauthorized: missing integration token or session credentials' }), {
+                status: 401,
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Set-Cookie': 'auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
+                }
+              });
+            } else {
+              const resolvedUserId = await resolveIntegrationUserId(token, env);
+              if (!resolvedUserId) {
+                response = new Response(JSON.stringify({ error: 'Unauthorized: invalid or revoked token' }), {
+                  status: 401,
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Set-Cookie': 'auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
+                  }
+                });
+              } else {
+                context.userId = resolvedUserId;
+              }
+            }
+          }
+
+          if (!response) {
+            response = await routeMatch.handler(context);
+          }
         } else if (routeMatch.methodNotAllowed) {
           response = new Response(JSON.stringify({
             error: `Method ${request.method} not allowed for ${apiPath}. Allowed: ${routeMatch.allowedMethods.join(', ')}`
@@ -550,7 +625,7 @@ export default {
         // SPA fallback for legacy /auction/* routes -> redirect to /outpost
         const outpostUrl = new URL(request.url);
         outpostUrl.pathname = outpostUrl.pathname.replace(/^\/auction/, '/outpost');
-        return Response.redirect(outpostUrl.toString(), 301);
+        return Response.redirect(outpostUrl.toString(), 308);
       } else {
         response = env?.ASSETS?.fetch
           ? await env.ASSETS.fetch(request)

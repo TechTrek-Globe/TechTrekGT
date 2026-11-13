@@ -61,6 +61,25 @@ export async function onRequestPost(context) {
       });
     }
 
+    if (user.status === 'Suspended') {
+      return new Response(JSON.stringify({ error: 'Account is suspended. Please contact support.' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (user.email_verified !== 1 && !user.email_verified_at) {
+      return new Response(JSON.stringify({
+        error: 'Email verification required. Please verify your email before signing in.',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        requiresVerification: true,
+        email: user.email
+      }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // Check if account has force_password_reset flag or legacy non-3-part hash (HIGH-6)
     const isLegacyHash = !isThreePartHash(user.password_hash);
     if (user.force_password_reset === 1 || isLegacyHash) {

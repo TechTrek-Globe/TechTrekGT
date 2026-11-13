@@ -16,24 +16,46 @@ export async function requireAuth(request, env) {
   const tokens = getAllTokensFromRequest(request);
   if (tokens.length === 0) {
     throw new Response(JSON.stringify({ error: 'Unauthorized: missing token' }), {
-      status: 401, headers: { 'Content-Type': 'application/json' }
+      status: 401,
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': 'auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
+      }
     });
   }
   for (const token of tokens) {
     const payload = await verifyToken(token, env.JWT_SECRET);
     if (payload && payload.userId) {
-      // Validate token_version (tv) claim against D1 user record if DB is available (T-14 / SEC-020)
+      // Validate token_version (tv) claim and status against D1 user record if DB is available (T-14 / SEC-020)
       if (env.DB) {
+        let user;
         try {
-          const user = await env.DB.prepare('SELECT token_version FROM users WHERE id = ?').bind(payload.userId).first();
-          if (user && user.token_version != null) {
-            const currentTv = user.token_version ?? 1;
-            const tokenTv = payload.tv ?? payload.token_version ?? 1;
+          user = await env.DB.prepare('SELECT id, status, token_version FROM users WHERE id = ?').bind(payload.userId).first();
+        } catch (dbErr) {
+          console.error('[requireAuth] D1 read error:', dbErr);
+          throw new Response(JSON.stringify({ error: 'Database service unavailable' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        if (user) {
+          if (user.status === 'Suspended') {
+            throw new Response(JSON.stringify({ error: 'Account is suspended. Please contact support.' }), {
+              status: 403,
+              headers: {
+                'Content-Type': 'application/json',
+                'Set-Cookie': 'auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
+              }
+            });
+          }
+          if (user.token_version != null) {
+            const currentTv = Number(user.token_version ?? 1);
+            const tokenTv = Number(payload.tv ?? payload.token_version ?? 1);
             if (tokenTv < currentTv) {
-              continue; // Token invalidated by token version increment (logout-all or password change)
+              continue; // Token invalidated by token version mismatch
             }
           }
-        } catch (_) {}
+        }
       }
       return payload;
     }

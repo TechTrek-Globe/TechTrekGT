@@ -666,6 +666,39 @@ Comprehensive architectural hardening addressing write amplification, constraint
    - Added composite index `idx_market_alerts_user_unread` on `auction_market_alerts(user_id, is_read, created_at DESC)`.
    - Dropped redundant duplicate index `idx_auction_sales_item` while retaining canonical `idx_auction_sales_item_unique`.
 
+## Phase 1 Security, Multi-Tenant Isolation & Invariant Hardening [ACTION ID: SEC-001 / AUDIT-005]
+
+Comprehensive edge router hardening, fail-closed authentication lifecycle governance, multi-tenant database isolation, rate-limiter resilience, and formula injection protection across Outpost Tracker.
+
+### Security & Invariant Hardening Capabilities
+
+1. **Central Dispatch Middleware & Route Normalization (`src/worker.js`)**:
+   - Dynamic `Vary: Origin`: Emits `Vary: Origin` header whenever `Access-Control-Allow-Origin` dynamically reflects request origin.
+   - API Normalization Priority: Normalizes `/outpost/api/*` and legacy `/auction/api/*` prefixes to canonical `/api/*` ahead of the HTML redirect block, preventing API requests from triggering redirects.
+   - HTTP 308 Non-API Redirects: Upgraded non-API HTML redirect responses from HTTP 301 to HTTP 308, preserving HTTP request methods (e.g. POST, PUT, DELETE) and payloads.
+   - Centralized Route Authentication: Enforces `routeMatch.route.auth` contracts (`'session'`, `'session_admin'`, `'bearer_or_secret'`, `'webhook'`) directly inside the Worker dispatch middleware before invoking underlying endpoint handlers.
+2. **Fail-Closed Auth & Session Invalidation (`functions/utils/guard.js`, `apiIntegrations.js`, `auth/*.js`)**:
+   - Cookie Scrubbing: Emits `Set-Cookie: auth_token=; Max-Age=0; HttpOnly; Secure; SameSite=Strict; Path=/` on all HTTP 401 and 403 responses.
+   - User Status Invariants: Rejects `'Suspended'` accounts with HTTP 403 across `requireAuth`, `resolveIntegrationUserId`, and `auth/login.js`.
+   - Token Version Enforcement: Invalidate stale sessions when `tokenTv < user.token_version` and increment `token_version` on email changes.
+   - Database Fail-Closed Protection: Catches D1 query errors during authentication and returns HTTP 503 rather than failing open.
+   - Pre-fetch Token Protection: `GET /api/auth/verify-email` handles HTML pre-fetch requests safely by redirecting to `/outpost?verified=true` without consuming tokens or mutating user records.
+   - Deprecated Key Isolation: Legacy `OUTPOST_SECRET_KEY` fallback is isolated behind `!env.DISABLE_OUTPOST_SECRET_KEY` with strict non-suspended checks.
+   - Registration Invariants: Sets `created_app = 'outpost'` on user registration and provisions default platforms atomically via `env.DB.batch()`.
+3. **Multi-Tenant Uniqueness Scoping & Anti-Takeover Guards**:
+   - User-Scoped Uniqueness: Scoped `ebay_listing_id` and `sku` uniqueness checks strictly to `user_id = ?` in `functions/api/items/[id].js`, `functions/api/ebay/sync-item.js`, and `functions/api/import/batch.js`, stripping foreign tenant row metadata from collision responses.
+   - Listing Takeover Prevention: `functions/api/ebay/listingsCache.js` enforces `WHERE ebay_active_listings.user_id = excluded.user_id` on conflict updates to prevent cross-tenant record overwriting.
+   - Batched Cascade Deletion: Batches item cascade deletions across analytics, traffic, comps, and inventory records via `env.DB.batch()`.
+4. **Chunked D1 Batch Execution Utility (`functions/utils/d1Batch.js`)**:
+   - Standalone utility `chunkedBatch(db, statements, chunkSize = 80)` guarantees batch executions stay within Cloudflare D1 statement ceilings.
+   - Applied across `auto-sku.js`, `listingsCache.js`, and `ebay/analytics.js`, eliminating unhandled write rejections and silent `.catch(() => {})` suppression.
+5. **Rate Limiter TTL & Parameterization**:
+   - `functions/api/items/enriched.js`: Corrected rate-limiter argument alignment by passing `env.RATE_LIMIT_KV`, `failClosed: true`, and `env.RATE_LIMIT_DO`.
+   - `functions/utils/RateLimitCounter.js`: Dynamically computes Durable Object alarm TTL from the active rate-limit window with a 60-second floor instead of hardcoded 15-minute timers.
+6. **CSV Formula Injection Sanitization (`src/utils/csvExport.js`)**:
+   - Utility `escapeCsvCell(value)` neutralizes spreadsheet formula execution triggers (leading `=`, `+`, `-`, `@`, `\t`, `\r`) by prepending a single quote (`'`) and escaping double quotes.
+   - Applied across export workflows in `TaxReportModal.jsx` (sales and supplies ledgers) and `SettingsView.jsx` (inventory items and sales logs).
+
 
 
 

@@ -4,6 +4,7 @@ import {
   Loader2, Calculator, Calendar, Layers, AlertCircle, Building2
 } from 'lucide-react';
 import { getTaxReport } from '../utils/auctionApi';
+import { escapeCsvCell } from '../utils/csvExport';
 
 export function TaxReportModal({ isOpen, onClose }) {
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
@@ -64,10 +65,10 @@ export function TaxReportModal({ isOpen, onClose }) {
 
     for (const s of (salesLedger || [])) {
       lines.push([
-        s.sale_date,
-        `"${(s.item_name || '').replace(/"/g, '""')}"`,
-        `"${s.category || ''}"`,
-        `"${s.platform || ''}"`,
+        escapeCsvCell(s.sale_date),
+        escapeCsvCell(s.item_name || ''),
+        escapeCsvCell(s.category || ''),
+        escapeCsvCell(s.platform || ''),
         (s.gross_sale_price || 0).toFixed(2),
         (s.buyer_shipping_paid || 0).toFixed(2),
         ((s.platform_fees_amt || 0) + (s.payment_processing_amt || 0) + (s.promoted_listing_fee || 0)).toFixed(2),
@@ -83,9 +84,9 @@ export function TaxReportModal({ isOpen, onClose }) {
 
     for (const sup of (suppliesLedger || [])) {
       lines.push([
-        sup.purchase_date,
-        `"${(sup.name || '').replace(/"/g, '""')}"`,
-        `"${sup.category || ''}"`,
+        escapeCsvCell(sup.purchase_date),
+        escapeCsvCell(sup.name || ''),
+        escapeCsvCell(sup.category || ''),
         sup.quantity,
         (sup.cost || 0).toFixed(2),
         (sup.unit_cost || 0).toFixed(3)

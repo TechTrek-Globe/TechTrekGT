@@ -36,7 +36,7 @@ export async function onRequestGet(context) {
     const offset         = (page - 1) * limit;
 
     if (q) {
-      const rl = await checkRateLimit(env, `items-search:${payload.userId}`, 60, 60, false);
+      const rl = await checkRateLimit(env.RATE_LIMIT_KV, `items-search:${payload.userId}`, 60, 60, true, env.RATE_LIMIT_DO);
       if (!rl.allowed) {
         return new Response(JSON.stringify({ error: 'Search rate limit exceeded. Please wait a moment before searching again.' }), {
           status: 429,

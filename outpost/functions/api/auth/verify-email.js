@@ -41,9 +41,20 @@ async function handleVerification(context, token, rememberMe = false) {
   }
 
   try {
-    const verifRecord = await env.DB.prepare(
-      'SELECT id, user_id, email, expires_at, used FROM email_verifications WHERE token = ? AND used = 0'
-    ).bind(cleanToken).first();
+    let verifRecord;
+    try {
+      verifRecord = await env.DB.prepare(
+        'SELECT id, user_id, email, change_type, expires_at, used FROM email_verifications WHERE token = ? AND used = 0'
+      ).bind(cleanToken).first();
+    } catch (colErr) {
+      if (String(colErr).includes('change_type')) {
+        verifRecord = await env.DB.prepare(
+          'SELECT id, user_id, email, expires_at, used FROM email_verifications WHERE token = ? AND used = 0'
+        ).bind(cleanToken).first();
+      } else {
+        throw colErr;
+      }
+    }
 
     if (!verifRecord) {
       return new Response(JSON.stringify({ error: 'Invalid or expired verification token.' }), {
@@ -67,7 +78,7 @@ async function handleVerification(context, token, rememberMe = false) {
     }
 
     const user = await env.DB.prepare(
-      'SELECT id, email, name, role FROM users WHERE id = ?'
+      'SELECT id, email, name, role, token_version FROM users WHERE id = ?'
     ).bind(verifRecord.user_id).first();
 
     if (!user) {
@@ -80,6 +91,8 @@ async function handleVerification(context, token, rememberMe = false) {
     const nowIso = new Date().toISOString();
     const isEmailChange = verifRecord.change_type === 'email_change' || (verifRecord.email && verifRecord.email.toLowerCase() !== user.email.toLowerCase());
     const verifiedEmail = isEmailChange ? verifRecord.email.trim().toLowerCase() : user.email;
+    const currentTv = Number(user.token_version ?? 1);
+    const finalTv = isEmailChange ? currentTv + 1 : currentTv;
 
     if (isEmailChange) {
       const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ? AND id != ?').bind(verifiedEmail, user.id).first();
@@ -92,12 +105,12 @@ async function handleVerification(context, token, rememberMe = false) {
 
       if (typeof env.DB.batch === 'function') {
         await env.DB.batch([
-          env.DB.prepare('UPDATE users SET email = ?, email_verified = 1, email_verified_at = ? WHERE id = ?').bind(verifiedEmail, nowIso, user.id),
+          env.DB.prepare('UPDATE users SET email = ?, email_verified = 1, email_verified_at = ?, token_version = ? WHERE id = ?').bind(verifiedEmail, nowIso, finalTv, user.id),
           env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(verifRecord.id),
           env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0').bind(user.id)
         ]);
       } else {
-        await env.DB.prepare('UPDATE users SET email = ?, email_verified = 1, email_verified_at = ? WHERE id = ?').bind(verifiedEmail, nowIso, user.id).run();
+        await env.DB.prepare('UPDATE users SET email = ?, email_verified = 1, email_verified_at = ?, token_version = ? WHERE id = ?').bind(verifiedEmail, nowIso, finalTv, user.id).run();
         await env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE id = ?').bind(verifRecord.id).run();
         await env.DB.prepare('UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0').bind(user.id).run();
       }
@@ -117,21 +130,10 @@ async function handleVerification(context, token, rememberMe = false) {
 
     const maxAge = rememberMe ? 30 * 24 * 3600 : 7200;
     const authToken = await createToken(
-      { userId: user.id, tv: user.token_version ?? 1 },
+      { userId: user.id, tv: finalTv },
       env.JWT_SECRET,
       maxAge
     );
-
-    // Remove cookie-setting GET redirect (T-13 / Item 9 / Problem C)
-    const acceptHeader = request.headers.get('Accept') || '';
-    if (request.method === 'GET' && acceptHeader.includes('text/html')) {
-      return new Response(null, {
-        status: 302,
-        headers: {
-          'Location': '/outpost?verified=true'
-        }
-      });
-    }
 
     return new Response(JSON.stringify({
       success: true,
@@ -163,8 +165,22 @@ async function handleVerification(context, token, rememberMe = false) {
 
 export async function onRequestGet(context) {
   const { request } = context;
+  const acceptHeader = request.headers.get('Accept') || '';
   const url = new URL(request.url);
   const token = url.searchParams.get('token') || url.searchParams.get('code') || '';
+
+  // Prevent email client link pre-fetch scanners from mutating state and burning tokens:
+  // If request accepts HTML (standard browser navigation from an email client), redirect to
+  // the client-side verification view without mutating DB state.
+  if (acceptHeader.includes('text/html')) {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        'Location': '/outpost?verified=true'
+      }
+    });
+  }
+
   const rememberMe = url.searchParams.get('rememberMe') === 'true';
   return handleVerification(context, token, rememberMe);
 }

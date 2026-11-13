@@ -23,6 +23,7 @@ import {
 } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings, resetColumnWidths } from '../utils/userSettings';
+import { escapeCsvCell } from '../utils/csvExport';
 
 const TABS = [
   { id: 'platforms', label: 'Marketplace Fees', icon: DollarSign, badge: null },
@@ -378,15 +379,15 @@ export function SettingsView() {
       ];
 
       const rows = items.map(i => [
-        `"${i.id}"`,
-        `"${(i.item_name || '').replace(/"/g, '""')}"`,
-        `"${(i.category || '').replace(/"/g, '""')}"`,
-        `"${(i.athlete_person || '').replace(/"/g, '""')}"`,
-        `"${(i.authenticator || '').replace(/"/g, '""')}"`,
-        `"${(i.cert_number || '').replace(/"/g, '""')}"`,
-        `"${(i.invoice_ref || '').replace(/"/g, '""')}"`,
-        `"${i.status || ''}"`,
-        `"${i.platform || ''}"`,
+        escapeCsvCell(i.id),
+        escapeCsvCell(i.item_name || ''),
+        escapeCsvCell(i.category || ''),
+        escapeCsvCell(i.athlete_person || ''),
+        escapeCsvCell(i.authenticator || ''),
+        escapeCsvCell(i.cert_number || ''),
+        escapeCsvCell(i.invoice_ref || ''),
+        escapeCsvCell(i.status || ''),
+        escapeCsvCell(i.platform || ''),
         i.unit_price || 0,
         i.prorated_discount || 0,
         i.prorated_shipping || 0,
@@ -394,9 +395,9 @@ export function SettingsView() {
         i.true_total_cost || 0,
         i.min_sell_price || 0,
         i.current_list_price || '',
-        `"${i.date_acquired || ''}"`,
-        `"${i.date_listed || ''}"`,
-        `"${(i.notes || '').replace(/"/g, '""')}"`
+        escapeCsvCell(i.date_acquired || ''),
+        escapeCsvCell(i.date_listed || ''),
+        escapeCsvCell(i.notes || '')
       ]);
 
       const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -428,13 +429,13 @@ export function SettingsView() {
       ];
 
       const rows = sales.map(s => [
-        `"${s.id}"`,
-        `"${(s.item_name || '').replace(/"/g, '""')}"`,
-        `"${(s.category || '').replace(/"/g, '""')}"`,
-        `"${(s.athlete_person || '').replace(/"/g, '""')}"`,
-        `"${s.sale_date || ''}"`,
-        `"${s.platform || ''}"`,
-        `"${(s.buyer_handle || '').replace(/"/g, '""')}"`,
+        escapeCsvCell(s.id),
+        escapeCsvCell(s.item_name || ''),
+        escapeCsvCell(s.category || ''),
+        escapeCsvCell(s.athlete_person || ''),
+        escapeCsvCell(s.sale_date || ''),
+        escapeCsvCell(s.platform || ''),
+        escapeCsvCell(s.buyer_handle || ''),
         s.gross_sale_price || 0,
         s.buyer_shipping_paid || 0,
         s.actual_shipping_cost || 0,

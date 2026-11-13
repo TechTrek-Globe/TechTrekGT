@@ -76,10 +76,10 @@ CREATE TABLE IF NOT EXISTS wayfinder_journeys (
   end_date        TEXT,
   status          TEXT NOT NULL DEFAULT 'planning',
   visibility      TEXT NOT NULL DEFAULT 'private',
-  created_by      TEXT NOT NULL,
+  created_by      TEXT,
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ============================================================
@@ -176,6 +176,28 @@ CREATE TABLE IF NOT EXISTS wayfinder_documents (
   FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (journey_id) REFERENCES wayfinder_journeys(id)
 );
+
+-- ============================================================
+-- DOCUMENT BLOBS - Authenticated chunked binary storage in D1
+-- Replaces unauthenticated static PDFs and handles payloads > 1MB safely
+-- ============================================================
+CREATE TABLE IF NOT EXISTS wayfinder_document_blobs (
+  id           TEXT PRIMARY KEY,
+  document_id  TEXT NOT NULL,
+  user_id      TEXT NOT NULL,
+  chunk_index  INTEGER NOT NULL DEFAULT 0,
+  total_chunks INTEGER NOT NULL DEFAULT 1,
+  mime_type    TEXT NOT NULL DEFAULT 'application/pdf',
+  size_bytes   INTEGER NOT NULL DEFAULT 0,
+  sha256_hash  TEXT,
+  chunk_b64    TEXT NOT NULL,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (document_id) REFERENCES wayfinder_documents(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id)     REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(document_id, chunk_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wf_doc_blobs_doc ON wayfinder_document_blobs(document_id, chunk_index);
 
 -- ============================================================
 -- EXTRACTION JOBS - Processing state per document
@@ -278,7 +300,7 @@ CREATE TABLE IF NOT EXISTS wayfinder_expense_splits (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS wayfinder_audit_events (
   id               TEXT PRIMARY KEY,
-  user_id          TEXT NOT NULL,
+  user_id          TEXT,
   journey_id       TEXT,
   entity_type      TEXT NOT NULL,
   entity_id        TEXT NOT NULL,
@@ -291,7 +313,7 @@ CREATE TABLE IF NOT EXISTS wayfinder_audit_events (
   details          TEXT,
   ip_address       TEXT,
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ============================================================
@@ -471,3 +493,22 @@ CREATE TABLE IF NOT EXISTS wayfinder_agenda_shares (
 );
 CREATE INDEX IF NOT EXISTS idx_wf_shares_user ON wayfinder_agenda_shares(user_id);
 CREATE INDEX IF NOT EXISTS idx_wf_shares_agenda ON wayfinder_agenda_shares(agenda_id);
+
+-- ============================================================
+-- BOOKMARKS - User-saved POI bookmarks per journey
+-- ============================================================
+CREATE TABLE IF NOT EXISTS wayfinder_bookmarks (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  journey_id  TEXT NOT NULL,
+  item_id     TEXT NOT NULL,
+  item_type   TEXT NOT NULL DEFAULT 'poi',
+  city        TEXT,
+  title       TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (journey_id) REFERENCES wayfinder_journeys(id) ON DELETE CASCADE,
+  UNIQUE(user_id, journey_id, item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wf_bookmarks_user_journey ON wayfinder_bookmarks(user_id, journey_id);

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Settings, Thermometer, Coins, Map, Scale, Clock, Trash2, UserX } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 export function SettingsModal({ isOpen, onClose }) {
   const { settings, updateSettings } = useSettings();
@@ -10,6 +11,8 @@ export function SettingsModal({ isOpen, onClose }) {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+
+  useEscapeKey(isOpen, onClose);
 
   if (!isOpen) return null;
 

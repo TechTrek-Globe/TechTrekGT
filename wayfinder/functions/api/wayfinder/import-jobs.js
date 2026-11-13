@@ -5,7 +5,7 @@
 
 import { generateId } from '../../utils/id.js';
 import { parseBookingDocument } from './gemini-parser.js';
-import { resolveAgendaAccess, canManage } from '../../utils/agendaAccess.js';
+import { resolveAgendaAccess, canManage, canEdit, getAgendaMembers } from '../../utils/agendaAccess.js';
 
 // Fields that always require user confirmation before approval
 const CRITICAL_FIELDS = new Set([
@@ -182,16 +182,6 @@ export async function handleImportJobs(context, url, method) {
         );
       }).filter(Boolean);
 
-      const deleteFieldsStmt = env.DB.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id = ?').bind(docId);
-      await env.DB.batch([deleteFieldsStmt, ...stmts]);
-
-      // Update job status and document metadata
-      await env.DB.prepare(
-        `UPDATE wayfinder_extraction_jobs
-         SET status = 'ready_for_review', completed_at = ?
-         WHERE document_id = ?`
-      ).bind(new Date().toISOString(), docId).run();
-
       // Upgrade safe_display_name if currently generic
       let updatedSafeName = doc.safe_display_name;
       const lowerName = (doc.safe_display_name || '').toLowerCase();
@@ -201,11 +191,20 @@ export async function handleImportJobs(context, url, method) {
         }
       }
 
-      await env.DB.prepare(
+      const nowIso = new Date().toISOString();
+      const deleteFieldsStmt = env.DB.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id = ?').bind(docId);
+      const updateJobStmt = env.DB.prepare(
+        `UPDATE wayfinder_extraction_jobs
+         SET status = 'ready_for_review', completed_at = ?
+         WHERE document_id = ?`
+      ).bind(nowIso, docId);
+      const updateDocStmt = env.DB.prepare(
         `UPDATE wayfinder_documents
          SET detected_provider = ?, detected_doc_type = ?, safe_display_name = ?, processing_status = 'needs_review'
          WHERE id = ?`
-      ).bind(parseResult.provider || null, parseResult.docType || null, updatedSafeName, docId).run();
+      ).bind(parseResult.provider || null, parseResult.docType || null, updatedSafeName, docId);
+
+      await env.DB.batch([deleteFieldsStmt, ...stmts, updateJobStmt, updateDocStmt]);
 
       return json({
         success: true,
@@ -256,20 +255,18 @@ export async function handleImportJobs(context, url, method) {
       }).filter(Boolean);
 
       const deleteFieldsStmt = env.DB.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id = ?').bind(docId);
-      await env.DB.batch([deleteFieldsStmt, ...stmts]);
-
-      // Update job status and document metadata
-      await env.DB.prepare(
+      const updateJobStmt = env.DB.prepare(
         `UPDATE wayfinder_extraction_jobs
          SET status = 'ready_for_review', completed_at = ?
          WHERE document_id = ?`
-      ).bind(new Date().toISOString(), docId).run();
-
-      await env.DB.prepare(
+      ).bind(new Date().toISOString(), docId);
+      const updateDocStmt = env.DB.prepare(
         `UPDATE wayfinder_documents
          SET detected_provider = ?, detected_doc_type = ?, processing_status = 'needs_review'
          WHERE id = ?`
-      ).bind(provider || null, doc_type || null, docId).run();
+      ).bind(provider || null, doc_type || null, docId);
+
+      await env.DB.batch([deleteFieldsStmt, ...stmts, updateJobStmt, updateDocStmt]);
 
       return json({ success: true, fields_saved: stmts.length });
     }
@@ -288,7 +285,7 @@ export async function handleImportJobs(context, url, method) {
       if (!canManage(jAccess.role) && doc.user_id !== user.userId && !canEdit(jAccess.role)) return json({ error: 'Forbidden' }, 403);
       const finalJourneyId = jAccess.journey.id;
 
-      // Apply user overrides first - marks fields as user_verified
+      // Apply user overrides and verify remaining unverified fields atomically before reading
       const overrideStmts = Object.entries(field_overrides).map(([fieldName, value]) => {
         return env.DB.prepare(
           `UPDATE wayfinder_extracted_fields
@@ -296,17 +293,13 @@ export async function handleImportJobs(context, url, method) {
            WHERE document_id = ? AND field_name = ?`
         ).bind(sanitizeText(String(value)), docId, fieldName);
       });
-
-      if (overrideStmts.length > 0) {
-        await env.DB.batch(overrideStmts);
-      }
-
-      // Explicit user approval verifies all remaining unverified fields for this document
-      await env.DB.prepare(
+      const verifyRemainingStmt = env.DB.prepare(
         `UPDATE wayfinder_extracted_fields
          SET verification_status = 'user_verified'
          WHERE document_id = ? AND verification_status = 'unverified'`
-      ).bind(docId).run();
+      ).bind(docId);
+
+      await env.DB.batch([...overrideStmts, verifyRemainingStmt]);
 
       // Pre-flight reads in parallel: extracted fields, existing itinerary item, existing expense
       const [allFields, existingItem, existingExpense] = await Promise.all([
@@ -466,12 +459,26 @@ export async function handleImportJobs(context, url, method) {
           amountUsd = Math.round((parsedCost.amount * 1.08) * 100) / 100;
         }
 
+        const rawMembers = await getAgendaMembers(env, jAccess.journey);
+        const members = rawMembers.length > 0
+          ? rawMembers
+          : [{ id: user.userId, name: user.name || user.email || 'Traveler' }];
+        const totalCents = Math.round(parsedCost.amount * 100);
+        const count = members.length;
+        const baseCents = Math.floor(totalCents / count);
+        const remCents = totalCents - baseCents * count;
+        const basePct = Math.round((10000 / count)) / 100;
+        const memberSplits = members.map((m, idx) => ({
+          userId: m.id,
+          userName: m.name || m.email || 'Collaborator',
+          amount: (baseCents + (idx < remCents ? 1 : 0)) / 100,
+          pct: idx === count - 1 ? Math.round((100 - basePct * (count - 1)) * 100) / 100 : basePct,
+        }));
+        const payerName = user.name || user.email || 'Traveler';
+
         if (!existingExpense) {
           expenseId = generateId();
           const expenseCat = mapDocTypeToExpenseCategory(docType);
-          const payerName = user.name || user.email || 'Jonathan Kemp';
-          const split1 = Math.floor((parsedCost.amount / 2) * 100) / 100;
-          const split2 = Number((parsedCost.amount - split1).toFixed(2));
 
           batchStmts.push(
             env.DB.prepare(
@@ -499,42 +506,56 @@ export async function handleImportJobs(context, url, method) {
             )
           );
 
-          // Add 50/50 split between Jonathan Kemp and Ronald Milton Few
-          const splitId1 = generateId();
-          const splitId2 = generateId();
-          batchStmts.push(
-            env.DB.prepare(
-              `INSERT INTO wayfinder_expense_splits
-               (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
-               VALUES (?, ?, ?, ?, ?, 50, ?)`
-            ).bind(splitId1, expenseId, user.userId, payerName, split1, nowIso),
-            env.DB.prepare(
-              `INSERT INTO wayfinder_expense_splits
-               (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
-               VALUES (?, ?, 'usr-ronald-few', 'Ronald Milton Few', ?, 50, ?)`
-            ).bind(splitId2, expenseId, split2, nowIso)
-          );
+          for (const split of memberSplits) {
+            batchStmts.push(
+              env.DB.prepare(
+                `INSERT INTO wayfinder_expense_splits
+                 (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`
+              ).bind(generateId(), expenseId, split.userId, split.userName, split.amount, split.pct, nowIso)
+            );
+          }
         } else {
-          // Re-approval: propagate price changes to existing expense and split rows
-          const split1 = Math.floor((parsedCost.amount / 2) * 100) / 100;
-          const split2 = Number((parsedCost.amount - split1).toFixed(2));
+          // Re-approval: propagate price changes across active members while preserving settled status
           expenseId = existingExpense.id;
+          const prevSplits = await env.DB.prepare(
+            'SELECT user_id, is_settled, settled_at, settle_method FROM wayfinder_expense_splits WHERE expense_id = ?'
+          ).bind(existingExpense.id).all();
+          const settledByUser = new Map();
+          for (const row of prevSplits.results || []) {
+            if (row?.is_settled) settledByUser.set(row.user_id, row);
+          }
+
           batchStmts.push(
             env.DB.prepare(
               `UPDATE wayfinder_expenses
-               SET amount_original = ?, currency_original = ?, amount_usd = ?, paid_by_user_id = ?,
+               SET amount_original = ?, currency_original = ?, amount_usd = ?, paid_by_name = ?, paid_by_user_id = ?,
                    description = ?, purchase_site = ?, payment_method = ?
                WHERE id = ?`
-            ).bind(parsedCost.amount, parsedCost.currency, amountUsd, user.userId, title, purchaseSite, paymentMethod, existingExpense.id),
-            env.DB.prepare(
-              `UPDATE wayfinder_expense_splits SET amount_owed = ?
-               WHERE expense_id = ? AND user_id = ?`
-            ).bind(split1, existingExpense.id, user.userId),
-            env.DB.prepare(
-              `UPDATE wayfinder_expense_splits SET amount_owed = ?
-               WHERE expense_id = ? AND user_id = 'usr-ronald-few'`
-            ).bind(split2, existingExpense.id)
+            ).bind(parsedCost.amount, parsedCost.currency, amountUsd, payerName, user.userId, title, purchaseSite, paymentMethod, existingExpense.id),
+            env.DB.prepare('DELETE FROM wayfinder_expense_splits WHERE expense_id = ?').bind(existingExpense.id)
           );
+          for (const split of memberSplits) {
+            const prev = settledByUser.get(split.userId);
+            batchStmts.push(
+              env.DB.prepare(
+                `INSERT INTO wayfinder_expense_splits
+                 (id, expense_id, user_id, user_name, amount_owed, percentage, is_settled, settled_at, settle_method, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              ).bind(
+                generateId(),
+                existingExpense.id,
+                split.userId,
+                split.userName,
+                split.amount,
+                split.pct,
+                prev ? 1 : 0,
+                prev ? prev.settled_at : null,
+                prev ? prev.settle_method : null,
+                nowIso
+              )
+            );
+          }
         }
       }
 
@@ -656,28 +677,28 @@ function generateInitialFields(doc, linkedItem) {
 
   if (docType === 'hotel') {
     fields.push(
-      { field_name: 'hotel_name', extracted_value: provider !== 'Hotel Accommodation' ? provider : title.replace(/^hotel:\s*/i, ''), confidence: 'high' },
-      { field_name: 'hotel_address', extracted_value: linkedItem?.location || 'Poland', confidence: 'medium' },
-      { field_name: 'check_in_date', extracted_value: linkedItem?.local_date || '2026-12-04', confidence: 'high' },
-      { field_name: 'check_out_date', extracted_value: linkedItem?.end_date || (linkedItem?.local_date ? linkedItem.local_date : '2026-12-07'), confidence: 'medium' },
-      { field_name: 'check_in_time', extracted_value: linkedItem?.local_time || '15:00', confidence: 'medium' }
+      { field_name: 'hotel_name', extracted_value: provider !== 'Hotel Accommodation' ? provider : title.replace(/^hotel:\s*/i, ''), confidence: 'high' }
     );
+    if (linkedItem?.location) fields.push({ field_name: 'hotel_address', extracted_value: linkedItem.location, confidence: 'medium' });
+    if (linkedItem?.local_date) fields.push({ field_name: 'check_in_date', extracted_value: linkedItem.local_date, confidence: 'high' });
+    if (linkedItem?.end_date || linkedItem?.local_date) fields.push({ field_name: 'check_out_date', extracted_value: linkedItem.end_date || linkedItem.local_date, confidence: 'medium' });
+    if (linkedItem?.local_time) fields.push({ field_name: 'check_in_time', extracted_value: linkedItem.local_time, confidence: 'medium' });
   } else if (docType === 'flight') {
     fields.push(
-      { field_name: 'airline', extracted_value: provider, confidence: 'high' },
-      { field_name: 'departure_date', extracted_value: linkedItem?.local_date || '2026-12-03', confidence: 'high' },
-      { field_name: 'departure_time', extracted_value: linkedItem?.local_time || '20:10', confidence: 'medium' }
+      { field_name: 'airline', extracted_value: provider, confidence: 'high' }
     );
+    if (linkedItem?.local_date) fields.push({ field_name: 'departure_date', extracted_value: linkedItem.local_date, confidence: 'high' });
+    if (linkedItem?.local_time) fields.push({ field_name: 'departure_time', extracted_value: linkedItem.local_time, confidence: 'medium' });
   } else if (docType === 'rail' || docType === 'train') {
     fields.push(
-      { field_name: 'carrier', extracted_value: provider, confidence: 'high' },
-      { field_name: 'departure_date', extracted_value: linkedItem?.local_date || '2026-12-07', confidence: 'high' }
+      { field_name: 'carrier', extracted_value: provider, confidence: 'high' }
     );
+    if (linkedItem?.local_date) fields.push({ field_name: 'departure_date', extracted_value: linkedItem.local_date, confidence: 'high' });
   } else {
     fields.push(
-      { field_name: 'activity_title', extracted_value: title, confidence: 'high' },
-      { field_name: 'tour_date', extracted_value: linkedItem?.local_date || '2026-12-06', confidence: 'high' }
+      { field_name: 'activity_title', extracted_value: title, confidence: 'high' }
     );
+    if (linkedItem?.local_date) fields.push({ field_name: 'tour_date', extracted_value: linkedItem.local_date, confidence: 'high' });
   }
 
   if (confNumber) {

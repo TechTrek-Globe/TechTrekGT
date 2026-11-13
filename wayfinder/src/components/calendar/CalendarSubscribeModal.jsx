@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getApiUrl } from '../../utils/api';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { 
   Calendar, Download, Copy, Check, ExternalLink, RefreshCw, 
   ShieldCheck, Smartphone, Sparkles, Clock, Plane, Train, 
@@ -91,6 +92,8 @@ export function CalendarSubscribeModal({ isOpen, onClose }) {
     window.location.href = downloadUrl;
   };
 
+  useEscapeKey(isOpen && isAuthenticated, onClose);
+
   if (!isOpen || !isAuthenticated) return null;
 
   const urls = tokenData?.urls || {};
@@ -154,10 +157,10 @@ export function CalendarSubscribeModal({ isOpen, onClose }) {
             <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col">
               <span className="text-[11px] font-semibold text-wf-muted flex items-center gap-1.5 mb-1">
                 <Plane className="w-3.5 h-3.5 text-sky-400" />
-                <span>Inbound Flight</span>
+                <span>Inbound Arrival</span>
               </span>
-              <span className="text-xs sm:text-sm font-bold text-white">Delta DL9208</span>
-              <span className="text-[10px] text-slate-400">Touchdown 13:30 CET</span>
+              <span className="text-xs sm:text-sm font-bold text-white">Kraków (KRK)</span>
+              <span className="text-[10px] text-slate-400">Dec 4 • SKA1 Rail Link</span>
             </div>
 
             <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col">
@@ -189,7 +192,7 @@ export function CalendarSubscribeModal({ isOpen, onClose }) {
                     Public Itinerary Mode Active
                   </h4>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    You can download the public 10-day Poland itinerary snapshot right now. Sign in to generate a private live subscription feed with your confirmed Delta flight DL9208 and hotel vouchers.
+                    You can download the public 10-day Poland itinerary snapshot right now. Sign in to generate a private live subscription feed with your confirmed flights, hotel vouchers, and tickets.
                   </p>
                 </div>
               </div>

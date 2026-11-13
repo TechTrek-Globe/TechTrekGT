@@ -4,10 +4,44 @@
 
 export const DEFAULT_EXCHANGE_RATES = {
   PLN: 1.0,
-  USD: 4.0,   // 1 USD = 4.00 PLN
-  EUR: 4.3,   // 1 EUR = 4.30 PLN
-  GBP: 5.15   // 1 GBP = 5.15 PLN
+  USD: 3.73,  // NBP reference fallback until /api/wayfinder/exchange-rate hydrates
+  EUR: 4.30,
+  GBP: 4.95
 };
+
+let dynamicExchangeRates = { ...DEFAULT_EXCHANGE_RATES };
+
+try {
+  if (typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem('wayfinder_pln_usd_rate');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const plnPerUnit = parsed?.plnPerUnit || {};
+      if (Number(plnPerUnit.USD) > 0) dynamicExchangeRates.USD = Number(plnPerUnit.USD);
+      else if (Number(parsed?.usdToPln) > 0) dynamicExchangeRates.USD = Number(parsed.usdToPln);
+      if (Number(plnPerUnit.EUR) > 0) dynamicExchangeRates.EUR = Number(plnPerUnit.EUR);
+      else if (Number(parsed?.eurToPln) > 0) dynamicExchangeRates.EUR = Number(parsed.eurToPln);
+      if (Number(plnPerUnit.GBP) > 0) dynamicExchangeRates.GBP = Number(plnPerUnit.GBP);
+      else if (Number(parsed?.gbpToPln) > 0) dynamicExchangeRates.GBP = Number(parsed.gbpToPln);
+    }
+  }
+} catch {
+  // Ignore unavailable storage (Node tests / private mode)
+}
+
+export function setDynamicExchangeRates(plnPerUnit = {}) {
+  if (!plnPerUnit || typeof plnPerUnit !== 'object') return;
+  for (const code of ['USD', 'EUR', 'GBP']) {
+    const val = Number(plnPerUnit[code]);
+    if (val > 0 && Number.isFinite(val)) {
+      dynamicExchangeRates[code] = val;
+    }
+  }
+}
+
+export function getExchangeRates() {
+  return { ...dynamicExchangeRates };
+}
 
 /**
  * Convert an amount from one currency to another using reference rates relative to PLN.
@@ -17,7 +51,7 @@ export function convertCurrency(amount, fromCurrency = 'PLN', toCurrency = 'PLN'
   const to = (toCurrency || 'PLN').toUpperCase();
   if (from === to) return Number(amount) || 0;
 
-  const rates = { ...DEFAULT_EXCHANGE_RATES, ...customRates };
+  const rates = { ...dynamicExchangeRates, ...customRates };
   const fromRate = rates[from] || 1.0;
   const toRate = rates[to] || 1.0;
 

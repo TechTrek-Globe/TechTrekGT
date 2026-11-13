@@ -7,13 +7,14 @@ import {
 } from 'lucide-react';
 import { polandJourney } from '../data/poland-2026';
 import { cityImages } from '../utils/cityImages';
-import polandMapRouteClean from '../assets/poland-map-route-clean.png';
+import polandMapRouteClean from '../assets/poland-map-route-clean.jpg';
 import { useAuth } from '../context/AuthContext';
 import { useWayfinder } from '../context/WayfinderContext';
 import { PrivateBookingCard } from './itinerary/PrivateBookingCard';
 import { DocumentViewerModal } from './DocumentViewerModal';
 import { WeatherWidget } from './weather/WeatherWidget';
 import { CalendarSubscribeModal } from './calendar/CalendarSubscribeModal';
+import { formatCompactStopDates } from './Formatters';
 import { 
   buildUnifiedDayTimeline, 
   getCustomTimelineOrder, 
@@ -60,8 +61,7 @@ const stopTransitInfo = {
     arrivalBadge: '🚆 Historic Hanseatic Port & Baltic Amber Coast',
     arrivalSub: 'Arrives Gdańsk Główny at 17:30. Check into waterfront or Granary Island base for 3-night holiday finale.',
     nextTransitTitle: '✈️ Return Flight: Gdańsk Lech Wałęsa (GDN) ➔ Home',
-    nextTransitDetails: 'Early airport transfer (04:30) for DL9528 departure at 06:45',
-    nextTransitDetailsPublic: 'Early airport transfer (04:30) for morning international departure (06:45)',
+    nextTransitDetails: 'Early airport transfer (04:30) for morning international departure (06:45)',
     nextTransitNotes: 'Pre-book taxi or Bolt 35 min to airport • Ample time for international check-in & security'
   }
 };
@@ -141,6 +141,7 @@ function JourneyStopSchedule({
   days,
   privateItems,
   accommodations,
+  documents = [],
   pushRoute,
   isExpanded,
   nextStopExpanded,
@@ -153,6 +154,9 @@ function JourneyStopSchedule({
 }) {
   const { isAuthenticated: contextIsAuth } = useAuth();
   const isAuthenticated = propIsAuth !== undefined ? propIsAuth : contextIsAuth;
+  const krakowFlightDoc = isAuthenticated && city.id === 'krakow'
+    ? (documents || []).find((d) => (d?.detected_doc_type || '').toLowerCase() === 'flight') || null
+    : null;
   const [customOrder, setCustomOrder] = useState(() => getCustomTimelineOrder());
   const [draggedItem, setDraggedItem] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
@@ -274,12 +278,12 @@ function JourneyStopSchedule({
               {transitInfo?.arrivalBadge && (
                 <div className="text-xs text-sky-300 font-medium mt-1 flex flex-wrap items-center gap-2">
                   <span className="truncate"><FormatText text={transitInfo.arrivalBadge} /></span>
-                  {isAuthenticated && city.id === 'krakow' && onOpenDocViewer && (
+                  {isAuthenticated && city.id === 'krakow' && krakowFlightDoc && onOpenDocViewer && (
                     <button
                       type="button"
-                      onClick={onOpenDocViewer}
+                      onClick={() => onOpenDocViewer(krakowFlightDoc)}
                       className="px-2 py-0.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/40 text-[10px] font-bold flex items-center space-x-1 cursor-pointer transition-colors"
-                      title="View Delta flight document"
+                      title="View flight confirmation document"
                     >
                       <FileText className="w-3.5 h-3.5 text-sky-400" />
                       <span>View Document</span>
@@ -341,7 +345,7 @@ function JourneyStopSchedule({
               return (
                 <div key={dayItem.day} className="relative space-y-4">
                   {/* Day Header Sub-strip */}
-                  <div className="sticky top-14 sm:top-16 z-20 p-3 rounded-2xl bg-slate-950/95 backdrop-blur-md border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-lg">
+                  <div className="sticky top-[166px] md:top-[124px] z-20 p-3 rounded-2xl bg-slate-950/95 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-lg">
                     <div className="flex items-center space-x-3">
                       <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-black text-xs">
                         Day 0{dayItem.day}
@@ -434,7 +438,7 @@ function JourneyStopSchedule({
                         const isTrainItem = isConfirmedIntercityRail(timelineItem.data);
                         const isFlightItem = isFlightScheduleItem(timelineItem.data);
                         const travelDomId = getTravelDomIdForScheduleItem(timelineItem.data, dayItem.day);
-                        const travelDoc = isAuthenticated ? getTravelDocForScheduleItem(timelineItem.data, dayItem) : null;
+                        const travelDoc = isAuthenticated ? getTravelDocForScheduleItem(timelineItem.data, dayItem, documents) : null;
                         const isTravelCard = Boolean(travelDoc);
                         const isHighlighted = highlightedTravelId && (highlightedTravelId === travelDomId || highlightedTravelId === timelineItem.key);
 
@@ -611,11 +615,16 @@ function JourneyStopSchedule({
                                         title="Click to view flight ticket and confirmation"
                                       >
                                         <Plane className="w-3.5 h-3.5 text-sky-400 group-hover/btn:scale-110 transition-transform" />
-                                        <span>View Delta Flight Confirmation</span>
+                                        <span>View Flight Confirmation</span>
                                       </button>
-                                      <span className="text-[11px] text-slate-400 font-mono">
-                                        {travelDoc.details?.flightLeg ? `${travelDoc.details.flightLeg} • ` : ''}Conf: <strong className="text-emerald-300">{travelDoc.details?.confirmation || 'GUDI3J'}</strong>
-                                      </span>
+                                      {(travelDoc.details?.flightLeg || travelDoc.details?.confirmation) && (
+                                        <span className="text-[11px] text-slate-400 font-mono">
+                                          {travelDoc.details?.flightLeg ? `${travelDoc.details.flightLeg} • ` : ''}
+                                          {travelDoc.details?.confirmation ? (
+                                            <>Conf: <strong className="text-emerald-300">{travelDoc.details.confirmation}</strong></>
+                                          ) : null}
+                                        </span>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -645,7 +654,7 @@ function JourneyStopSchedule({
                 <span>{transitInfo.nextTransitTitle}</span>
               </div>
               <div className="text-[11px] text-amber-300/90 font-medium">
-                <FormatText text={!isAuthenticated && transitInfo.nextTransitDetailsPublic ? transitInfo.nextTransitDetailsPublic : transitInfo.nextTransitDetails} />
+                <FormatText text={transitInfo.nextTransitDetails} />
               </div>
             </div>
           </div>
@@ -741,9 +750,15 @@ export function PolandLanding() {
   }, []);
 
   const { isAuthenticated, user, setIsAuthModalOpen } = useAuth();
-  const { itinerary: privateItems = [], accommodations = [] } = useWayfinder() || {};
+  const { itinerary: privateItems = [], accommodations = [], documents = [] } = useWayfinder() || {};
   const [selectedStopFilter, setSelectedStopFilter] = useState('all');
   const [viewMode, setViewMode] = useState('cards');
+
+  React.useEffect(() => {
+    if (isAuthenticated && viewMode === 'schedule') {
+      setViewMode('cards');
+    }
+  }, [isAuthenticated, viewMode]);
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [highlightedTravelId, setHighlightedTravelId] = useState(null);
@@ -796,6 +811,10 @@ export function PolandLanding() {
   ];
 
   const navigateToTravel = (travelId, cityId, dayNumber) => {
+    if (isAuthenticated) {
+      pushRoute(null, `/wayfinder/poland-christmas-2026/private${dayNumber ? `?day=${dayNumber}` : ''}`);
+      return;
+    }
     if (viewMode !== 'schedule') {
       setViewMode('schedule');
     }
@@ -827,7 +846,7 @@ export function PolandLanding() {
       setIsAuthModalOpen(true);
       return;
     }
-    const matchedDoc = getTravelDocForScheduleItem(data, dayItem);
+    const matchedDoc = getTravelDocForScheduleItem(data, dayItem, documents);
     if (!matchedDoc) return;
     setViewerDoc(matchedDoc);
     setIsDocViewerOpen(true);
@@ -955,7 +974,7 @@ export function PolandLanding() {
                   type="button"
                   onClick={() => navigateToTravel('travel-flight-krk', 'krakow', 1)}
                   className="absolute top-[88%] left-[75%] z-20 hover:z-40 focus:z-40 -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 group/flightin focus:outline-none"
-                  title="Delta Flight Arrival into Kraków (Day 1) - Click to jump to schedule"
+                  title="Flight Arrival into Kraków (Day 1) - Click to jump to schedule"
                 >
                   <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-950/95 border border-sky-400 text-sky-300 text-[8px] sm:text-[10px] font-black tracking-wider uppercase flex items-center space-x-1 sm:space-x-1.5 whitespace-nowrap shadow-lg shadow-sky-950/80 backdrop-blur-md group-hover/flightin:bg-sky-500 group-hover/flightin:text-slate-950 group-hover/flightin:border-sky-300 transition-colors animate-pulse">
                     <Plane className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-sky-300 group-hover/flightin:text-slate-950 rotate-45 transition-colors" />
@@ -968,7 +987,7 @@ export function PolandLanding() {
                   type="button"
                   onClick={() => navigateToTravel('travel-flight-gdn', 'gdansk', 10)}
                   className="absolute top-[10%] left-[25%] z-20 hover:z-40 focus:z-40 -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 group/flightout focus:outline-none"
-                  title="Delta Return Flight Departure from Gdańsk (Day 10) - Click to jump to schedule"
+                  title="Return Flight Departure from Gdańsk (Day 10) - Click to jump to schedule"
                 >
                   <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-950/95 border border-sky-400 text-sky-300 text-[8px] sm:text-[10px] font-black tracking-wider uppercase flex items-center space-x-1 sm:space-x-1.5 whitespace-nowrap shadow-lg shadow-sky-950/80 backdrop-blur-md group-hover/flightout:bg-sky-500 group-hover/flightout:text-slate-950 group-hover/flightout:border-sky-300 transition-colors animate-pulse">
                     <Plane className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-sky-300 group-hover/flightout:text-slate-950 -rotate-45 transition-colors" />
@@ -1117,34 +1136,51 @@ export function PolandLanding() {
             </div>
           </div>
 
-          {/* Controls Bar: Stop Filter Pills + View Mode Toggle */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/60 p-2.5 rounded-2xl border border-white/5 backdrop-blur-md">
+          {/* Controls Bar: Locked at top on scroll; shows actual dates when signed in */}
+          <div className="sticky top-14 sm:top-16 z-30 flex flex-col md:flex-row md:items-center justify-between gap-2.5 bg-slate-950/95 p-2.5 rounded-2xl border border-amber-500/25 shadow-xl">
             {/* Stop Filter Pills */}
             <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
               <button
                 onClick={() => setSelectedStopFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap min-h-[34px] ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap min-h-[34px] flex items-center space-x-1.5 ${
                   selectedStopFilter === 'all'
                     ? 'bg-amber-500 text-slate-950 shadow-md'
                     : 'text-slate-300 hover:text-white hover:bg-white/5'
                 }`}
               >
-                All Stops (5)
+                <span>All Stops</span>
+                <span className="font-mono text-[11px] opacity-85">
+                  {isAuthenticated ? `(${formatCompactStopDates(polandJourney.dates)})` : '(5)'}
+                </span>
               </button>
-              {polandJourney.route.map((city, idx) => (
-                <button
-                  key={city.id}
-                  onClick={() => setSelectedStopFilter(city.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap min-h-[34px] flex items-center space-x-1 ${
-                    selectedStopFilter === city.id
-                      ? 'bg-amber-500 text-slate-950 shadow-md'
-                      : 'text-slate-300 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <span>0{idx + 1}</span>
-                  <span>{city.name}</span>
-                </button>
-              ))}
+              {polandJourney.route.map((city, idx) => {
+                const shortDates = isAuthenticated ? formatCompactStopDates(city.itineraryDates) : '';
+                return (
+                  <button
+                    key={city.id}
+                    onClick={() => setSelectedStopFilter(city.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap min-h-[34px] flex items-center space-x-1.5 ${
+                      selectedStopFilter === city.id
+                        ? 'bg-amber-500 text-slate-950 shadow-md'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <span>0{idx + 1}</span>
+                    <span>{city.name}</span>
+                    {shortDates && (
+                      <span
+                        className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                          selectedStopFilter === city.id
+                            ? 'bg-slate-950/15 text-slate-950'
+                            : 'bg-white/10 text-amber-300'
+                        }`}
+                      >
+                        {shortDates}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {/* View Mode & Expand Controls */}
@@ -1169,13 +1205,20 @@ export function PolandLanding() {
 
               <div className="flex items-center space-x-1 bg-slate-950/80 p-1 rounded-xl border border-white/10">
                 <button
-                  onClick={() => setViewMode('schedule')}
+                  onClick={() => {
+                    if (isAuthenticated) {
+                      const cityQuery = selectedStopFilter !== 'all' ? `?city=${encodeURIComponent(selectedStopFilter)}` : '';
+                      pushRoute(null, `/wayfinder/poland-christmas-2026/private${cityQuery}`);
+                    } else {
+                      setViewMode('schedule');
+                    }
+                  }}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-colors ${
                     viewMode === 'schedule'
                       ? 'bg-amber-500 text-slate-950 shadow-sm'
                       : 'text-slate-400 hover:text-white'
                   }`}
-                  title="Full Schedule Timeline View"
+                  title={isAuthenticated ? 'Open Day-by-Day Itinerary in Private Hub' : 'Full Schedule Timeline View'}
                 >
                   <Calendar className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Schedule View</span>
@@ -1207,8 +1250,12 @@ export function PolandLanding() {
                   totalCount={polandJourney.route.length}
                   pushRoute={pushRoute}
                   onSelectSchedule={(cId) => {
-                    setSelectedStopFilter(cId);
-                    setViewMode('schedule');
+                    if (isAuthenticated) {
+                      pushRoute(null, `/wayfinder/poland-christmas-2026/private?city=${encodeURIComponent(cId)}`);
+                    } else {
+                      setSelectedStopFilter(cId);
+                      setViewMode('schedule');
+                    }
                   }}
                 />
               ))}
@@ -1228,6 +1275,7 @@ export function PolandLanding() {
                     days={cityDays}
                     privateItems={privateItems}
                     accommodations={accommodations}
+                    documents={documents}
                     pushRoute={pushRoute}
                     isExpanded={!!expandedStops[city.id]}
                     nextStopExpanded={nextCity ? !!expandedStops[nextCity.id] : false}

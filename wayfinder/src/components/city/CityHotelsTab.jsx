@@ -83,11 +83,20 @@ export function CityHotelsTab({
   toggleItinerary, 
   isAuthenticated 
 }) {
-  const { itinerary = [], accommodations = [] } = useWayfinder() || {};
+  const { itinerary = [], accommodations = [], documents = [] } = useWayfinder() || {};
   const [isFlightDocViewerOpen, setIsFlightDocViewerOpen] = useState(false);
   const [isStayDocViewerOpen, setIsStayDocViewerOpen] = useState(false);
 
   const confirmedStay = findConfirmedHotelForCity(city, accommodations, itinerary);
+  const confirmedStayDoc = confirmedStay?.source_document_id
+    ? (documents || []).find((d) => d && d.id === confirmedStay.source_document_id) || null
+    : null;
+  const inboundFlightDoc = isAuthenticated
+    ? (documents || []).find((d) => (d?.detected_doc_type || '').toLowerCase() === 'flight') || null
+    : null;
+  const inboundFlightItem = isAuthenticated
+    ? (itinerary || []).find((i) => (i?.item_type || '').toLowerCase() === 'flight') || null
+    : null;
   const meta = confirmedStay ? parseBookingMetadata(confirmedStay) : null;
   const hotelName = confirmedStay?.hotel_name || confirmedStay?.title || `Hotel in ${city.name}`;
   const hotelAddress = confirmedStay?.location || confirmedStay?.hotel_address || meta?.fields?.['address'] || meta?.fields?.['hotel_address'] || `${city.base || city.name}, Poland`;
@@ -309,14 +318,14 @@ export function CityHotelsTab({
               </div>
             </div>
 
-            {isAuthenticated && (
+            {isAuthenticated && inboundFlightDoc && (
               <button
                 type="button"
                 onClick={() => setIsFlightDocViewerOpen(true)}
                 className="px-3.5 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-sm"
               >
                 <FileText className="w-3.5 h-3.5 text-sky-400" />
-                <span>View Delta Flight Document</span>
+                <span>View Flight Document</span>
               </button>
             )}
           </div>
@@ -340,14 +349,16 @@ export function CityHotelsTab({
             <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1.5">
               <div className="text-amber-300 font-bold uppercase tracking-wider text-[11px] flex items-center space-x-1.5">
                 <Plane className="w-3.5 h-3.5 text-amber-400" />
-                <span>{isAuthenticated ? 'Delta Flight Details' : 'Airport Transit Details'}</span>
+                <span>{isAuthenticated && inboundFlightItem ? 'Flight Arrival Details' : 'Airport Transit Details'}</span>
               </div>
               <div className="text-white font-bold text-sm">
-                {isAuthenticated ? 'DL9208 (AMS ➔ KRK)' : 'Kraków Airport (KRK)'}
+                {isAuthenticated && (inboundFlightItem?.route || inboundFlightItem?.title)
+                  ? (inboundFlightItem.route || inboundFlightItem.title)
+                  : 'Kraków Airport (KRK)'}
               </div>
               <p className="text-slate-400 text-[11px] leading-snug">
-                {isAuthenticated ? (
-                  <>Inbound connection from DL0074 (ATL ➔ AMS). Delta Confirmation: <strong className="text-emerald-300 font-mono">GUDI3J</strong>.</>
+                {isAuthenticated && inboundFlightItem?.confirmation_number ? (
+                  <>Booking Confirmation: <strong className="text-emerald-300 font-mono">{inboundFlightItem.confirmation_number}</strong>.</>
                 ) : (
                   <>Direct 17-minute SKA1 commuter rail from airport terminal into Kraków Główny central station.</>
                 )}
@@ -488,14 +499,13 @@ export function CityHotelsTab({
           onClose={() => setIsStayDocViewerOpen(false)}
           doc={{
             id: confirmedStay.source_document_id || `hotel-${city.id}`,
-            filename: confirmedStay.filename || confirmedStay.original_filename || `${hotelName.replace(/\s+/g, '_')}_Confirmation.pdf`,
-            safe_display_name: `${hotelName} : Booking Confirmation`,
-            mime_type: confirmedStay.mime_type || 'application/pdf',
+            filename: confirmedStayDoc?.filename || confirmedStay.filename || confirmedStay.original_filename || `${hotelName.replace(/\s+/g, '_')}_Confirmation.pdf`,
+            safe_display_name: confirmedStayDoc?.safe_display_name || `${hotelName} : Booking Confirmation`,
+            mime_type: confirmedStayDoc?.mime_type || confirmedStay.mime_type || 'application/pdf',
             detected_doc_type: 'hotel',
             item_type: 'hotel',
-            file_url: (city.id === 'wroclaw' || (hotelName || '').toLowerCase().includes('altus'))
-              ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`
-              : null,
+            has_blob: Boolean(confirmedStayDoc?.has_blob || confirmedStay.source_document_id),
+            file_url: confirmedStayDoc?.file_url || (confirmedStay.source_document_id ? `/api/wayfinder/documents/${encodeURIComponent(confirmedStay.source_document_id)}/file` : null),
             details: {
               confirmation: confirmationNumber,
               hotelName: hotelName,
@@ -511,26 +521,12 @@ export function CityHotelsTab({
         />
       )}
 
-      {/* Delta Flight Document Preview Modal */}
-      {isAuthenticated && (
+      {/* Uploaded Flight Document Preview Modal */}
+      {isAuthenticated && inboundFlightDoc && (
         <DocumentViewerModal
           isOpen={isFlightDocViewerOpen}
           onClose={() => setIsFlightDocViewerOpen(false)}
-          doc={{
-            id: 'delta-poland-2026',
-            filename: 'Poland_Delta.pdf',
-            safe_display_name: 'Delta Air Lines: Flight Confirmation (ATL -> AMS -> KRK)',
-            mime_type: 'application/pdf',
-            details: {
-              confirmation: 'GUDI3J',
-              passengers: 'Ronald Milton Few, Jonathan Kemp',
-              touchdown: 'Dec 4, 2026 at 13:30 CET (Local Poland Time)',
-              flightLeg: 'DL9208 (AMS -> KRK)',
-              originLeg: 'DL0074 (ATL -> AMS, departs Dec 3 at 20:10 EST)',
-              layover: '55 minutes at Amsterdam (AMS)',
-              lodgingSync: 'Arrives in Krakow Old Town/Kazimierz at ~14:45-15:15 CET, synchronizing with standard 15:00 check-in.'
-            }
-          }}
+          doc={inboundFlightDoc}
         />
       )}
     </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { X, Lock, Mail, User, ShieldCheck, ArrowRight, Loader2, KeyRound, CheckCircle2, HelpCircle } from 'lucide-react';
 
 export const PRESET_SECURITY_QUESTIONS = [
@@ -49,6 +50,8 @@ export function AuthModal() {
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEscapeKey(isAuthModalOpen, () => setIsAuthModalOpen(false));
 
   if (!isAuthModalOpen) return null;
 

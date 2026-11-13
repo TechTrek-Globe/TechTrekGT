@@ -5,6 +5,7 @@ import {
 import { DocumentViewerModal } from '../DocumentViewerModal';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useWayfinder } from '../../context/WayfinderContext';
 import { formatTime } from '../Formatters';
 
 // Resolve theme colors per booking type
@@ -110,9 +111,7 @@ export function parseBookingMetadata(item) {
     activityDetailsUrl = item?.activity_details_url || fields['activity details'] || fields['activity detail'] || null;
 
     if (isGyg) {
-      const titleLower = (item?.title || '').toLowerCase();
-      const isAuschwitzRef = confNumber === 'GYG7VKK692WY' || titleLower.includes('auschwitz');
-      const rawRef = item?.booking_reference || fields['booking reference'] || (confNumber && !confNumber.startsWith('GYG') ? confNumber : null) || (isAuschwitzRef ? '6ICXW284P0LJK9OYS594M5NZKD52BTFT' : null);
+      const rawRef = item?.booking_reference || fields['booking reference'] || (confNumber && !confNumber.startsWith('GYG') ? confNumber : null);
       const gygBookingRef = rawRef;
 
       if (mobileTicketUrl && mobileTicketUrl.includes('adj_fallback=')) {
@@ -123,8 +122,9 @@ export function parseBookingMetadata(item) {
           activityDetailsUrl = decoded;
         }
       } else if (gygBookingRef && ((mobileTicketUrl && (mobileTicketUrl.includes('adj.st') || mobileTicketUrl.includes('getyourguide.com'))) || !mobileTicketUrl)) {
-        mobileTicketUrl = `https://www.getyourguide.com/booking/${gygBookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`;
-        activityDetailsUrl = `https://www.getyourguide.com/booking/${gygBookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`;
+        const cleanUrl = `https://www.getyourguide.com/booking/${encodeURIComponent(gygBookingRef)}`;
+        mobileTicketUrl = cleanUrl;
+        activityDetailsUrl = cleanUrl;
       }
     } else {
       if (mobileTicketUrl && (mobileTicketUrl.includes('adj.st') || mobileTicketUrl.includes('getyourguide.com'))) {
@@ -169,6 +169,7 @@ export function parseBookingMetadata(item) {
 
 export function PrivateBookingCard({ item, reorderControls }) {
   const { isAuthenticated } = useAuth();
+  const { documents = [] } = useWayfinder() || {};
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const rawType = item.docType || item.detected_doc_type || item.item_type || 'booking';
   const docType = rawType === 'train' ? 'rail' : rawType;
@@ -227,15 +228,13 @@ export function PrivateBookingCard({ item, reorderControls }) {
   // Clean narrative description (never dumps internal metadata fields)
   const displayDescription = item.description || meta.description;
 
-  const titleLower = (item.title || '').toLowerCase();
-  const fnameLower = (item.filename || '').toLowerCase();
-  const confUpper = (item.confirmation_number || meta.confNumber || '').toUpperCase();
-  const isAuschwitzGyg = confUpper === 'GYG7VKK692WY' || titleLower.includes('auschwitz') || fnameLower.includes('gyg7vkk692wy');
-  const isDeltaFlight = confUpper === 'GUDI3J' || titleLower.includes('delta') || titleLower.includes('dl9208') || titleLower.includes('dl9528') || titleLower.includes('dl9227') || fnameLower.includes('poland_delta');
-  const isGalicjaRail = confUpper === 'WN 71563945' || confUpper === 'WN71563945' || titleLower.includes('galicja') || fnameLower.includes('wn71563945') || item.source_document_id === '967d6a06-610d-4c56-a95f-d4ca5a5d1769';
-  const isAltusHotel = titleLower.includes('altus') || fnameLower.includes('altus');
-  const hasAttachableDoc = Boolean(item.source_document_id || item.filename || isAuschwitzGyg || isDeltaFlight || isGalicjaRail || isAltusHotel);
-  const resolvedFlightLeg = titleLower.includes('dl9528') ? 'DL9528 (GDN -> AMS)' : titleLower.includes('dl9227') ? 'DL9227 (AMS -> ATL)' : (isDeltaFlight ? 'DL9208 (AMS -> KRK)' : null);
+  const linkedDoc = item.source_document_id
+    ? (documents || []).find((d) => d && d.id === item.source_document_id) || null
+    : null;
+  const hasAttachableDoc = Boolean(linkedDoc || item.source_document_id || item.filename);
+  const resolvedFlightLeg = docType === 'flight'
+    ? (item.route || (item.origin && item.destination ? `${item.origin} -> ${item.destination}` : (item.flight_number || item.title || null)))
+    : null;
 
   return (
     <div className="relative group">
@@ -376,7 +375,7 @@ export function PrivateBookingCard({ item, reorderControls }) {
                   ) : (
                     <FileText className="w-3.5 h-3.5 text-sky-400" />
                   )}
-                  <span>View Attached {docType === 'flight' ? 'Flight Document' : docType === 'hotel' ? 'Booking Confirmation (PDF)' : docType === 'rail' ? `PKP Ticket${meta.confNumber || isGalicjaRail ? ` (${meta.confNumber || 'WN 71563945'})` : ''}` : 'Ticket (PDF)'}</span>
+                  <span>View Attached {docType === 'flight' ? 'Flight Document' : docType === 'hotel' ? 'Booking Confirmation (PDF)' : docType === 'rail' ? `Rail Ticket${meta.confNumber ? ` (${meta.confNumber})` : ''}` : 'Ticket (PDF)'}</span>
                 </button>
               )}
             </div>
@@ -393,14 +392,14 @@ export function PrivateBookingCard({ item, reorderControls }) {
               </a>
             )}
 
-            {item.confirmation_number === 'GUDI3J' && !meta.mobileTicketUrl && (
+            {docType === 'flight' && meta.confNumber && !meta.mobileTicketUrl && (
               <span className="text-[11px] text-slate-400">
-                Delta Confirmation: <strong className="text-emerald-300 font-mono">GUDI3J</strong>
+                Confirmation: <strong className="text-emerald-300 font-mono">{meta.confNumber}</strong>
               </span>
             )}
             {docType === 'rail' && meta.confNumber && (
               <span className="text-[11px] text-slate-400">
-                PKP Conf: <strong className="text-amber-300 font-mono">{meta.confNumber}</strong>
+                Rail Conf: <strong className="text-amber-300 font-mono">{meta.confNumber}</strong>
               </span>
             )}
           </div>
@@ -413,38 +412,31 @@ export function PrivateBookingCard({ item, reorderControls }) {
           isOpen={isDocViewerOpen}
           onClose={() => setIsDocViewerOpen(false)}
           doc={{
-            id: item.source_document_id || (isAuschwitzGyg ? 'doc-gyg-7vkk692wy' : isGalicjaRail ? '967d6a06-610d-4c56-a95f-d4ca5a5d1769' : isDeltaFlight ? 'delta-poland-2026' : (item.id || `${docType}-doc`)),
-            filename: item.filename || (isAuschwitzGyg ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf' : isDeltaFlight ? 'Poland_Delta.pdf' : isGalicjaRail ? 'Bilet - WN71563945.pdf' : (item.title || 'Booking Voucher')),
-            safe_display_name: item.title || (isGalicjaRail ? 'PKP Intercity IC 58 Galicja' : 'Booking Confirmation'),
+            id: linkedDoc?.id || item.source_document_id || item.id || `${docType}-doc`,
+            filename: linkedDoc?.filename || linkedDoc?.original_filename || item.filename || item.title || 'Booking Voucher',
+            safe_display_name: linkedDoc?.safe_display_name || item.title || 'Booking Confirmation',
+            mime_type: linkedDoc?.mime_type || 'application/pdf',
             item_type: docType,
-            detected_doc_type: docType,
-            file_url: isAuschwitzGyg
-              ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`
-              : isDeltaFlight
-              ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/Poland_Delta.pdf`
-              : isAltusHotel
-              ? `${(import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '')}/Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`
-              : null,
+            detected_doc_type: linkedDoc?.detected_doc_type || docType,
+            has_blob: Boolean(linkedDoc?.has_blob || item.source_document_id),
+            file_url: linkedDoc?.file_url || (item.source_document_id ? `/api/wayfinder/documents/${encodeURIComponent(item.source_document_id)}/file` : null),
             details: {
-              confirmation: item.confirmation_number || meta.confNumber || (isAuschwitzGyg ? 'GYG7VKK692WY' : isGalicjaRail ? 'WN 71563945' : isDeltaFlight ? 'GUDI3J' : ''),
-              provider: item.provider || (isAuschwitzGyg ? 'GetYourGuide / Mr.Shuttle' : (docType === 'rail' ? 'PKP Intercity S.A.' : item.title)),
-              supplier: meta.supplier || (isAuschwitzGyg ? 'Mr.Shuttle' : null),
-              trainNumber: docType === 'rail' ? (item.title || (isGalicjaRail ? 'IC 58 Galicja' : 'PKP Rail Ticket')) : null,
-              route: docType === 'rail' ? (item.route || (item.origin && item.destination ? `${item.origin} ➔ ${item.destination}` : (isGalicjaRail ? 'Kraków Główny ➔ Wrocław Główny' : null))) : null,
-              departureTime: docType === 'rail' ? (rawStart || (isGalicjaRail ? '11:50' : null)) : null,
-              arrivalTime: docType === 'rail' ? (rawEnd || (isGalicjaRail ? '14:50' : null)) : null,
+              confirmation: item.confirmation_number || meta.confNumber || '',
+              provider: item.provider || linkedDoc?.detected_provider || '',
+              supplier: meta.supplier || null,
+              portalUrl: meta.activityDetailsUrl || meta.mobileTicketUrl || null,
+              trainNumber: docType === 'rail' ? (item.train_number || item.title || 'Rail Ticket') : null,
+              route: docType === 'rail' ? (item.route || (item.origin && item.destination ? `${item.origin} ➔ ${item.destination}` : null)) : null,
+              departureTime: docType === 'rail' ? (rawStart || null) : (docType === 'flight' && rawStart ? `${item.local_date || ''} ${rawStart}`.trim() : null),
+              arrivalTime: docType === 'rail' ? (rawEnd || null) : null,
               date: item.local_date || null,
-              seats: docType === 'rail' ? (item.seat || (isGalicjaRail ? 'Carriage 272, Seats 34 & 36 (1st Class)' : null)) : null,
+              seats: docType === 'rail' ? (item.seat || null) : null,
               schedule: item.local_date && rawStart ? `${item.local_date} ${rawStart}` : null,
-              pickupWindow: meta.pickupWindow || (isAuschwitzGyg ? '05:30 - 07:30' : null),
-              bagRestriction: meta.bagRestriction || (isAuschwitzGyg ? 'Max 30x20x10 cm on Museum grounds' : null),
-              location: item.location || displayLocation || (isAuschwitzGyg ? 'Hotel Pickup (Kraków)' : (isGalicjaRail ? 'Kraków Główny' : '')),
-              passengers: item.passengers || meta.rawTickets || (isGalicjaRail || isDeltaFlight ? 'Ronald Milton Few, Jonathan Kemp' : '2 Adults'),
-              flightLeg: docType === 'flight' ? (resolvedFlightLeg || `${item.origin || ''} -> ${item.destination || ''}`.trim() || item.title) : null,
-              touchdown: isDeltaFlight && resolvedFlightLeg === 'DL9208 (AMS -> KRK)' ? 'Dec 4, 2026 at 13:30 CET (Local Poland Time)' : null,
-              originLeg: isDeltaFlight && resolvedFlightLeg === 'DL9208 (AMS -> KRK)' ? 'DL0074 (ATL -> AMS, departs Dec 3 at 20:10 EST)' : null,
-              layover: isDeltaFlight && resolvedFlightLeg === 'DL9208 (AMS -> KRK)' ? '55 minutes at Amsterdam (AMS)' : null,
-              lodgingSync: isDeltaFlight && resolvedFlightLeg === 'DL9208 (AMS -> KRK)' ? 'Arrives in Krakow Old Town/Kazimierz at ~14:45-15:15 CET, synchronizing with standard 15:00 check-in.' : null
+              pickupWindow: meta.pickupWindow || null,
+              bagRestriction: meta.bagRestriction || null,
+              location: item.location || displayLocation || '',
+              passengers: item.passengers || meta.rawTickets || null,
+              flightLeg: resolvedFlightLeg
             }
           }}
         />

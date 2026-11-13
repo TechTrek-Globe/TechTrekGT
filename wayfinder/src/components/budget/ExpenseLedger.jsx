@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue } from 'react';
 import { 
   DollarSign, Receipt, Plus, ArrowRight, CheckCircle2, Trash2, Edit2,
   RefreshCw, Users, CreditCard, Sparkles, Plane, Building, Train, 
-  Utensils, ShoppingBag, ShoppingCart, Globe, AlertCircle, ArrowUpRight, ArrowDownLeft, RotateCcw, ShieldCheck, X
+  Utensils, ShoppingBag, ShoppingCart, Globe, AlertCircle, ArrowUpRight, ArrowDownLeft, RotateCcw, ShieldCheck, Search, X
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -78,12 +78,28 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
   const isViewer = agendaRole === 'viewer';
   const [expenses, setExpenses] = useState([]);
   const [settlements, setSettlements] = useState([]);
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Display currency from Settings (user sets it in the global Settings modal)
   const displayCurrency = settings.currency || 'USD';
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+      const tag = event.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.target?.isContentEditable) return;
+      event.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -103,7 +119,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
   const [formCategory, setFormCategory] = useState('dining');
   const [formAmount, setFormAmount] = useState('');
   const [formCurrency, setFormCurrency] = useState(displayCurrency);
-  const [formPayer, setFormPayer] = useState('self');
+  const [formPayer, setFormPayer] = useState('');
   const [formSplitType, setFormSplitType] = useState('equal'); // 'equal' or 'self'
   const [formSite, setFormSite] = useState('');
   const [formPaymentMethod, setFormPaymentMethod] = useState('');
@@ -196,7 +212,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
   }, [journeyId]);
 
   const availableBookingSites = useMemo(() => {
-    const baseDefaults = ['Booking.com', 'Hotels.com', 'Delta.com', 'PKP Intercity', 'GetYourGuide', 'On-Site'];
+    const baseDefaults = ['Booking.com', 'Hotels.com', 'PKP Intercity', 'GetYourGuide', 'Airlines', 'On-Site'];
     const fromExpenses = (expenses || [])
       .map(e => (e.purchase_site || '').trim())
       .filter(Boolean);
@@ -214,24 +230,37 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
   }, [expenses, savedBookingSites]);
 
   // Use real user.id (matches D1 stored user_id), with safe fallback
-  const currentUserId = user?.id || user?.userId || 'usr-1785511589441-3fvgv';
-  const currentUserName = user?.name || user?.email?.split('@')[0] || 'Jonathan Kemp';
-  const partnerId = 'usr-ronald-few';
-  const partnerName = 'Ronald Milton Few';
+  const currentUserId = user?.id || user?.userId || 'self';
+  const currentUserName = user?.name || user?.email?.split('@')[0] || 'Traveler';
 
-  const participants = useMemo(() => [
-    { id: currentUserId, name: currentUserName },
-    { id: partnerId, name: partnerName }
-  ], [currentUserId, currentUserName]);
+  const participants = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    for (const m of members) {
+      if (!m?.id || seen.has(m.id)) continue;
+      seen.add(m.id);
+      list.push({ id: m.id, name: m.name || m.email || 'Collaborator' });
+    }
+    if (!seen.has(currentUserId)) {
+      list.unshift({ id: currentUserId, name: currentUserName });
+    }
+    return list;
+  }, [members, currentUserId, currentUserName]);
 
-  // Load expenses from D1
+  // Load expenses and agenda members from D1
   const loadExpenses = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(getApiUrl(`/api/wayfinder/expenses?journey_id=${journeyId}`), {
-        credentials: 'include'
-      });
+      const encodedId = encodeURIComponent(journeyId);
+      const [res, membersRes] = await Promise.all([
+        fetch(getApiUrl(`/api/wayfinder/expenses?journey_id=${encodedId}`), { credentials: 'include' }),
+        fetch(getApiUrl(`/api/wayfinder/agendas/${encodedId}/members`), { credentials: 'include' }).catch(() => null),
+      ]);
+      if (membersRes?.ok) {
+        const memData = await membersRes.json().catch(() => ({}));
+        setMembers(Array.isArray(memData.members) ? memData.members : []);
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setExpenses(data.expenses || []);
@@ -265,11 +294,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
   }, [expenses, settlements, displayCurrency]);
 
   const userBalance = useMemo(() => {
-    return balances.find(b => 
-      b.id === currentUserId || 
-      b.id === 'usr-1785511589441-3fvgv' || 
-      b.name?.toLowerCase().includes('jon')
-    ) || { paid: 0, owed: 0, net: 0 };
+    return balances.find(b => b.id === currentUserId) || { paid: 0, owed: 0, net: 0 };
   }, [balances, currentUserId]);
 
   const totalExpeditionInDisplay = useMemo(() => {
@@ -290,28 +315,23 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
     } else if (personFilter === 'settled') {
       result = result.filter(e => e.splits?.length > 0 && e.splits.every(s => Boolean(s.is_settled)));
     }
-    return result;
-  }, [expenses, selectedCategory, personFilter, activePersonId]);
-
-  // Handle Preset Seed
-  const handleSeedPresets = async () => {
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(getApiUrl('/api/wayfinder/expenses/preset'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ journey_id: journeyId })
-      });
-      if (!res.ok) throw new Error('Preset creation failed');
-      await loadExpenses();
-    } catch (e) {
-      console.error(e);
-      alert('Failed to load sample expenses: ' + e.message);
-    } finally {
-      setIsSubmitting(false);
+    const q = deferredSearchQuery.trim().toLowerCase();
+    if (q) {
+      result = result.filter((e) =>
+        [
+          e.description,
+          e.purchase_site,
+          e.payment_method,
+          e.paid_by_name,
+          e.currency_original,
+          e.expense_date,
+        ]
+          .filter(Boolean)
+          .some((val) => String(val).toLowerCase().includes(q))
+      );
     }
-  };
+    return result;
+  }, [expenses, selectedCategory, personFilter, activePersonId, deferredSearchQuery]);
 
   // Modal open handlers
   const handleOpenAddModal = () => {
@@ -320,7 +340,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
     setFormCategory('dining');
     setFormAmount('');
     setFormCurrency(displayCurrency);
-    setFormPayer('self');
+    setFormPayer(currentUserId);
     setFormSplitType('equal');
     setFormSite('');
     setFormPaymentMethod('');
@@ -337,12 +357,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
     setFormPaymentMethod(exp.payment_method || '');
 
     // Determine who paid
-    const payerId = exp.paid_by_user_id || exp.user_id;
-    if (payerId === currentUserId || exp.paid_by_name?.toLowerCase().includes('jon')) {
-      setFormPayer('self');
-    } else {
-      setFormPayer('partner');
-    }
+    const payerId = exp.paid_by_user_id || exp.user_id || currentUserId;
+    setFormPayer(payerId);
 
     // Determine split type
     if (exp.splits && exp.splits.length === 1 && exp.splits[0].percentage === 100) {
@@ -362,15 +378,19 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
     setIsSubmitting(true);
     try {
       const amt = Number(formAmount);
+      const selectedPayerId = formPayer || currentUserId;
+      const payerObj = participants.find(p => p.id === selectedPayerId) || {
+        id: selectedPayerId,
+        name: selectedPayerId === currentUserId
+          ? currentUserName
+          : (editingExpense?.paid_by_name || 'Collaborator'),
+      };
       let splits = [];
 
       if (formSplitType === 'equal') {
         splits = splitEqually(amt, participants);
       } else {
-        // Paid for self only
-        const payerObj = formPayer === 'self'
-          ? { id: currentUserId, name: currentUserName }
-          : { id: partnerId, name: partnerName };
+        // Paid for payer only
         splits = [{ userId: payerObj.id, userName: payerObj.name, amountOwed: amt, percentage: 100 }];
       }
 
@@ -382,8 +402,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
         amount_original: amt,
         currency_original: formCurrency,
         amount_usd: amtInUsd,
-        paid_by_name: formPayer === 'self' ? currentUserName : partnerName,
-        paid_by_user_id: formPayer === 'self' ? currentUserId : partnerId,
+        paid_by_name: payerObj.name,
+        paid_by_user_id: payerObj.id,
         purchase_site: formSite.trim() || null,
         payment_method: formPaymentMethod.trim() || null,
         splits: splits.map(s => ({
@@ -597,7 +617,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
       {isViewer && (
         <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs flex items-center space-x-2.5 shadow-sm">
           <ShieldCheck className="w-4 h-4 shrink-0 text-sky-400" />
-          <span>Viewing shared expedition ledger with real-time currency conversion and 50/50 balance splits (read-only collaborator access).</span>
+          <span>Viewing shared expedition ledger with real-time currency conversion and group balance splits (read-only collaborator access).</span>
         </div>
       )}
 
@@ -609,7 +629,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
             <span>Shared Expense Ledger</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-            Multi-currency cost tracker with 50/50 splits and debt settle-up simplification.
+            Multi-currency cost tracker with collaborative group splits and debt settle-up simplification.
           </p>
         </div>
 
@@ -771,7 +791,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
         }}
       />
 
-      {/* Filter Tabs & Empty State Presets */}
+      {/* Filter Tabs & Search Input */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
         {/* Category Filter Pills */}
         <div className="flex items-center space-x-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
@@ -791,17 +811,29 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
           ))}
         </div>
 
-        {expenses.length === 0 && (
-          <button
-            type="button"
-            onClick={handleSeedPresets}
-            disabled={isSubmitting}
-            className="px-3.5 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 font-bold text-xs flex items-center space-x-1.5 transition-all self-start sm:self-center"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Load Poland 2026 Sample Expenses</span>
-          </button>
-        )}
+        {/* Search Input (press / to focus) */}
+        <div className="relative w-full sm:w-64 shrink-0">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search expenses... (/)"
+            aria-label="Search expenses"
+            className="w-full pl-8 pr-8 py-1.5 rounded-xl bg-slate-950/90 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400/60"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear expense search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Expense Items List */}
@@ -812,16 +844,18 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
           <Receipt className="w-10 h-10 text-slate-500 mx-auto" />
           <h4 className="text-lg font-bold text-white">No expenses in this category</h4>
           <p className="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto">
-            Add your shared hotel stays, train tickets, and Christmas market purchases to calculate balances.
+            Add your shared hotel stays, train tickets, and market purchases to calculate balances across collaborators.
           </p>
-          <button
-            type="button"
-            onClick={handleSeedPresets}
-            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center space-x-1.5 shadow-md"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Load Poland 2026 Sample Expenses</span>
-          </button>
+          {!isViewer && (
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center space-x-1.5 shadow-md"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add First Expense</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -1138,12 +1172,18 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                 <div>
                   <label className="block font-bold text-slate-300 mb-1">Who Paid?</label>
                   <select
-                    value={formPayer}
+                    value={formPayer || currentUserId}
                     onChange={(e) => setFormPayer(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white focus:outline-none focus:border-amber-400"
                   >
-                    <option value="self">You ({currentUserName})</option>
-                    <option value="partner">{partnerName}</option>
+                    {participants.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.id === currentUserId ? `You (${p.name})` : p.name}
+                      </option>
+                    ))}
+                    {formPayer && !participants.some(p => p.id === formPayer) && (
+                      <option value={formPayer}>{editingExpense?.paid_by_name || 'Former Collaborator'}</option>
+                    )}
                   </select>
                 </div>
 
@@ -1154,8 +1194,10 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                     onChange={(e) => setFormSplitType(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white focus:outline-none focus:border-amber-400"
                   >
-                    <option value="equal">Split Equally (50/50)</option>
-                    <option value="self">Paid for Self Only</option>
+                    <option value="equal">
+                      {participants.length > 1 ? `Split Equally (${participants.length}-way)` : 'Full Amount (Solo)'}
+                    </option>
+                    <option value="self">Paid for Payer Only</option>
                   </select>
                 </div>
               </div>
@@ -1173,7 +1215,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                     list="trip-booking-sites-list"
                     value={formSite}
                     onChange={(e) => setFormSite(e.target.value)}
-                    placeholder="e.g. Booking.com, Hotels.com, Delta.com"
+                    placeholder="e.g. Booking.com, Hotels.com, PKP Intercity"
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs sm:text-sm"
                   />
                   <datalist id="trip-booking-sites-list">

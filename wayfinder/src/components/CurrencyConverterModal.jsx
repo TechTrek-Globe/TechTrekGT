@@ -8,9 +8,11 @@ export function CurrencyConverterModal({ isOpen, onClose }) {
   const [usdValue, setUsdValue] = useState('');
   const [lastEdited, setLastEdited] = useState('FOREIGN'); // 'FOREIGN' or 'USD'
 
-  const { code, symbol, rate, country, presets } = activeCurrency || {
+  const { code, symbol, baseCode = 'USD', baseSymbol = '$', rate, country, presets } = activeCurrency || {
     code: 'PLN',
     symbol: 'zł',
+    baseCode: 'USD',
+    baseSymbol: '$',
     rate: 3.73,
     country: 'Poland',
     presets: [10, 25, 50, 100, 200],
@@ -115,7 +117,7 @@ export function CurrencyConverterModal({ isOpen, onClose }) {
           <div className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between text-[11px]">
             <div className="flex items-center space-x-1 text-wf-muted">
               <span>Rate:</span>
-              <span className="font-bold text-wf-amber">1 USD = {rate.toFixed(2)} {code}</span>
+              <span className="font-bold text-wf-amber">1 {baseCode} = {rate.toFixed(2)} {code}</span>
             </div>
             <button
               onClick={refreshRates}
@@ -152,11 +154,11 @@ export function CurrencyConverterModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* US Dollar (USD) Input */}
+            {/* Base Currency Input */}
             <div className="p-2 rounded-lg bg-wf-navy-mid/80 border border-wf-blue/40 focus-within:border-wf-blue transition-all">
               <div className="flex items-center justify-between text-[10px] font-bold text-wf-muted uppercase">
-                <span>USD (United States)</span>
-                <span className="text-wf-blue-lt font-extrabold">$</span>
+                <span>{baseCode} (Base Currency)</span>
+                <span className="text-wf-blue-lt font-extrabold">{baseSymbol}</span>
               </div>
               <input
                 type="text"

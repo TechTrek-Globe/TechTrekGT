@@ -4,6 +4,43 @@
 
 import { generateId } from '../../utils/id.js';
 import { resolveAgendaAccess, canEdit, canManage, canViewSensitive } from '../../utils/agendaAccess.js';
+import {
+  MAX_D1_BLOB_SIZE,
+  ensureDocumentBlobsTable,
+  base64ToBytes,
+  sha256HexBytes,
+  buildBlobStatements,
+  readDocumentBlob,
+  headDocumentBlob,
+  sanitizeHeaderFilename
+} from '../../utils/documentBlobs.js';
+
+function normalizeDocumentMime(mimeType, filename) {
+  if (mimeType && mimeType !== 'application/octet-stream') return mimeType;
+  const lowerName = (filename || '').toLowerCase();
+  if (lowerName.endsWith('.pdf')) return 'application/pdf';
+  if (lowerName.endsWith('.png')) return 'image/png';
+  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'image/jpeg';
+  if (lowerName.endsWith('.webp')) return 'image/webp';
+  if (lowerName.endsWith('.heic')) return 'image/heic';
+  return mimeType || '';
+}
+
+async function authorizeDocumentAccess(env, doc, user, requireWrite = false) {
+  if (!doc) return { ok: false, status: 404, error: 'Document not found' };
+  if (doc.journey_id) {
+    const access = await resolveAgendaAccess(env, doc.journey_id, user);
+    const allowed = requireWrite
+      ? (doc.user_id === user.userId || canManage(access.role) || canEdit(access.role))
+      : canViewSensitive(access.role);
+    if (!allowed) return { ok: false, status: 403, error: 'Forbidden' };
+    return { ok: true, access };
+  }
+  if (doc.user_id !== user.userId) {
+    return { ok: false, status: 403, error: 'Forbidden' };
+  }
+  return { ok: true, access: null };
+}
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_MIME  = new Set([
@@ -25,9 +62,115 @@ export async function handleDocuments(context, url, method) {
   const parts = url.pathname.split('/').filter(Boolean);
   const docIdx = parts.indexOf('documents');
   const subpath = docIdx !== -1 ? (parts[docIdx + 1] || null) : null;
+  const subpath2 = docIdx !== -1 ? (parts[docIdx + 2] || null) : null;
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
+
+    // Authenticated private document binary retrieval (GET / HEAD /api/wayfinder/documents/:id/file)
+    if ((method === 'GET' || method === 'HEAD') && subpath && subpath2 === 'file') {
+      const doc = await env.DB.prepare(
+        'SELECT * FROM wayfinder_documents WHERE id = ? AND deleted_at IS NULL'
+      ).bind(subpath).first();
+      const authz = await authorizeDocumentAccess(env, doc, user, false);
+      if (!authz.ok) return json({ error: authz.error }, authz.status);
+
+      const safeFilename = sanitizeHeaderFilename(doc.safe_display_name || doc.original_filename || 'document.pdf');
+      if (method === 'HEAD') {
+        const meta = await headDocumentBlob(env.DB, doc.id);
+        if (!meta) return json({ error: 'Document binary not available' }, 404);
+        return new Response(null, {
+          status: 200,
+          headers: {
+            'Content-Type': meta.mimeType,
+            'Content-Length': String(meta.sizeBytes),
+            'Content-Disposition': `inline; filename="${safeFilename}"`,
+            'Cache-Control': 'private, no-store',
+            'X-Content-Type-Options': 'nosniff',
+          }
+        });
+      }
+
+      const blob = await readDocumentBlob(env.DB, doc.id);
+      if (!blob) return json({ error: 'Document binary not available' }, 404);
+      return new Response(blob.bytes, {
+        status: 200,
+        headers: {
+          'Content-Type': blob.mimeType,
+          'Content-Length': String(blob.bytes.byteLength),
+          'Content-Disposition': `inline; filename="${safeFilename}"`,
+          'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
+        }
+      });
+    }
+
+    // Attach or replace binary content on an existing document (POST / PUT /api/wayfinder/documents/:id/file)
+    if ((method === 'POST' || method === 'PUT') && subpath && subpath !== 'register' && subpath2 === 'file') {
+      const doc = await env.DB.prepare(
+        'SELECT * FROM wayfinder_documents WHERE id = ? AND deleted_at IS NULL'
+      ).bind(subpath).first();
+      const authz = await authorizeDocumentAccess(env, doc, user, true);
+      if (!authz.ok) return json({ error: authz.error }, authz.status);
+
+      let attachBytes = null;
+      let attachMime = doc.mime_type;
+      let attachName = doc.original_filename;
+      const contentType = request.headers.get('content-type') || '';
+      if (contentType.includes('multipart/form-data')) {
+        const formData = await request.formData().catch(() => null);
+        const file = formData?.get('file');
+        if (file && typeof file === 'object' && typeof file.arrayBuffer === 'function') {
+          attachBytes = new Uint8Array(await file.arrayBuffer());
+          attachName = file.name || attachName;
+          attachMime = file.type || attachMime;
+        }
+      } else {
+        const body = await request.json().catch(() => ({}));
+        const b64 = body.base64 || body.content_b64;
+        if (b64) attachBytes = base64ToBytes(b64);
+        attachMime = body.mime_type || body.type || attachMime;
+        attachName = body.original_filename || body.filename || attachName;
+      }
+
+      attachMime = normalizeDocumentMime(attachMime, attachName);
+      if (!attachBytes || attachBytes.byteLength === 0) {
+        return json({ error: 'Binary file payload is required' }, 400);
+      }
+      if (!ALLOWED_MIME.has(attachMime)) {
+        return json({ error: `Unsupported file type: ${attachMime}` }, 422);
+      }
+      if (attachBytes.byteLength > MAX_D1_BLOB_SIZE) {
+        return json({ error: 'File exceeds 10 MB server storage limit' }, 422);
+      }
+
+      const fileHash = await sha256HexBytes(attachBytes);
+      await ensureDocumentBlobsTable(env.DB);
+      const blobStmts = buildBlobStatements(env.DB, {
+        documentId: doc.id,
+        userId: user.userId,
+        bytes: attachBytes,
+        mimeType: attachMime,
+        sha256Hash: fileHash
+      });
+
+      await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE wayfinder_documents
+           SET mime_type = ?, file_size_bytes = ?, file_hash = COALESCE(?, file_hash), storage_status = 'd1_blob'
+           WHERE id = ?`
+        ).bind(attachMime, attachBytes.byteLength, fileHash, doc.id),
+        ...blobStmts
+      ]);
+
+      return json({
+        success: true,
+        document_id: doc.id,
+        file_url: `/api/wayfinder/documents/${doc.id}/file`,
+        storage_status: 'd1_blob',
+        file_size_bytes: attachBytes.byteLength
+      });
+    }
 
     if (method === 'GET') {
       const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
@@ -60,6 +203,7 @@ export async function handleDocuments(context, url, method) {
       let file_size_bytes = null;
       let file_hash = null;
       let journey_id = null;
+      let fileBytes = null;
 
       const contentType = request.headers.get('content-type') || '';
       if (contentType.includes('multipart/form-data')) {
@@ -70,6 +214,13 @@ export async function handleDocuments(context, url, method) {
             original_filename = file.name || 'uploaded_document';
             mime_type = file.type || 'application/pdf';
             file_size_bytes = file.size || 0;
+            if (typeof file.arrayBuffer === 'function') {
+              const buf = await file.arrayBuffer();
+              if (buf && buf.byteLength > 0) {
+                fileBytes = new Uint8Array(buf);
+                file_size_bytes = fileBytes.byteLength;
+              }
+            }
           }
           journey_id = formData.get('journey_id') || formData.get('journeyId');
         }
@@ -80,17 +231,17 @@ export async function handleDocuments(context, url, method) {
         file_size_bytes = body.file_size_bytes || body.size;
         file_hash = body.file_hash || body.hash;
         journey_id = body.journey_id || body.journeyId;
+        const rawB64 = body.base64 || body.content_b64;
+        if (rawB64 && typeof rawB64 === 'string') {
+          fileBytes = base64ToBytes(rawB64);
+          if (fileBytes.byteLength > 0) {
+            file_size_bytes = fileBytes.byteLength;
+          }
+        }
       }
 
       // Infer or normalize MIME type if missing or generic on mobile/iOS
-      if (!mime_type || mime_type === 'application/octet-stream') {
-        const lowerName = (original_filename || '').toLowerCase();
-        if (lowerName.endsWith('.pdf')) mime_type = 'application/pdf';
-        else if (lowerName.endsWith('.png')) mime_type = 'image/png';
-        else if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) mime_type = 'image/jpeg';
-        else if (lowerName.endsWith('.webp')) mime_type = 'image/webp';
-        else if (lowerName.endsWith('.heic')) mime_type = 'image/heic';
-      }
+      mime_type = normalizeDocumentMime(mime_type, original_filename);
 
       if (!original_filename || !mime_type) {
         return json({ error: 'original_filename and mime_type are required' }, 400);
@@ -102,6 +253,12 @@ export async function handleDocuments(context, url, method) {
       }
       if (file_size_bytes && file_size_bytes > MAX_FILE_SIZE) {
         return json({ error: 'File exceeds 20 MB limit' }, 422);
+      }
+      if (fileBytes && fileBytes.byteLength > MAX_D1_BLOB_SIZE) {
+        return json({ error: 'File exceeds 10 MB server storage limit' }, 422);
+      }
+      if (!file_hash && fileBytes && fileBytes.byteLength > 0) {
+        file_hash = await sha256HexBytes(fileBytes);
       }
 
       // Duplicate check by hash
@@ -134,22 +291,37 @@ export async function handleDocuments(context, url, method) {
       const safeName = sanitizeFilename(original_filename);
       const jobId = generateId();
       const auditId = generateId();
+      const hasBlob = Boolean(fileBytes && fileBytes.byteLength > 0);
+      const storageStatus = hasBlob ? 'd1_blob' : 'pending_r2';
+      if (hasBlob) {
+        await ensureDocumentBlobsTable(env.DB);
+      }
+      const blobStmts = hasBlob
+        ? buildBlobStatements(env.DB, {
+            documentId: id,
+            userId: user.userId,
+            bytes: fileBytes,
+            mimeType: mime_type,
+            sha256Hash: file_hash
+          })
+        : [];
 
-      // Batch document creation, extraction job placeholder, and audit event atomically
+      // Batch document creation, extraction job placeholder, audit event, and binary chunks atomically
       await env.DB.batch([
         env.DB.prepare(
           `INSERT INTO wayfinder_documents
            (id, user_id, journey_id, original_filename, safe_display_name, mime_type,
             file_size_bytes, file_hash, storage_status, processing_status, security_scan_status)
-           VALUES (?,?,?,?,?,?,?,?,'pending_r2','pending','pending')`
+           VALUES (?,?,?,?,?,?,?,?,?,'pending','pending')`
         ).bind(id, user.userId, journey_id || null, original_filename, safeName,
-               mime_type, file_size_bytes || null, file_hash || null),
+               mime_type, file_size_bytes || null, file_hash || null, storageStatus),
         env.DB.prepare(
           'INSERT INTO wayfinder_extraction_jobs (id, document_id, user_id, status) VALUES (?,?,?,?)'
         ).bind(jobId, id, user.userId, 'pending'),
         env.DB.prepare(
           'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
-        ).bind(auditId, user.userId, journey_id || null, 'document', id, 'register')
+        ).bind(auditId, user.userId, journey_id || null, 'document', id, 'register'),
+        ...blobStmts
       ]);
 
       return json({
@@ -157,7 +329,8 @@ export async function handleDocuments(context, url, method) {
         extraction_job_id: jobId,
         safe_display_name: safeName,
         filename: safeName,
-        storage_note: 'R2 storage not yet configured - document metadata registered. File extraction available client-side.',
+        storage_status: storageStatus,
+        file_url: hasBlob ? `/api/wayfinder/documents/${id}/file` : null,
       }, 201);
     }
 
@@ -259,6 +432,12 @@ export async function handleDocuments(context, url, method) {
         env.DB.prepare('DELETE FROM wayfinder_extraction_jobs WHERE document_id = ?').bind(docId)
       );
 
+      // 5.5 Delete stored binary chunks (ensure table exists before batch DELETE)
+      await ensureDocumentBlobsTable(env.DB);
+      batchStmts.push(
+        env.DB.prepare('DELETE FROM wayfinder_document_blobs WHERE document_id = ?').bind(docId)
+      );
+
       // 6. Delete document record completely to allow clean re-import without hash conflict
       batchStmts.push(
         env.DB.prepare('DELETE FROM wayfinder_documents WHERE id = ?').bind(docId)
@@ -320,6 +499,8 @@ function safeDoc(doc) {
     detected_doc_type:   doc.detected_doc_type,
     security_scan_status:doc.security_scan_status,
     storage_status:      doc.storage_status,
+    has_blob:            doc.storage_status === 'd1_blob',
+    file_url:            doc.storage_status === 'd1_blob' ? `/api/wayfinder/documents/${doc.id}/file` : null,
     retention_status:    doc.retention_status,
   };
 }

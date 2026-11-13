@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { X, Copy, Check, Loader2, Send, Trash2, Users } from 'lucide-react';
 import { getApiUrl } from '../utils/api';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 async function call(path, options = {}) {
   const res = await fetch(getApiUrl(path), {
@@ -44,6 +45,8 @@ export function ShareAgendaModal({ isOpen, onClose, agendaId, agendaTitle }) {
       refresh();
     }
   }, [isOpen, refresh]);
+
+  useEscapeKey(isOpen, onClose);
 
   if (!isOpen) return null;
 

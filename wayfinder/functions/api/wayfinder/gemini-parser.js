@@ -623,12 +623,10 @@ export function heuristicParseDocument({ text = '', filename = '', mimeType = ''
   let confidence = 'medium';
 
   // 1. Hotel / Lodging Heuristics Detection
-  const isAltus = combined.includes('altus') || 
-                  condensed.includes('altuspalace') || 
+  const isAltus = combined.includes('altus') ||
+                  condensed.includes('altuspalace') ||
                   condensed.includes('hotelaltuspalace') ||
-                  condensed.includes('imiwhdh') || 
-                  (condensed.includes('profitroom') && (condensed.includes('wroc') || condensed.includes('palace') || condensed.includes('imiwhdh'))) ||
-                  (combined.includes('wierzbowa') && combined.includes('wroc'));
+                  (condensed.includes('profitroom') && (condensed.includes('wroc') || condensed.includes('palace')));
 
   const isHotel = isAltus ||
                   combined.includes('hotel') ||
@@ -945,134 +943,48 @@ export function heuristicParseDocument({ text = '', filename = '', mimeType = ''
     }
   }
 
-  // --- Provider-Specific Fallback Defaults (fill gaps via nullish coalescing) ---
+  // --- Provider-Specific Labels (no fabricated PNRs, prices, seats, addresses, or dates) ---
   const fnameTitle = filename ? filename.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ') : null;
   const isGenericTitle = !title || title === 'Travel Booking' || title === fnameTitle;
 
   if (item_type === 'hotel') {
     if (isAltus) {
-      provider = provider || 'Hotel Altus Palace Wrocław';
-      title = isGenericTitle ? 'Altus Palace Wrocław 5-Star Stay (Check-in)' : title;
-      location = location ?? 'ul. Wierzbowa 15, 50-056 Wrocław';
-      start_date = start_date ?? '2026-12-07';
-      start_time = start_time ?? '15:00';
-      end_date = end_date ?? '2026-12-09';
-      end_time = end_time ?? '12:00';
-      seat = seat ?? 'Junior Suite';
-      price = price ?? 1420.20;
-      currency = currency || 'PLN';
-      confirmation_number = confirmation_number || 'IMIWHDH';
-      confidence = 'high';
-      notes = notes ?? 'Non-refundable Rate. Junior Suite. Quiet room in historic palace section requested.';
+      provider = provider || 'Hotel Altus Palace';
+      title = isGenericTitle ? 'Hotel Altus Palace' : title;
     } else if (combined.includes('the bridge') || combined.includes('mgallery') || (combined.includes('accor') && combined.includes('wroclaw'))) {
       provider = provider || 'Accor / The Bridge Wrocław MGallery';
-      title = isGenericTitle ? 'The Bridge Wrocław MGallery Stay (Check-in)' : title;
-      location = location ?? 'Plac Katedralny 8, 50-329 Wrocław';
-      start_date = start_date ?? '2026-12-07';
-      start_time = start_time ?? '15:00';
-      end_date = end_date ?? '2026-12-09';
-      end_time = end_time ?? '11:00';
-      price = price ?? 1850.00;
-      currency = currency || 'PLN';
-      confirmation_number = confirmation_number || 'ACCOR-WR9281';
-      confidence = 'high';
+      title = isGenericTitle ? 'The Bridge Wrocław MGallery Stay' : title;
     } else if (combined.includes('stary')) {
-      provider = provider || 'Hotel Stary Kraków';
-      title = isGenericTitle ? 'Hotel Stary Kraków Stay (Check-in)' : title;
-      location = location ?? 'ul. Szczepańska 5, 31-011 Kraków';
-      start_date = start_date ?? '2026-12-04';
-      start_time = start_time ?? '15:00';
-      end_date = end_date ?? '2026-12-07';
-      end_time = end_time ?? '11:00';
-      price = price ?? 2400.00;
-      currency = currency || 'PLN';
-      confirmation_number = confirmation_number || 'STARY-KR4410';
-      confidence = 'high';
+      provider = provider || 'Hotel Stary';
+      title = isGenericTitle ? 'Hotel Stary Reservation' : title;
     } else {
       provider = provider || 'Hotel Accommodation';
       title = isGenericTitle ? 'Hotel Reservation' : title;
     }
   } else if (item_type === 'rail') {
-    provider = provider || 'PKP Intercity';
-    confidence = 'high';
-    
-    if (combined.includes('wroclaw') && combined.includes('poznan')) {
-      title = isGenericTitle ? 'PKP Intercity IC 13100: Wrocław Główny -> Poznań Główny' : title;
-      origin = origin ?? 'Wrocław Główny';
-      destination = destination ?? 'Poznań Główny';
-      start_date = start_date ?? '2026-12-09';
-      start_time = start_time ?? '10:45';
-      end_date = end_date ?? '2026-12-09';
-      end_time = end_time ?? '12:15';
-      seat = seat ?? 'Car 5, Seats 41/42 (1st Class)';
-      price = price ?? 120.00;
-      confirmation_number = confirmation_number || 'PKP-883921';
-    } else if (combined.includes('krakow') && combined.includes('wroclaw')) {
-      title = isGenericTitle ? 'PKP Intercity IC 1305 "Śląsk": Kraków Główny -> Wrocław Główny' : title;
-      origin = origin ?? 'Kraków Główny';
-      destination = destination ?? 'Wrocław Główny';
-      start_date = start_date ?? '2026-12-07';
-      start_time = start_time ?? '11:30';
-      end_date = end_date ?? '2026-12-07';
-      end_time = end_time ?? '14:15';
-      seat = seat ?? 'Car 3, Seats 24/25 (1st Class)';
-      price = price ?? 190.00;
-      confirmation_number = confirmation_number || 'PKP-772910';
-    } else {
-      title = isGenericTitle ? 'PKP Intercity Train Reservation' : title;
-      start_date = start_date ?? '2026-12-07';
-      price = price ?? 150.00;
-      currency = currency || 'PLN';
-      confirmation_number = confirmation_number || 'PKP-PLN-552';
+    provider = provider || (combined.includes('pkp') || combined.includes('intercity') ? 'PKP Intercity' : 'Rail Carrier');
+    if (isGenericTitle) {
+      title = provider === 'PKP Intercity' ? 'PKP Intercity Train Reservation' : 'Rail Reservation';
     }
   } else if (item_type === 'flight') {
-    if (combined.includes('delta') || /\bdl\s*9208\b/i.test(combined) || combined.includes('gudi3j')) {
+    if (combined.includes('delta') || /\bdl\s*9208\b/i.test(combined)) {
       provider = provider || 'Delta Air Lines';
-      title = isGenericTitle ? 'Flight DL9208: Atlanta (ATL) to Kraków (KRK)' : title;
-      origin = origin ?? 'ATL';
-      destination = destination ?? 'KRK';
-      start_date = start_date ?? '2026-12-03';
-      start_time = start_time ?? '18:20';
-      end_date = end_date ?? '2026-12-04';
-      end_time = end_time ?? '13:45';
-      seat = seat ?? 'Seats 14A, 14B (Comfort+)';
-      price = price ?? 1980.00;
-      currency = currency || 'USD';
-      confirmation_number = confirmation_number || 'GUDI3J';
-      confidence = 'high';
+      title = isGenericTitle ? 'Delta Air Lines Flight' : title;
     } else if (combined.includes('lot')) {
       provider = provider || 'LOT Polish Airlines';
-      title = isGenericTitle ? 'Flight LO3923: Warsaw (WAW) to Kraków (KRK)' : title;
-      origin = origin ?? 'WAW';
-      destination = destination ?? 'KRK';
-      start_date = start_date ?? '2026-12-04';
-      start_time = start_time ?? '11:15';
-      end_date = end_date ?? '2026-12-04';
-      end_time = end_time ?? '12:10';
-      price = price ?? 340.00;
-      currency = currency || 'PLN';
-      confirmation_number = confirmation_number || 'LOT-992144';
-      confidence = 'high';
+      title = isGenericTitle ? 'LOT Polish Airlines Flight' : title;
     } else {
       provider = provider || 'Airline Reservation';
       title = isGenericTitle ? 'Flight Reservation' : title;
-      price = price ?? 500.00;
-      currency = currency || 'USD';
     }
-  } else if (combined.includes('auschwitz') || combined.includes('wieliczka') || combined.includes('gyg7vkk692wy')) {
+  } else if (combined.includes('auschwitz') || combined.includes('wieliczka')) {
     item_type = 'excursion';
     provider = provider || 'GetYourGuide';
-    title = isGenericTitle ? 'GetYourGuide: Auschwitz-Birkenau & Wieliczka Salt Mine Tour' : title;
-    location = location ?? 'Hotel Pickup (Kraków) -> Auschwitz & Wieliczka';
-    start_date = start_date ?? '2026-12-06';
-    start_time = start_time ?? '06:30';
-    end_date = end_date ?? '2026-12-06';
-    end_time = end_time ?? '17:30';
-    seat = seat ?? '2 Adults (English Guide • 11h)';
-    price = price ?? 284.76;
-    currency = currency || 'USD';
-    confirmation_number = confirmation_number || 'GYG7VKK692WY';
-    confidence = 'high';
+    if (combined.includes('auschwitz') && (combined.includes('wieliczka') || combined.includes('salt'))) {
+      title = isGenericTitle ? 'GetYourGuide: Auschwitz-Birkenau & Wieliczka Salt Mine Tour' : title;
+    } else if (isGenericTitle) {
+      title = 'Guided Excursion';
+    }
   } else if (combined.includes('getyourguide') || combined.includes('gyg') || combined.includes('tour') || combined.includes('excursion')) {
     item_type = 'excursion';
     if (combined.includes('getyourguide') || combined.includes('gyg')) {
@@ -1093,7 +1005,7 @@ export function heuristicParseDocument({ text = '', filename = '', mimeType = ''
     origin,
     destination,
     price,
-    currency: currency || 'PLN',
+    currency: currency || (price !== null ? 'PLN' : null),
     seat,
     guests,
     purchase_site,
@@ -1183,7 +1095,7 @@ export function mapExtractionToFields(extraction) {
  * Lightweight connectivity check for Gemini / Google API Key
  */
 export function isApiKeyConnected(env) {
-  const key = env?.GEMINI_API_KEY || env?.GOOGLE_API_KEY || env?.GOOGLE_MAPS_API_KEY;
+  const key = env?.GEMINI_API_KEY || env?.GOOGLE_AI_API_KEY || env?.GOOGLE_API_KEY;
   return Boolean(key && typeof key === 'string' && key.trim().length > 0);
 }
 
@@ -1238,7 +1150,7 @@ export async function callGeminiRestApi({ apiKey, model = 'gemini-3.5-flash', co
  */
 export async function parseBookingDocument({ env = {}, text = '', base64 = null, mimeType = 'application/pdf', filename = '', user = null }) {
   const isConnected = isApiKeyConnected(env);
-  const apiKey = isConnected ? (env.GEMINI_API_KEY || env.GOOGLE_API_KEY || env.GOOGLE_MAPS_API_KEY) : null;
+  const apiKey = isConnected ? (env.GEMINI_API_KEY || env.GOOGLE_AI_API_KEY || env.GOOGLE_API_KEY) : null;
   const model = env.GEMINI_MODEL || 'gemini-3.5-flash';
 
   // If text is not provided or empty, attempt extraction from PDF binary base64
@@ -1332,13 +1244,14 @@ export async function parseBookingDocument({ env = {}, text = '', base64 = null,
 /**
  * Email Worker Fallback: Parses inbound email body with Gemini
  */
-export async function parseBookingWithGemini(env = {}, bodyText = '', subject = '', from = '', user = null) {
+export async function parseBookingWithGemini(env = {}, bodyText = '', subject = '', from = '', user = null, attachment = null) {
   try {
     const res = await parseBookingDocument({
       env,
       text: `Subject: ${subject}\nFrom: ${from}\n\n${bodyText}`,
-      filename: `email-${subject.slice(0, 30)}.eml`,
-      mimeType: 'text/plain',
+      base64: attachment?.base64 || null,
+      mimeType: attachment?.mimeType || 'text/plain',
+      filename: attachment?.filename || `email-${subject.slice(0, 30)}.eml`,
       user
     });
     return res.extraction;

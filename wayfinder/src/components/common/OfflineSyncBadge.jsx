@@ -1,22 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { CloudOff, RefreshCw, CheckCircle2, AlertTriangle, Layers, X, Wifi } from 'lucide-react';
 import { getQueue, getQueueCount, replayQueue } from '../../utils/mutationQueue';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 export function OfflineSyncBadge({ className = '' }) {
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [justSynced, setJustSynced] = useState(false);
+  const [attentionMessage, setAttentionMessage] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [queuedItems, setQueuedItems] = useState([]);
+
+  useEscapeKey(isModalOpen, () => setIsModalOpen(false));
 
   // Subscribe to network and queue events
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
+    const refreshQueueState = () => {
+      getQueue().then((items) => {
+        setPendingCount(items.length);
+        const authPaused = items.find((i) => i.status === 'auth_required');
+        if (authPaused) {
+          setAttentionMessage('Session expired. Sign in again to sync pending changes.');
+        }
+      });
+    };
+
     const handleQueueUpdate = (e) => {
       setPendingCount(e.detail?.pendingCount ?? 0);
+      refreshQueueState();
     };
 
     const handleSyncStart = () => {
@@ -24,29 +39,42 @@ export function OfflineSyncBadge({ className = '' }) {
       setJustSynced(false);
     };
 
+    const handleSyncStatus = (e) => {
+      if (e.detail?.status === 'needs_attention') {
+        setAttentionMessage(e.detail.message || 'Offline sync needs attention.');
+      } else if (e.detail?.status === 'synced') {
+        setAttentionMessage(null);
+      }
+    };
+
     const handleSyncComplete = (e) => {
       setIsSyncing(false);
       const synced = e.detail?.syncedCount ?? 0;
-      if (synced > 0) {
+      if (synced > 0 && (e.detail?.failedCount ?? 0) === 0) {
+        setAttentionMessage(null);
         setJustSynced(true);
         setTimeout(() => setJustSynced(false), 4000);
       }
+      refreshQueueState();
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('wayfinder:queue-updated', handleQueueUpdate);
     window.addEventListener('wayfinder:sync-start', handleSyncStart);
+    window.addEventListener('wayfinder:sync-status', handleSyncStatus);
     window.addEventListener('wayfinder:sync-complete', handleSyncComplete);
 
     // Initial check
     getQueueCount().then(c => setPendingCount(c));
+    refreshQueueState();
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('wayfinder:queue-updated', handleQueueUpdate);
       window.removeEventListener('wayfinder:sync-start', handleSyncStart);
+      window.removeEventListener('wayfinder:sync-status', handleSyncStatus);
       window.removeEventListener('wayfinder:sync-complete', handleSyncComplete);
     };
   }, []);
@@ -65,14 +93,32 @@ export function OfflineSyncBadge({ className = '' }) {
     setQueuedItems(items);
   };
 
-  // If online, not syncing, no pending items, and not recently synced: stay ambient
-  if (isOnline && pendingCount === 0 && !isSyncing && !justSynced) {
+  // If online, not syncing, no pending items, no warning, and not recently synced: stay ambient
+  if (isOnline && pendingCount === 0 && !isSyncing && !justSynced && !attentionMessage) {
     return null;
   }
 
   return (
     <>
       <div className={`inline-flex items-center space-x-1.5 transition-all animate-fade-in ${className}`}>
+        {/* Needs Attention Alert */}
+        {!isSyncing && attentionMessage && (
+          <button
+            type="button"
+            onClick={handleOpenModal}
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-200 text-xs font-bold hover:bg-rose-500/30 transition-all shadow-sm cursor-pointer"
+            title={attentionMessage}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+            <span>Needs Attention</span>
+            {pendingCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-rose-400 text-slate-950 text-[10px] font-black">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* State 1: Currently Syncing */}
         {isSyncing && (
           <button
@@ -116,7 +162,7 @@ export function OfflineSyncBadge({ className = '' }) {
         )}
 
         {/* State 4: Back Online with Pending Items Waiting to Sync */}
-        {!isSyncing && !justSynced && isOnline && pendingCount > 0 && (
+        {!isSyncing && !justSynced && isOnline && pendingCount > 0 && !attentionMessage && (
           <button
             type="button"
             onClick={handleManualSync}

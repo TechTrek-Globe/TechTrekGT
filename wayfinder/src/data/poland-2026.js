@@ -8,21 +8,13 @@ export const polandJourney = {
   "endDate": "2026-12-13",
   "outboundFlightDate": "2026-12-03",
   "flightArrival": {
-    "airline": "Delta Air Lines",
-    "flightNumber": "DL9208",
-    "carrier": "Delta Air Lines / KLM Partner",
-    "inboundLeg1": "DL0074 ATL ➔ AMS (Departs Dec 3, 20:10 EST | Arrives Dec 4, 10:40 CET)",
-    "layover": "55 minutes layover at Amsterdam Schiphol (AMS)",
-    "inboundLeg2": "DL9208 AMS ➔ KRK (Departs Dec 4, 11:35 CET | Arrives Dec 4, 13:30 CET)",
     "arrivalDate": "2026-12-04",
     "arrivalDisplayDate": "Friday, Dec 4, 2026",
     "arrivalTime": "13:30",
     "timezone": "CET (Central European Time / UTC+1, Poland Local Time)",
     "airport": "Kraków John Paul II International Airport (KRK / Balice)",
     "airportCode": "KRK",
-    "checkInSync": "Touching down at 13:30 CET allows ~45 mins for passport control and baggage claim, plus a 17-minute direct SKA1 commuter train ride to Kraków Główny. Travelers reach Old Town or Kazimierz accommodations between 14:45 and 15:15 CET, synchronizing with standard 15:00 hotel check-in times.",
-    "documentFilename": "Poland_Delta.pdf",
-    "documentPath": "/Poland-2026/docs/Poland_Delta.pdf"
+    "checkInSync": "Touching down around midday/early afternoon allows ~45 mins for passport control and baggage claim, plus a 17-minute direct SKA1 commuter train ride to Kraków Główny. Travelers reach Old Town or Kazimierz accommodations around 15:00 CET check-in."
   },
   "totalNights": 9,
   "totalDays": 10,
@@ -227,18 +219,14 @@ export const polandJourney = {
         }
       ],
       "flightArrival": {
-        "flightNumber": "DL9208",
-        "airline": "Delta Air Lines",
-        "routing": "ATL ➔ AMS ➔ KRK",
         "arrivalDate": "2026-12-04",
         "arrivalTime": "13:30",
         "timezone": "CET (UTC+1, Poland Local Time)",
         "airport": "Kraków John Paul II International Airport (KRK / Balice)",
-        "checkInSync": "Landing at 13:30 CET allows ~45m for customs and luggage, followed by the 17-minute direct SKA1 train to Kraków Główny, putting you at your Old Town or Kazimierz hotel between 14:45 and 15:15 CET (aligns with standard 15:00 check-in).",
-        "documentFilename": "Poland_Delta.pdf"
+        "checkInSync": "Landing in the early afternoon allows ~45m for customs and luggage, followed by the 17-minute direct SKA1 train to Kraków Główny, putting you at your Old Town or Kazimierz hotel around standard 15:00 check-in."
       },
       "transit": {
-        "airport": "Delta DL9208 arrives at Kraków Airport (KRK) at 13:30 CET on Dec 4. Direct SKA1 train from Kraków Airport (KRK) to Kraków Główny central station runs every 30 mins (17-min journey, ~17 PLN (~$4.50 USD) ticket).",
+        "airport": "Flights arrive at Kraków John Paul II Airport (KRK / Balice). Direct SKA1 train from Kraków Airport (KRK) to Kraków Główny central station runs every 30 mins (17-min journey, ~17 PLN (~$4.50 USD) ticket).",
         "cityTransit": "Trams & buses managed by ZTP Kraków. Use 24-hr (~17 PLN (~$4.50 USD)) or 72-hr (~50 PLN (~$13.35 USD)) passes. Trams 1, 3, 8, 13, and 24 connect Old Town directly with Kazimierz.",
         "station": "Kraków Główny train station is directly attached to Galeria Krakowska and is a flat 5-minute walk to the Barbican and Planty Park entry to Old Town."
       },
@@ -255,8 +243,8 @@ export const polandJourney = {
           "location": "Grand Main Square (Old Town)",
           "lat": 50.0614167,
           "lng": 19.9364255,
-          "imageSrc": "/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.png",
-          "imageUrl": "/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.png",
+          "imageSrc": "/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.jpg",
+          "imageUrl": "/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.jpg",
           "hours": "Nov 28, 2026 - Jan 1, 2027 | Open 10am-8pm. Early close on Dec 24 (~2pm).",
           "address": "Rynek Główny 1, 31-042 Kraków (Tram: Teatr Bagatela or Dworzec Główny)",
           "vibe": "Bustling, Grand & Iconic",
@@ -292,8 +280,8 @@ export const polandJourney = {
           "location": "Small Square (Behind St. Mary's)",
           "lat": 50.0610715,
           "lng": 19.9401271,
-          "imageSrc": "/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.png",
-          "imageUrl": "/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.png",
+          "imageSrc": "/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.jpg",
+          "imageUrl": "/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.jpg",
           "hours": "Late Nov - Dec 26 | Daily 11:00 AM - 9:00 PM",
           "address": "Mały Rynek, 31-041 Kraków (2-min walk from Main Square)",
           "vibe": "Cozy, Artisanal & Intimate",
@@ -328,8 +316,8 @@ export const polandJourney = {
           "location": "Kazimierz (Jewish Quarter)",
           "lat": 50.0487502,
           "lng": 19.9442715,
-          "imageSrc": "/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.png",
-          "imageUrl": "/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.png",
+          "imageSrc": "/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.jpg",
+          "imageUrl": "/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.jpg",
           "vibe": "Bohemian, Vintage & Eclectic",
           "bestTime": "6:00 PM - 9:00 PM (Combine with Kazimierz nightlife & Zapiekanki)",
           "highlights": [
@@ -646,36 +634,6 @@ export const polandJourney = {
           "hoursData": "Competition: Dec 3, 2026 at 12:00 PM; Exhibition: daily through Jan 5, 2027",
           "daysClosed": "Competition is a single annual event; exhibition closed Dec 25",
           "address": "Rynek Główny 35, 31-011 Kraków"
-        }
-      ],
-      "restaurants": [
-        {
-          "name": "Morskie Oko",
-          "price": "$$",
-          "cuisine": "Highlander Polish (Podhale Region)",
-          "signature": "Góralski Pierogi, Roasted Duck with Apples, Grilled Oscypek with Cranberries, Lamb Shank.",
-          "notes": "Atmospheric wooden log cabin interior with live highlander folk musicians and crackling stone fireplaces."
-        },
-        {
-          "name": "Czarna Kaczka (The Black Duck)",
-          "price": "$$ - $$$",
-          "cuisine": "Classic Royal Polish",
-          "signature": "Roasted Half Duck with Red Cabbage & Plum Sauce, Wild Mushroom Soup in Bread Bowl.",
-          "notes": "Elegant, romantic Old Town dining specializing in traditional Polish game and fowl recipes."
-        },
-        {
-          "name": "Pod Wawelem",
-          "price": "$ - $$",
-          "cuisine": "Traditional Polish Tavern",
-          "signature": "Giant Schnitzels, Grilled Meat Skewers (Szaszłyk), Crispy Pork Knuckle (Golonka), Draft Beers.",
-          "notes": "Lively, festive hall situated right at the foot of Wawel Castle. Generous portions and family friendly."
-        },
-        {
-          "name": "Plac Nowy Zapiekanki (Kazimierz)",
-          "price": "$",
-          "cuisine": "Polish Street Food Classic",
-          "signature": "Toasted Zapiekanki baguettes with sautéed mushrooms, melted cheese, chives, and garlic sauce.",
-          "notes": "Essential Krakow late-night snack served from the central rotunda in Kazimierz."
         }
       ],
       "restaurantsDetailed": [
@@ -1620,7 +1578,7 @@ export const polandJourney = {
             "Wooden Toys",
             "Silesian Ceramics"
           ],
-          "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.png"
+          "imageSrc": "/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.jpg"
         },
         {
           "id": "wroclaw-plac-solny",
@@ -1866,13 +1824,6 @@ export const polandJourney = {
           "urgentAlert": "ADVANCE TIME-SLOT REQUIRED: Entry is strictly by timed ticket booked online in advance at luminapark.pl. Located 20-30 min south of center (taxi/rideshare recommended).",
           "address": "Główna 12, 55-040 Ślęza"
         }
-      ],
-      "restaurants": [
-        "Konspira",
-        "Karczma Lwowska",
-        "Pod Fredrą",
-        "Pierogarnia Stary Młyn",
-        "Piwnica Świdnicka"
       ],
       "restaurantsDetailed": [
         {
@@ -3011,13 +2962,6 @@ export const polandJourney = {
           "address": "Stary Rynek, 61-772 Poznań"
         }
       ],
-      "restaurants": [
-        "Brovaria (Craft Microbrewery on Stary Rynek)",
-        "Restauracja Bamberka (Traditional Bambrzy & Greater Poland Heritage)",
-        "Wiejskie Jadło Poznań (Rustic Polish Village Cuisine)",
-        "Pierogarnia Stary Młyn Poznań (Traditional & Oven-Baked Piecuchy)",
-        "Restauracja Muga (1 Michelin Star Contemporary Fine Dining)"
-      ],
       "restaurantsDetailed": [
         {
           "id": "brovaria",
@@ -3398,11 +3342,6 @@ export const polandJourney = {
           "daysClosed": "Dec 25 and Jan 1",
           "address": "Rabiańska 9, 87-100 Toruń"
         }
-      ],
-      "restaurants": [
-        "Karczma Spichrz (Quick hearty lunch)",
-        "Restauracja Manekin (Iconic Crepes)",
-        "Jan Olbracht Browar Staromiejski"
       ],
       "restaurantsDetailed": [
         {
@@ -4073,13 +4012,6 @@ export const polandJourney = {
           "address": "ul. Opata Jacka Rybińskiego, 80-320 Gdańsk"
         }
       ],
-      "restaurants": [
-        "Pierogarnia Mandu (Legendary Handcrafted Pierogi)",
-        "Restauracja Kubicki (Oldest Surviving Gdańsk Dining since 1918)",
-        "Gdański Bowke (Maritime Port Fare & Polish Craft Beer)",
-        "Brovarnia Gdańsk (Award-Winning Waterfront Microbrewery)",
-        "Bar Mleczny Neptun (Authentic Historic Milk Bar on Długa)"
-      ],
       "restaurantsDetailed": [
         {
           "id": "pierogarnia-mandu",
@@ -4484,8 +4416,8 @@ export const polandJourney = {
       "coordinates": { "lat": 50.0722, "lng": 19.7997 },
       "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Krakow+Airport+Train+Station",
       "badge": "Airport Link (Inbound)",
-      "flightDetails": "Delta Air Lines DL9208 (AMS ➔ KRK). Landing at 13:30 CET on Friday, Dec 4, 2026. Inbound transfer from DL0074 (ATL ➔ AMS).",
-      "flightTouchdown": "13:30 CET (Local Poland Time / Dec 4, 2026)",
+      "flightDetails": "Direct SKA1 rail link connects KRK Airport Terminal 1 to Kraków Główny central station every 30 minutes.",
+      "flightTouchdown": "Kraków John Paul II International Airport (KRK)",
       "platforms": "Covered terminal platform connected directly via covered glass footbridge",
       "walkingFromCenter": "Directly connected to Terminal 1 via escalator/elevator walkway",
       "transitLines": "SKA1 commuter train (Koleje Małopolskie) directly to Kraków Główny central station (17-min journey, ~17 PLN, departures every 30 mins from 5 AM to midnight)",
@@ -4913,7 +4845,7 @@ export const polandJourney = {
         {
           "time": "10:30",
           "itemType": "hotel",
-          "title": "Morning Base Check-out & Transfer to Kraków Główny",
+          "title": "Morning Base Check-out & Walk to Kraków Główny Station",
           "description": "Pack bags and take a short walk through Planty Park to Kraków Główny central station.",
           "location": "Kraków Główny",
           "badge": "Departure"
@@ -5017,7 +4949,7 @@ export const polandJourney = {
         {
           "time": "09:45",
           "itemType": "hotel",
-          "title": "Morning Check-out & Transfer to Wrocław Główny",
+          "title": "Morning Check-out & Walk to Wrocław Główny Station",
           "description": "Check out from your Wrocław base and head to Wrocław Główny central station.",
           "location": "Wrocław Główny",
           "badge": "Departure"
@@ -5245,13 +5177,13 @@ export const polandJourney = {
       "cityName": "Gdańsk",
       "theme": "Baltic Farewell & Return Flight",
       "base": "Departure Day (Gdańsk Airport GDN)",
-      "highlights": ["Early GDN Airport Transfer", "Delta Flight DL9528", "Amsterdam Schiphol Layover", "Homeward Flight DL9227 to Atlanta"],
+      "highlights": ["Early GDN Airport Transfer", "Morning Departure", "European Hub Transit", "Transatlantic Return"],
       "schedule": [
         {
           "time": "04:30",
           "itemType": "hotel",
           "title": "Early Check-out and GDN Airport Transfer",
-          "description": "Final bag pack and 35-40 minute taxi or pre-booked private transfer to Gdansk Lech Walesa Airport (GDN). Allow ample time for international check-in, bag drop, and security ahead of DL9528 departure at 06:45.",
+          "description": "Final bag pack and 35-40 minute taxi or pre-booked private transfer to Gdansk Lech Walesa Airport (GDN). Allow ample time for international check-in, bag drop, and security ahead of morning departure.",
           "location": "Gdansk Lech Walesa Airport (GDN)",
           "badge": "Airport Transfer"
         },
@@ -5282,38 +5214,5 @@ export const polandJourney = {
       ]
     }
   ]
-};
-
-// Private confirmed booking overlays (accessible only when authenticated)
-export const confirmedFlightEvents = {
-  day1Arrival: {
-    time: "13:30",
-    itemType: "flight",
-    title: "Confirmed Arrival: DL9208 Amsterdam (AMS) -> Krakow (KRK)",
-    description: "Delta flight DL9208 arrives KRK at 13:30 local time. Departed AMS at 11:35. Inbound operated via DL0074 (ATL -> AMS, dep 20:10 Dec 3) with 55-min AMS layover. Confirmation: GUDI3J. Passengers: Ronald Milton Few and Jonathan Kemp. Clear border control (non-Schengen) and collect checked baggage.",
-    location: "Krakow John Paul II International Airport (KRK)",
-    badge: "Confirmed Arrival",
-    confirmationNumber: "GUDI3J",
-    documentFilename: "Poland_Delta.pdf",
-    hasDocument: true
-  },
-  day10Departure: {
-    time: "06:45",
-    itemType: "flight",
-    title: "Confirmed Departure: DL9528 Gdansk (GDN) -> Amsterdam (AMS)",
-    description: "Delta flight DL9528 departs GDN at 06:45, arrives Amsterdam Schiphol (AMS) at 08:40. Confirmation: GUDI3J. Passengers: Ronald Milton Few and Jonathan Kemp.",
-    location: "Gdansk Lech Walesa Airport (GDN) -> Amsterdam Schiphol (AMS)",
-    badge: "Confirmed Flight",
-    confirmationNumber: "GUDI3J"
-  },
-  day10Homeward: {
-    time: "10:00",
-    itemType: "flight",
-    title: "Confirmed Departure: DL9227 Amsterdam (AMS) -> Atlanta (ATL)",
-    description: "Delta flight DL9227 departs AMS at 10:00, arrives Atlanta Hartsfield-Jackson (ATL) at 13:35 local time. Confirmation: GUDI3J. End of an unforgettable Poland Christmas expedition!",
-    location: "Amsterdam Schiphol (AMS) -> Atlanta Hartsfield-Jackson (ATL)",
-    badge: "Homeward Flight",
-    confirmationNumber: "GUDI3J"
-  }
 };
 

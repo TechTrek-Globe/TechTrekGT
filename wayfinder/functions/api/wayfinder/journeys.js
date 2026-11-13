@@ -1,11 +1,8 @@
 // GET /api/wayfinder/journeys - list user's accessible journeys
 // GET /api/wayfinder/journeys/:slug - get single journey with destinations
 
-import { ensureShareTables } from '../../utils/agendaAccess.js';
-
 export async function handleJourneys(context, url, method) {
   const { env, user } = context;
-  try { await ensureShareTables(env.DB); } catch (e) { /* DB unavailable handled below */ }
   const parts = url.pathname.split('/').filter(Boolean);
   const journeyIdx = parts.indexOf('journeys');
   const slug = journeyIdx !== -1 ? (parts[journeyIdx + 1] || null) : null;

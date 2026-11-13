@@ -16,10 +16,10 @@ export function CityFoodTab({
     ...(city.cafesDetailed || city[`${city.id}CafesDetailed`] || [])
   ], [city]);
   const hasDetailed = detailedItems.length > 0;
-  if (!hasDetailed && (!city.restaurants || city.restaurants.length === 0)) return null;
+  const hasFood = hasDetailed || (Array.isArray(city.restaurants) && city.restaurants.length > 0);
 
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !hasFood) return;
     const checkAndScroll = () => {
       const hash = window.location.hash?.replace('#', '');
       const params = new URLSearchParams(window.location.search);
@@ -48,7 +48,9 @@ export function CityFoodTab({
       window.removeEventListener('hashchange', checkAndScroll);
       window.removeEventListener('popstate', checkAndScroll);
     };
-  }, [detailedItems, setRestaurantCategoryFilter]);
+  }, [detailedItems, hasFood, setRestaurantCategoryFilter]);
+
+  if (!hasFood) return null;
 
   return (
     <div id="restaurants-section" className="space-y-4 animate-fade-in scroll-mt-32">
@@ -278,7 +280,7 @@ export function CityFoodTab({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {city.restaurants.map((rest, idx) => (
+          {(city.restaurants || []).map((rest, idx) => (
             <div key={idx} className="glass-panel p-7 rounded-3xl border border-white/10 hover:border-amber-500/30 transition-all flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-2">

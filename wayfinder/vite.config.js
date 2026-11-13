@@ -9,9 +9,20 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          icons: ['lucide-react'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          const normalized = id.replace(/\\/g, '/');
+          if (
+            normalized.includes('/node_modules/react/') ||
+            normalized.includes('/node_modules/react-dom/') ||
+            normalized.includes('/node_modules/scheduler/')
+          ) {
+            return 'vendor';
+          }
+          if (normalized.includes('/node_modules/lucide-react/')) {
+            return 'icons';
+          }
+          return undefined;
         },
       },
     },

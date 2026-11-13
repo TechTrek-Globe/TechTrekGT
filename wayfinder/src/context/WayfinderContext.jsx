@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getApiUrl } from '../utils/api';
 import { resilientFetch } from '../utils/mutationQueue';
+import { saveUserCache, getUserCache } from '../utils/documentStorage';
 import { useAuth } from './AuthContext';
 
 const WayfinderContext = createContext(null);
@@ -9,35 +10,62 @@ const AGENDA_ACCESS_REF = 'poland-christmas-2026';
 const NO_PERMISSIONS = { itinerary: false, packing: false, documents: false, expenses: false, share: false, edit: false };
 
 export function WayfinderProvider({ children }) {
-  const { isAuthenticated } = useAuth();
-  
+  const { user, isAuthenticated } = useAuth();
+  const userId = user?.id || null;
+
   const [itinerary, setItinerary] = useState([]);
   const [accommodations, setAccommodations] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [bookmarks, setBookmarks] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   // Server-resolved agenda role: 'owner' | 'admin' | 'editor' | 'viewer' | 'none' | null (unknown)
   const [agendaAccess, setAgendaAccess] = useState({ role: null, permissions: NO_PERMISSIONS, loaded: false });
+  const controllersRef = useRef({});
+
+  const beginSignal = useCallback((channel) => {
+    if (controllersRef.current[channel]) {
+      controllersRef.current[channel].abort();
+    }
+    const ctrl = new AbortController();
+    controllersRef.current[channel] = ctrl;
+    return ctrl.signal;
+  }, []);
+
+  useEffect(() => {
+    const controllers = controllersRef.current;
+    return () => {
+      for (const ctrl of Object.values(controllers)) {
+        ctrl?.abort();
+      }
+    };
+  }, []);
 
   const refreshAgendaAccess = useCallback(async () => {
     if (!isAuthenticated) {
       setAgendaAccess({ role: null, permissions: NO_PERMISSIONS, loaded: true });
       return;
     }
+    const signal = beginSignal('access');
     try {
-      const res = await fetch(getApiUrl(`/api/wayfinder/agendas/${AGENDA_ACCESS_REF}/access`), { credentials: 'include' });
+      const res = await fetch(getApiUrl(`/api/wayfinder/agendas/${AGENDA_ACCESS_REF}/access`), {
+        credentials: 'include',
+        signal,
+      });
       const data = await res.json().catch(() => ({}));
+      if (signal.aborted) return;
       setAgendaAccess({
         role: res.ok ? (data.role || 'none') : 'none',
         permissions: res.ok && data.permissions ? data.permissions : NO_PERMISSIONS,
         loaded: true
       });
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       // Network failure: fail closed with unknown role
       setAgendaAccess({ role: null, permissions: NO_PERMISSIONS, loaded: true });
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, beginSignal]);
 
   useEffect(() => {
     refreshAgendaAccess();
@@ -45,55 +73,138 @@ export function WayfinderProvider({ children }) {
 
   const fetchItinerary = useCallback(async (journeyId = 'poland-christmas-2026') => {
     if (!isAuthenticated) return;
+    const signal = beginSignal('itinerary');
     try {
-      const res = await fetch(getApiUrl(`/api/wayfinder/itinerary?journey_id=${journeyId}`), { credentials: 'include' });
+      const res = await fetch(getApiUrl(`/api/wayfinder/itinerary?journey_id=${journeyId}`), {
+        credentials: 'include',
+        signal,
+      });
       if (res.ok) {
-        const data = await res.json();
-        setItinerary(data.items || []);
+        const data = await res.json().catch(() => ({}));
+        const items = data.items || [];
+        if (!signal.aborted) {
+          setItinerary(items);
+          if (userId) void saveUserCache(userId, `itinerary:${journeyId}`, items);
+        }
+        return;
       }
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       console.error('Failed to fetch itinerary:', err);
     }
-  }, [isAuthenticated]);
+    if (userId && !signal.aborted) {
+      const cached = await getUserCache(userId, `itinerary:${journeyId}`);
+      if (Array.isArray(cached) && !signal.aborted) setItinerary(cached);
+    }
+  }, [isAuthenticated, userId, beginSignal]);
 
   const fetchAccommodations = useCallback(async (journeyId = 'poland-christmas-2026') => {
     if (!isAuthenticated) return;
+    const signal = beginSignal('accommodations');
     try {
-      const res = await fetch(getApiUrl(`/api/wayfinder/accommodations?journey_id=${journeyId}`), { credentials: 'include' });
+      const res = await fetch(getApiUrl(`/api/wayfinder/accommodations?journey_id=${journeyId}`), {
+        credentials: 'include',
+        signal,
+      });
       if (res.ok) {
-        const data = await res.json();
-        setAccommodations(data.accommodations || []);
+        const data = await res.json().catch(() => ({}));
+        const list = data.accommodations || [];
+        if (!signal.aborted) {
+          setAccommodations(list);
+          if (userId) void saveUserCache(userId, `accommodations:${journeyId}`, list);
+        }
+        return;
       }
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       console.error('Failed to fetch accommodations:', err);
     }
-  }, [isAuthenticated]);
+    if (userId && !signal.aborted) {
+      const cached = await getUserCache(userId, `accommodations:${journeyId}`);
+      if (Array.isArray(cached) && !signal.aborted) setAccommodations(cached);
+    }
+  }, [isAuthenticated, userId, beginSignal]);
 
   const fetchDocuments = useCallback(async (journeyId = 'poland-christmas-2026') => {
     if (!isAuthenticated) return;
+    const signal = beginSignal('documents');
     try {
-      const res = await fetch(getApiUrl(`/api/wayfinder/documents?journey_id=${journeyId}`), { credentials: 'include' });
+      const res = await fetch(getApiUrl(`/api/wayfinder/documents?journey_id=${journeyId}`), {
+        credentials: 'include',
+        signal,
+      });
       if (res.ok) {
-        const data = await res.json();
-        setDocuments(data.documents || []);
+        const data = await res.json().catch(() => ({}));
+        const list = data.documents || [];
+        if (!signal.aborted) {
+          setDocuments(list);
+          if (userId) void saveUserCache(userId, `documents:${journeyId}`, list);
+        }
+        return;
       }
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       console.error('Failed to fetch documents:', err);
     }
-  }, [isAuthenticated]);
+    if (userId && !signal.aborted) {
+      const cached = await getUserCache(userId, `documents:${journeyId}`);
+      if (Array.isArray(cached) && !signal.aborted) setDocuments(cached);
+    }
+  }, [isAuthenticated, userId, beginSignal]);
 
   const fetchJobs = useCallback(async () => {
     if (!isAuthenticated) return;
+    const signal = beginSignal('jobs');
     try {
-      const res = await fetch(getApiUrl('/api/wayfinder/import-jobs'), { credentials: 'include' });
+      const res = await fetch(getApiUrl('/api/wayfinder/import-jobs'), {
+        credentials: 'include',
+        signal,
+      });
       if (res.ok) {
-        const data = await res.json();
-        setJobs(data.jobs || []);
+        const data = await res.json().catch(() => ({}));
+        const list = data.jobs || [];
+        if (!signal.aborted) {
+          setJobs(list);
+          if (userId) void saveUserCache(userId, 'import_jobs', list);
+        }
+        return;
       }
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       console.error('Failed to fetch jobs:', err);
     }
-  }, [isAuthenticated]);
+    if (userId && !signal.aborted) {
+      const cached = await getUserCache(userId, 'import_jobs');
+      if (Array.isArray(cached) && !signal.aborted) setJobs(cached);
+    }
+  }, [isAuthenticated, userId, beginSignal]);
+
+  const fetchBookmarks = useCallback(async (journeyId = 'poland-christmas-2026') => {
+    if (!isAuthenticated) return;
+    const signal = beginSignal('bookmarks');
+    try {
+      const res = await fetch(getApiUrl(`/api/wayfinder/bookmarks?journey_id=${encodeURIComponent(journeyId)}`), {
+        credentials: 'include',
+        signal,
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const list = data.bookmarks || [];
+        if (!signal.aborted) {
+          setBookmarks(list);
+          if (userId) void saveUserCache(userId, `bookmarks:${journeyId}`, list);
+        }
+        return;
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      console.error('Failed to fetch bookmarks:', err);
+    }
+    if (userId && !signal.aborted) {
+      const cached = await getUserCache(userId, `bookmarks:${journeyId}`);
+      if (Array.isArray(cached) && !signal.aborted) setBookmarks(cached);
+    }
+  }, [isAuthenticated, userId, beginSignal]);
 
   const uploadDocument = async (journeyId, file, type, extractionResult = null) => {
     const formData = new FormData();
@@ -111,11 +222,11 @@ export function WayfinderProvider({ children }) {
     });
 
     if (!res.ok) {
-      const errorData = await res.json();
+      const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || 'Failed to upload document');
     }
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     await fetchDocuments(journeyId);
     await fetchJobs();
     return data;
@@ -124,10 +235,10 @@ export function WayfinderProvider({ children }) {
   const getJobFields = async (docId) => {
     const res = await fetch(getApiUrl(`/api/wayfinder/import-jobs/${docId}`), { credentials: 'include' });
     if (!res.ok) {
-      const errorData = await res.json();
+      const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || 'Failed to fetch job fields');
     }
-    return res.json();
+    return res.json().catch(() => ({}));
   };
 
   const saveExtractedFields = async (docId, fields, provider = null, docType = null) => {
@@ -142,10 +253,11 @@ export function WayfinderProvider({ children }) {
       action: 'Save extracted fields'
     });
     if (!res.ok) {
-      const errorData = await res.json();
+      const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || 'Failed to save extracted fields');
     }
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (data?.queued) return data;
     await fetchDocuments('poland-christmas-2026');
     await fetchJobs();
     return data;
@@ -166,7 +278,8 @@ export function WayfinderProvider({ children }) {
       const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || errorData.message || `Failed to approve import job (${res.status})`);
     }
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (data?.queued) return data;
     await fetchItinerary(journeyId);
     await fetchAccommodations(journeyId);
     await fetchDocuments(journeyId);
@@ -186,10 +299,11 @@ export function WayfinderProvider({ children }) {
       action: 'Reject import job'
     });
     if (!res.ok) {
-      const errorData = await res.json();
+      const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || 'Failed to reject import job');
     }
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (data?.queued) return data;
     await fetchDocuments('poland-christmas-2026');
     await fetchJobs();
     return data;
@@ -199,6 +313,7 @@ export function WayfinderProvider({ children }) {
     if (isAuthenticated && agendaAccess.loaded) {
       fetchItinerary();
       fetchAccommodations();
+      fetchBookmarks();
       if (agendaAccess.permissions.documents) {
         fetchDocuments();
         fetchJobs();
@@ -211,8 +326,9 @@ export function WayfinderProvider({ children }) {
       setAccommodations([]);
       setDocuments([]);
       setJobs([]);
+      setBookmarks([]);
     }
-  }, [isAuthenticated, agendaAccess.loaded, agendaAccess.permissions.documents, fetchItinerary, fetchAccommodations, fetchDocuments, fetchJobs]);
+  }, [isAuthenticated, agendaAccess.loaded, agendaAccess.permissions.documents, fetchItinerary, fetchAccommodations, fetchBookmarks, fetchDocuments, fetchJobs]);
 
   const parseDocument = async (docId, file) => {
     let base64 = null;
@@ -302,6 +418,7 @@ export function WayfinderProvider({ children }) {
       const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || errorData.message || 'Failed to delete document');
     }
+    const data = await res.json().catch(() => ({}));
 
     try {
       const { deleteLocalDocumentFile } = await import('../utils/documentStorage');
@@ -309,6 +426,11 @@ export function WayfinderProvider({ children }) {
         await deleteLocalDocumentFile(docId);
       }
     } catch (_) {}
+
+    if (data?.queued) {
+      setDocuments(prev => prev.filter(d => d.id !== docId));
+      return true;
+    }
 
     await Promise.all([
       fetchDocuments(journeyId),
@@ -334,8 +456,9 @@ export function WayfinderProvider({ children }) {
       const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || errorData.message || 'Failed to rename document');
     }
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     setDocuments(prev => prev.map(d => d.id === docId ? { ...d, safe_display_name: newTitle.trim(), filename: newTitle.trim() } : d));
+    if (data?.queued) return data;
     await Promise.all([
       fetchDocuments(journeyId),
       fetchItinerary(journeyId)
@@ -343,12 +466,74 @@ export function WayfinderProvider({ children }) {
     return data;
   };
 
+  const savedItemIds = useMemo(
+    () => new Set((bookmarks || []).map((b) => b.item_id)),
+    [bookmarks]
+  );
+
+  const toggleBookmark = useCallback(async (itemId, meta = {}, journeyId = 'poland-christmas-2026') => {
+    if (!itemId || !isAuthenticated) return false;
+    const isCurrentlySaved = savedItemIds.has(itemId);
+    const optimisticNext = isCurrentlySaved
+      ? bookmarks.filter((b) => b.item_id !== itemId)
+      : [
+          {
+            id: `local-${itemId}`,
+            user_id: userId,
+            journey_id: journeyId,
+            item_id: itemId,
+            item_type: meta.itemType || 'poi',
+            city: meta.city || null,
+            title: meta.title || null,
+          },
+          ...bookmarks,
+        ];
+    setBookmarks(optimisticNext);
+    if (userId) void saveUserCache(userId, `bookmarks:${journeyId}`, optimisticNext);
+
+    try {
+      const res = isCurrentlySaved
+        ? await resilientFetch(
+            getApiUrl(`/api/wayfinder/bookmarks/${encodeURIComponent(itemId)}?journey_id=${encodeURIComponent(journeyId)}`),
+            { method: 'DELETE', credentials: 'include' },
+            { entityType: 'bookmark', entityId: itemId, action: `Remove bookmark ${itemId}` }
+          )
+        : await resilientFetch(
+            getApiUrl('/api/wayfinder/bookmarks'),
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                journey_id: journeyId,
+                item_id: itemId,
+                item_type: meta.itemType || 'poi',
+                city: meta.city || null,
+                title: meta.title || null,
+              }),
+            },
+            { entityType: 'bookmark', entityId: itemId, action: `Save bookmark ${meta.title || itemId}` }
+          );
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && !data?.queued) {
+        void fetchBookmarks(journeyId);
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to toggle bookmark:', err);
+      return false;
+    }
+  }, [isAuthenticated, savedItemIds, bookmarks, userId, fetchBookmarks]);
+
   return (
     <WayfinderContext.Provider value={{
       itinerary,
       accommodations,
       documents,
       jobs,
+      bookmarks,
+      savedItemIds,
       isLoading,
       error,
       agendaAccess,
@@ -357,6 +542,8 @@ export function WayfinderProvider({ children }) {
       fetchAccommodations,
       fetchDocuments,
       fetchJobs,
+      fetchBookmarks,
+      toggleBookmark,
       uploadDocument,
       deleteDocument,
       renameDocument,

@@ -1,4 +1,13 @@
-import { hashPassword } from '../../utils/auth.js';
+import { hashPassword, hmacHex, buildClearCookieHeader } from '../../utils/auth.js';
+
+function constantTimeEquals(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
@@ -60,10 +69,10 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Verify token record in D1
+    // Fetch latest unused reset record for this email so wrong codes increment attempts
     const resetRecord = await env.DB.prepare(
-      'SELECT * FROM password_resets WHERE email = ? AND token = ? AND used = 0'
-    ).bind(cleanEmail, cleanToken).first();
+      'SELECT * FROM password_resets WHERE email = ? AND used = 0 ORDER BY created_at DESC LIMIT 1'
+    ).bind(cleanEmail).first();
 
     if (!resetRecord) {
       return new Response(JSON.stringify({ error: 'Invalid or expired password reset token.' }), {
@@ -80,6 +89,27 @@ export async function onRequestPost(context) {
       });
     }
 
+    const currentAttempts = Number(resetRecord.attempts || 0);
+    if (currentAttempts >= 5) {
+      await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
+      return new Response(JSON.stringify({ error: 'Too many invalid password reset attempts. Please request a new code.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const expectedHash = await hmacHex(cleanToken, env.JWT_SECRET || 'wayfinder-reset-pepper');
+    if (!constantTimeEquals(expectedHash, String(resetRecord.token || ''))) {
+      const nextAttempts = currentAttempts + 1;
+      await env.DB.prepare(
+        'UPDATE password_resets SET attempts = ?, used = CASE WHEN ? >= 5 THEN 1 ELSE used END WHERE id = ?'
+      ).bind(nextAttempts, nextAttempts, resetRecord.id).run();
+      return new Response(JSON.stringify({ error: 'Invalid or expired password reset token.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // Verify user exists
     const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
     if (!user) {
@@ -89,21 +119,24 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Hash new password and update user record
+    // Atomically update password, bump token_version to revoke existing sessions, and invalidate reset token
     const newPasswordHash = await hashPassword(newPassword);
-    await env.DB.prepare(
-      'UPDATE users SET password_hash = ? WHERE id = ?'
-    ).bind(newPasswordHash, user.id).run();
-
-    // Mark token as used
-    await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
+    await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?'
+      ).bind(newPasswordHash, user.id),
+      env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id)
+    ]);
 
     return new Response(JSON.stringify({
       success: true,
       message: 'Password reset successfully. You can now sign in with your new password.'
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': buildClearCookieHeader()
+      }
     });
 
   } catch (err) {

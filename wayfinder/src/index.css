@@ -3,23 +3,15 @@
 @tailwind utilities;
 
 @layer utilities {
-  /* Glassmorphism panels */
+  /* Glassmorphism panels (lightweight surfaces without expensive full-card backdrop blur) */
   .glass-panel {
-    background: rgba(15, 27, 45, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
+    background: rgba(15, 27, 45, 0.88);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 28px 0 rgba(0, 0, 0, 0.28);
   }
   .glass-card {
-    background: rgba(26, 46, 71, 0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(26, 46, 71, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   /* Gradient text */

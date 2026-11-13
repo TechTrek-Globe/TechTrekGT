@@ -12,8 +12,16 @@ import {
 } from '../functions/api/wayfinder/gemini-parser.js';
 import {
   parseGetYourGuideEmail,
-  extractBookingFields
+  extractBookingFields,
+  decodeRfc2047,
+  extractContentFromMime
 } from '../functions/api/wayfinder/email-worker.js';
+import {
+  handleExchangeRate
+} from '../functions/api/wayfinder/exchange-rate.js';
+import {
+  convertCurrency
+} from '../src/utils/expenseLedger.js';
 import {
   addMinutesWithDate
 } from '../functions/api/wayfinder/calendar.js';
@@ -94,12 +102,12 @@ test('Bare "dl" in Polish address does NOT trigger Delta flight', () => {
 
 test('Delta flight triggers only on explicit DL 9208 or Delta keywords', () => {
   const parsed = heuristicParseDocument({
-    text: 'Flight confirmation DL 9208 from Atlanta to Krakow',
+    text: 'Flight confirmation DL 9208 Confirmation: ABC123 from Atlanta to Krakow',
     filename: 'delta-confirmation.pdf'
   });
   assert.equal(parsed.provider, 'Delta Air Lines');
   assert.equal(parsed.item_type, 'flight');
-  assert.equal(parsed.confirmation_number, 'GUDI3J');
+  assert.equal(parsed.confirmation_number, 'ABC123');
 });
 
 test('Bare "bridge" does NOT trigger The Bridge MGallery hotel', () => {
@@ -131,7 +139,7 @@ test('Generic tour does NOT get Auschwitz hardcoded title', () => {
 
 test('Auschwitz/Wieliczka tour triggers specific details', () => {
   const parsed = heuristicParseDocument({
-    text: 'Voucher for Auschwitz-Birkenau & Wieliczka Salt Mine Tour',
+    text: 'Voucher for Auschwitz-Birkenau & Wieliczka Salt Mine Tour Total: $284.76',
     filename: 'gyg-tour.pdf'
   });
   assert.equal(parsed.item_type, 'excursion');
@@ -322,10 +330,11 @@ test('Odd-cent split partitioning preserves exact original total', () => {
 
 console.log('--- 9. API Key Connectivity & Authentication Guard Tests ---');
 
-test('isApiKeyConnected returns true for valid env key and false for missing/blank', () => {
+test('isApiKeyConnected returns true for valid env key and false for missing/blank/maps key', () => {
   assert.equal(isApiKeyConnected({ GEMINI_API_KEY: 'test-key-123' }), true);
+  assert.equal(isApiKeyConnected({ GOOGLE_AI_API_KEY: 'test-key-ai' }), true);
   assert.equal(isApiKeyConnected({ GOOGLE_API_KEY: 'test-key-456' }), true);
-  assert.equal(isApiKeyConnected({ GOOGLE_MAPS_API_KEY: 'test-key-789' }), true);
+  assert.equal(isApiKeyConnected({ GOOGLE_MAPS_API_KEY: 'test-key-789' }), false);
   assert.equal(isApiKeyConnected({}), false);
   assert.equal(isApiKeyConnected(null), false);
   assert.equal(isApiKeyConnected({ GEMINI_API_KEY: '   ' }), false);
@@ -432,7 +441,7 @@ test('buildUnifiedDayTimeline suppresses generic public train placeholder and de
       local_date: '2026-12-07',
       local_time: '11:50',
       title: 'IC 58 Galicja: Kraków Gł. - Wrocław Gł.',
-      confirmation_number: 'WN 71563945'
+      confirmation_number: 'PKP-REF-001'
     },
     {
       id: 'rail-2-dup',
@@ -440,7 +449,7 @@ test('buildUnifiedDayTimeline suppresses generic public train placeholder and de
       local_date: '2026-12-07',
       local_time: '11:50',
       title: 'IC 58 Galicja: Kraków Gł. - Wrocław Gł.',
-      confirmation_number: 'WN 71563945'
+      confirmation_number: 'PKP-REF-001'
     }
   ];
 
@@ -461,6 +470,70 @@ test('buildUnifiedDayTimeline suppresses generic public train placeholder and de
   assert.equal(railCardsUnauth.length, 1, 'Unauthenticated timeline must render public rail suggestion');
   assert.equal(railCardsUnauth[0].type, 'public');
   assert.equal(railCardsUnauth[0].data.title, 'Direct IC Train: Kraków Główny to Wrocław Główny');
+});
+
+console.log('--- 11. MIME UTF-8 Polish Decoding & NBP FX Tests ---');
+
+test('decodeRfc2047 and extractContentFromMime decode Polish UTF-8 quoted-printable across LF headers', async () => {
+  assert.equal(
+    decodeRfc2047('=?UTF-8?Q?Bilet_Krak=C3=B3w_G=C5=82=C3=B3wny?= -> =?UTF-8?Q?Wroc=C5=82aw?='),
+    'Bilet Kraków Główny -> Wrocław'
+  );
+
+  const lfMime = [
+    'From: tickets@intercity.pl',
+    'Subject: =?UTF-8?Q?Bilet_PKP_Wroc=C5=82aw?=',
+    'Content-Type: text/plain; charset="utf-8"',
+    'Content-Transfer-Encoding: quoted-printable',
+    '',
+    'Trasa: Krak=C3=B3w G=C5=82=C3=B3wny - Wroc=C5=82aw G=C5=82=C3=B3wny w =C5=82=C3=B3d=C5=BA'
+  ].join('\n');
+
+  const parsed = await extractContentFromMime({
+    raw: new TextEncoder().encode(lfMime)
+  });
+  assert.match(parsed.text, /Kraków Główny - Wrocław Główny/);
+  assert.equal(parsed.text.includes('C5'), false);
+});
+
+test('convertCurrency & handleExchangeRate normalize NBP FX Table A reciprocal rates accurately', async () => {
+  const plnToUsd = convertCurrency(100, 'PLN', 'USD', { USD: 3.73 });
+  const usdToPln = convertCurrency(100, 'USD', 'PLN', { USD: 3.73 });
+  assert.equal(plnToUsd, 26.81);
+  assert.equal(usdToPln, 373);
+
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => {
+      assert.match(String(url), /api\.nbp\.pl/);
+      return new Response(JSON.stringify([{
+        table: 'A',
+        no: '215/A/NBP/2026',
+        effectiveDate: '2026-11-12',
+        rates: [
+          { code: 'USD', mid: 3.73 },
+          { code: 'EUR', mid: 4.30 },
+          { code: 'GBP', mid: 4.95 }
+        ]
+      }]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const res = await handleExchangeRate(
+      {},
+      new URL('https://techtrekgt.com/wayfinder/api/wayfinder/exchange-rate'),
+      'GET'
+    );
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('X-FX-Source'), 'nbp');
+    const body = await res.json();
+    assert.equal(body.source, 'nbp');
+    assert.equal(body.usdToPln, 3.73);
+    assert.equal(body.plnToUsd, 0.2681);
+    assert.equal(body.plnPerUnit.EUR, 4.3);
+    assert.equal(body.usdToEur, Math.round((3.73 / 4.3) * 10000) / 10000);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
 });
 
 await queue;

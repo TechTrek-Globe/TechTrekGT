@@ -20,20 +20,40 @@ export function getApiUrl(endpoint) {
 }
 
 /**
- * Standard API fetch wrapper ensuring credentials: 'include' for HttpOnly cookies.
+ * Standard API fetch wrapper ensuring credentials: 'include' for HttpOnly cookies
+ * and notifying AuthContext when an authenticated endpoint rejects credentials.
  * @param {string} endpoint
  * @param {RequestInit} [options]
  * @returns {Promise<Response>}
  */
 export async function apiFetch(endpoint, options = {}) {
   const url = getApiUrl(endpoint);
-  const extraHeaders = options.headers || {};
-  return fetch(url, {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  const extraHeaders = { ...(options.headers || {}) };
+  if (isFormData) {
+    delete extraHeaders['Content-Type'];
+    delete extraHeaders['content-type'];
+  }
+
+  const headers = isFormData
+    ? extraHeaders
+    : { 'Content-Type': 'application/json', ...extraHeaders };
+
+  const res = await fetch(url, {
     ...options,
     credentials: options.credentials || 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...extraHeaders
-    }
+    headers,
   });
+
+  if (typeof window !== 'undefined') {
+    const lowerUrl = String(url).toLowerCase();
+    const isAuthCredentialSubmit = lowerUrl.includes('/api/auth/login') || lowerUrl.includes('/api/auth/register');
+    if ((res.status === 401 && !isAuthCredentialSubmit) || (res.status === 403 && lowerUrl.includes('/api/auth/'))) {
+      window.dispatchEvent(new CustomEvent('wayfinder:auth-expired', {
+        detail: { status: res.status, url }
+      }));
+    }
+  }
+
+  return res;
 }

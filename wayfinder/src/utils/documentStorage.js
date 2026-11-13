@@ -4,9 +4,10 @@
  */
 
 const DB_NAME = 'WayfinderDocumentDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = 'document_files';
 const STORE_MUTATIONS = 'mutation_queue';
+const STORE_CACHE = 'offline_cache';
 
 export function openDocumentDB() {
   return new Promise((resolve, reject) => {
@@ -26,6 +27,10 @@ export function openDocumentDB() {
         const mutStore = db.createObjectStore(STORE_MUTATIONS, { keyPath: 'id' });
         mutStore.createIndex('status', 'status', { unique: false });
         mutStore.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_CACHE)) {
+        const cacheStore = db.createObjectStore(STORE_CACHE, { keyPath: 'key' });
+        cacheStore.createIndex('userId', 'userId', { unique: false });
       }
     };
 
@@ -260,4 +265,73 @@ export async function clearLocalMutations() {
     console.warn('[DocumentStorage] Failed to clear mutations from IndexedDB:', err);
     return false;
   }
+}
+
+export async function saveUserCache(userId, cacheKey, value) {
+  if (!userId || !cacheKey) return false;
+  try {
+    const db = await openDocumentDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_CACHE, 'readwrite');
+      const store = tx.objectStore(STORE_CACHE);
+      const req = store.put({
+        key: `${userId}:${cacheKey}`,
+        userId,
+        value,
+        updatedAt: Date.now(),
+      });
+      req.onsuccess = () => resolve(true);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.warn('[DocumentStorage] Failed to write offline cache:', err);
+    return false;
+  }
+}
+
+export async function getUserCache(userId, cacheKey) {
+  if (!userId || !cacheKey) return null;
+  try {
+    const db = await openDocumentDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_CACHE, 'readonly');
+      const store = tx.objectStore(STORE_CACHE);
+      const req = store.get(`${userId}:${cacheKey}`);
+      req.onsuccess = () => resolve(req.result?.value ?? null);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.warn('[DocumentStorage] Failed to read offline cache:', err);
+    return null;
+  }
+}
+
+async function clearStore(storeName) {
+  try {
+    const db = await openDocumentDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const req = store.clear();
+      req.onsuccess = () => resolve(true);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.warn(`[DocumentStorage] Failed to clear ${storeName}:`, err);
+    return false;
+  }
+}
+
+export async function clearOfflineReadCaches() {
+  if (typeof localStorage !== 'undefined') {
+    for (const k of ['wayfinder_offline_packing_v1', 'wayfinder_custom_timeline_order', 'wayfinder_saved_items']) {
+      try { localStorage.removeItem(k); } catch (_) {}
+    }
+  }
+  await Promise.all([clearStore(STORE_NAME), clearStore(STORE_CACHE)]);
+}
+
+export async function clearLocalDataOnLogout() {
+  await clearOfflineReadCaches();
+  await clearLocalMutations();
 }

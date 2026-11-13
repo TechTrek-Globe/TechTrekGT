@@ -4,6 +4,7 @@ import { polandJourney } from '../data/poland-2026';
 import { cityImages, getAttractionImage } from '../utils/cityImages';
 import { useExchangeRate } from '../hooks/useExchangeRate';
 import { useAuth } from '../context/AuthContext';
+import { useWayfinder } from '../context/WayfinderContext';
 import { CityHeroImageCard } from './city/CityHeroImageCard';
 import { CityOverviewTab } from './city/CityOverviewTab';
 import { CityHistoryTab } from './city/CityHistoryTab';
@@ -12,13 +13,16 @@ import { CityAttractionsTab } from './city/CityAttractionsTab';
 import { CityFoodTab } from './city/CityFoodTab';
 import { CityHotelsTab } from './city/CityHotelsTab';
 import { CityLgbtqTab } from './city/CityLgbtqTab';
+import { formatCompactStopDates } from './Formatters';
 
 export function CityPage({ cityId, subPage = 'overview' }) {
   const [activeMarketTab, setActiveMarketTab] = useState(0);
   const [activeEpochTab, setActiveEpochTab] = useState('all');
   const [restaurantCategoryFilter, setRestaurantCategoryFilter] = useState('all');
   const [lgbtqCategoryFilter, setLgbtqCategoryFilter] = useState('all');
-  const [savedItems, setSavedItems] = useState(() => {
+  const { isAuthenticated } = useAuth();
+  const { savedItemIds, toggleBookmark } = useWayfinder();
+  const [localSavedItems, setLocalSavedItems] = useState(() => {
     try {
       const saved = localStorage.getItem('wayfinder_saved_items');
       return saved ? new Set(JSON.parse(saved)) : new Set();
@@ -27,8 +31,14 @@ export function CityPage({ cityId, subPage = 'overview' }) {
     }
   });
 
+  const savedItems = isAuthenticated ? savedItemIds : localSavedItems;
+
   const toggleItinerary = (id) => {
-    setSavedItems((prev) => {
+    if (isAuthenticated) {
+      void toggleBookmark(id, { city: cityId });
+      return;
+    }
+    setLocalSavedItems((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -43,8 +53,6 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       return next;
     });
   };
-
-  const { isAuthenticated } = useAuth();
   const exchangeRates = useExchangeRate();
   const subPageSectionRef = useRef(null);
   const cityHeaderRef = useRef(null);
@@ -85,19 +93,6 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
   const city = polandJourney.route.find(c => c.id === cityId);
 
-  if (!city) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-wf-muted p-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-white mb-2">City Not Found</h2>
-          <p>We couldn't find the city you're looking for in this journey.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const baseUrl = `/wayfinder/poland-christmas-2026/cities/${cityId}`;
-
   const activeSubPage = ['history', 'timeline', 'history-timeline', 'chronological'].includes(subPage)
     ? 'history'
     : (['attractions', 'sights', 'must-see', 'must-see-sights'].includes(subPage)
@@ -112,7 +107,15 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               ? 'lgbtq'
               : 'overview')))));
 
+  useEffect(() => {
+    setActiveMarketTab(0);
+    setActiveEpochTab('all');
+    setRestaurantCategoryFilter('all');
+    setLgbtqCategoryFilter('all');
+  }, [cityId]);
+
   useLayoutEffect(() => {
+    if (!city) return;
     if (typeof window !== 'undefined' && window.location.hash) return;
     if (activeSubPage !== 'overview') {
       setTimeout(scrollToSubPageArea, 50);
@@ -121,7 +124,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       const y = cityHeaderRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
       window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
     }
-  }, [cityId, activeSubPage]);
+  }, [city, cityId, activeSubPage]);
 
   // Dynamic Page Title, Meta Description, Canonical URL, Open Graph & JSON-LD Structured Data
   useEffect(() => {
@@ -233,6 +236,25 @@ export function CityPage({ cityId, subPage = 'overview' }) {
 
   }, [city, activeSubPage]);
 
+  if (!city) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-wf-muted p-8">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-white mb-2">City Not Found</h2>
+          <p>We couldn't find the city you're looking for in this journey.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const baseUrl = `/wayfinder/poland-christmas-2026/cities/${cityId}`;
+  const hasFoodGuide = Boolean(
+    (city.restaurantsDetailed || city[`${city.id}RestaurantsDetailed`] || []).length > 0 ||
+    (city.drinksDetailed || city[`${city.id}DrinksDetailed`] || []).length > 0 ||
+    (city.cafesDetailed || city[`${city.id}CafesDetailed`] || []).length > 0 ||
+    (city.restaurants && city.restaurants.length > 0)
+  );
+
   // OpenStreetMap embed bbox per destination stop (raw '&' separators)
   const osmMapByCity = {
     krakow: 'https://www.openstreetmap.org/export/embed.html?bbox=19.9200%2C50.0450%2C19.9650%2C50.0700&layer=mapnik&marker=50.0614%2C19.9366',
@@ -335,7 +357,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
       </div>
 
       {/* Top Sub-Header Toolbar (Opens Dedicated Sub-Pages & Stays Sticky at Top) */}
-      <div className="sticky top-14 z-30 py-2.5 bg-slate-950/95 backdrop-blur-xl border-y border-amber-500/30 w-full shadow-xl">
+      <div className="sticky top-14 sm:top-16 z-30 py-2.5 bg-slate-950/95 border-y border-amber-500/30 w-full shadow-xl">
         <div className="p-1.5 rounded-xl border border-amber-500/20 !bg-slate-900/90 shadow-md flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar no-overscroll-x">
           <a
             href={baseUrl}
@@ -382,7 +404,7 @@ export function CityPage({ cityId, subPage = 'overview' }) {
             </a>
           )}
 
-          {city.restaurants && city.restaurants.length > 0 && (
+          {hasFoodGuide && (
             <a
               href={`${baseUrl}/restaurants`}
               onClick={(e) => handleSubPageTabClick(e, `${baseUrl}/restaurants`)}
@@ -426,6 +448,42 @@ export function CityPage({ cityId, subPage = 'overview' }) {
               <span>Safe Spaces</span>
             </a>
           )}
+
+          <span className="h-5 w-px bg-white/15 mx-1 shrink-0" aria-hidden="true" />
+
+          {/* Quick City Switcher (shows actual dates when signed in) */}
+          <div className="flex items-center gap-1 shrink-0">
+            {polandJourney.route.map((c, idx) => {
+              const isCurrent = c.id === city.id;
+              const targetBase = `/wayfinder/poland-christmas-2026/cities/${c.id}`;
+              let targetPath = targetBase;
+              if (activeSubPage === 'markets' && c.markets?.length) targetPath = `${targetBase}/markets`;
+              else if (activeSubPage === 'attractions' && c.mustSee?.length) targetPath = `${targetBase}/attractions`;
+              else if (activeSubPage === 'restaurants' && (c.restaurantsDetailed?.length || c.cafesDetailed?.length || c.drinksDetailed?.length)) {
+                targetPath = `${targetBase}/restaurants`;
+              } else if (activeSubPage === 'hotels' && c.nights > 0) targetPath = `${targetBase}/hotels`;
+
+              const shortDates = isAuthenticated ? formatCompactStopDates(c.itineraryDates) : '';
+              return (
+                <a
+                  key={c.id}
+                  href={targetPath}
+                  onClick={(e) => pushRoute(e, targetPath)}
+                  className={`px-2.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center space-x-1 shrink-0 min-h-[38px] ${
+                    isCurrent
+                      ? 'bg-sky-500/20 text-sky-300 border border-sky-400/40'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <span className="opacity-70">0{idx + 1}</span>
+                  <span>{c.name}</span>
+                  {shortDates && (
+                    <span className="text-[10px] font-mono text-amber-300/90">({shortDates})</span>
+                  )}
+                </a>
+              );
+            })}
+          </div>
         </div>
       </div>
 

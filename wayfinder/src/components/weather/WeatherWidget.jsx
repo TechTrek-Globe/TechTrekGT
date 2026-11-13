@@ -21,6 +21,23 @@ import { formatTime } from '../Formatters';
 
 const WEATHER_CACHE_PREFIX = 'wf_weather_v3_';
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const inFlightWeatherRequests = new Map();
+
+function fetchWeatherDeduped(apiUrl) {
+  if (inFlightWeatherRequests.has(apiUrl)) {
+    return inFlightWeatherRequests.get(apiUrl);
+  }
+  const requestPromise = fetch(apiUrl)
+    .then((res) => {
+      if (!res.ok) throw new Error(`Weather error status ${res.status}`);
+      return res.json();
+    })
+    .finally(() => {
+      inFlightWeatherRequests.delete(apiUrl);
+    });
+  inFlightWeatherRequests.set(apiUrl, requestPromise);
+  return requestPromise;
+}
 
 function getWeatherIcon(main, size = 16) {
   const norm = (main || '').toLowerCase();
@@ -49,10 +66,32 @@ export function WeatherWidget({
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [isVisible, setIsVisible] = useState(() => typeof IntersectionObserver === 'undefined');
   const [showTooltip, setShowTooltip] = useState(false);
   const containerRef = useRef(null);
 
   const isFahrenheit = settings?.temperature === 'F';
+
+  // Defer offscreen weather fetches until widget scrolls near viewport
+  useEffect(() => {
+    if (isVisible || data) return;
+    const node = containerRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '250px' }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isVisible, data]);
 
   // Handle click outside to close open tooltip
   useEffect(() => {
@@ -92,7 +131,10 @@ export function WeatherWidget({
       // Ignore cache storage error
     }
 
-    // 2. Fetch from Wayfinder edge worker
+    // 2. Wait until near viewport before issuing network fetch
+    if (!isVisible) return;
+
+    // 3. Fetch from Wayfinder edge worker with request deduplication
     const fetchWeather = async () => {
       setLoading(true);
       setError(false);
@@ -107,9 +149,7 @@ export function WeatherWidget({
         const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
         const apiUrl = `${normalizedBase}/api/wayfinder/weather?${params.toString()}`;
 
-        const res = await fetch(apiUrl);
-        if (!res.ok) throw new Error(`Weather error status ${res.status}`);
-        const result = await res.json();
+        const result = await fetchWeatherDeduped(apiUrl);
 
         if (!isCancelled) {
           setData(result);
@@ -134,7 +174,7 @@ export function WeatherWidget({
     return () => {
       isCancelled = true;
     };
-  }, [city, lat, lng, date]);
+  }, [city, lat, lng, date, isVisible]);
 
   const formatTemp = (celsius) => {
     if (celsius === null || celsius === undefined || isNaN(celsius)) return '--';
@@ -144,17 +184,20 @@ export function WeatherWidget({
     return `${Math.round(celsius)}°C`;
   };
 
-  if (loading && !data) {
-    return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-slate-800/60 text-slate-400 border border-slate-700/50 ${className}`}>
-        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-        <span>Loading...</span>
-      </span>
-    );
+  if (error) {
+    return null; // Gracefully degrade with zero visual noise
   }
 
-  if (error || !data) {
-    return null; // Gracefully degrade with zero visual noise
+  if (!data) {
+    return (
+      <span
+        ref={containerRef}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-slate-800/60 text-slate-400 border border-slate-700/50 ${className}`}
+      >
+        <span className={`w-2 h-2 rounded-full bg-cyan-400 ${loading ? 'animate-ping' : 'opacity-60'}`} />
+        <span>{loading ? 'Loading...' : 'Weather'}</span>
+      </span>
+    );
   }
 
   // --- Variant 1: Compact inline pill badge ---
@@ -305,7 +348,7 @@ export function WeatherWidget({
 
   // --- Variant 2: Card (Expanded telemetry card for city hubs and stop details) ---
   return (
-    <div className={`p-4 rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950/90 border border-slate-800/80 shadow-lg backdrop-blur-md ${className}`}>
+    <div ref={containerRef} className={`p-4 rounded-2xl bg-gradient-to-br from-slate-900/95 via-slate-900/90 to-slate-950/95 border border-slate-800/80 shadow-lg ${className}`}>
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <div className="flex items-center gap-2">

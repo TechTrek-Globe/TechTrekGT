@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getApiUrl } from '../utils/api';
+import { clearOfflineReadCaches, clearLocalDataOnLogout } from '../utils/documentStorage';
 
 /** @type {React.Context<any>} */
 const AuthContext = createContext(null);
@@ -173,10 +174,11 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     sessionStorage.removeItem('wayfinder_last_activity');
     setIsAuthenticated(false);
     setUser(null);
+    await clearLocalDataOnLogout();
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', '/wayfinder');
       window.dispatchEvent(new PopStateEvent('popstate'));
@@ -184,7 +186,7 @@ export function AuthProvider({ children }) {
     try {
       await fetch(getApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
     } catch (e) {}
-  };
+  }, []);
 
   const deleteAccount = async () => {
     try {
@@ -200,6 +202,7 @@ export function AuthProvider({ children }) {
       sessionStorage.removeItem('wayfinder_last_activity');
       setIsAuthenticated(false);
       setUser(null);
+      await clearLocalDataOnLogout();
       if (typeof window !== 'undefined') {
         window.history.pushState({}, '', '/wayfinder/poland-christmas-2026');
         window.dispatchEvent(new PopStateEvent('popstate'));
@@ -209,6 +212,19 @@ export function AuthProvider({ children }) {
       throw err;
     }
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleAuthExpired = () => {
+      sessionStorage.removeItem('wayfinder_last_activity');
+      setIsAuthenticated(false);
+      setUser(null);
+      setIsAuthModalOpen(true);
+      void clearOfflineReadCaches();
+    };
+    window.addEventListener('wayfinder:auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('wayfinder:auth-expired', handleAuthExpired);
+  }, []);
 
   // Check auth status on load
   useEffect(() => {
@@ -225,6 +241,8 @@ export function AuthProvider({ children }) {
             setIsAuthenticated(true);
             setIsAuthModalOpen(false);
           }
+        } else if (res.status === 401 || res.status === 403) {
+          void clearOfflineReadCaches();
         }
       } catch (e) {
         // Not authenticated

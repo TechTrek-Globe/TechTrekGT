@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWayfinder } from '../context/WayfinderContext';
 import { saveLocalDocumentFile, getLocalDocumentFile } from '../utils/documentStorage';
+import { getApiUrl } from '../utils/api';
 import { BookingImportChannels } from './BookingImportChannels';
 import { parseBookingMetadata } from './itinerary/PrivateBookingCard';
 import { polandJourney } from '../data/poland-2026';
@@ -11,148 +12,80 @@ import {
   Trash2, ShoppingCart, CreditCard, Edit2, Pencil
 } from 'lucide-react';
 
-function simulateExtraction(file) {
-  const filename = (file.name || '').toLowerCase();
-  
-  if (filename.includes('hotel') || filename.includes('stary') || filename.includes('bridge') || filename.includes('accor') || filename.includes('altus') || filename.includes('accommodation') || filename.includes('booking') || filename.includes('confirmation') || filename.includes('profitroom') || filename.includes('palace') || filename.includes('imiwhdh')) {
-    const isStary = filename.includes('stary') || filename.includes('krakow') || filename.includes('cracow');
-    const isBridge = filename.includes('bridge') && !filename.includes('altus');
-    const isAltus = filename.includes('altus') || filename.includes('imiwhdh') || filename.includes('profitroom') || filename.includes('palace') || (!isStary && !isBridge);
-    const isWroclaw = filename.includes('bridge') || filename.includes('wroclaw') || isAltus;
+function buildManualEntryFields(file) {
+  const filename = (file?.name || '').toLowerCase();
+  const baseTitle = (file?.name || '').replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim();
+
+  if (filename.includes('hotel') || filename.includes('accommodation') || filename.includes('booking') || filename.includes('lodging')) {
     return {
-      provider: isAltus ? 'Hotel Altus Palace Wrocław' : (isWroclaw ? 'Accor / The Bridge MGallery' : 'Hotel Stary Krakow'),
+      provider: '',
       docType: 'hotel',
       fields: [
-        { field_name: 'hotel_name', extracted_value: isAltus ? 'Hotel Altus Palace Wrocław' : (isWroclaw ? 'The Bridge Wroclaw MGallery' : 'Hotel Stary (Krakow)'), confidence: 'high' },
-        { field_name: 'hotel_address', extracted_value: isAltus ? 'ul. Wierzbowa 15, 50-056 Wrocław' : (isWroclaw ? 'Plac Katedralny 8, Wroclaw' : 'ul. Szczepanska 5, Krakow'), confidence: 'high' },
-        { field_name: 'check_in_date', extracted_value: isWroclaw ? '2026-12-07' : '2026-12-04', confidence: 'high' },
-        { field_name: 'check_in_time', extracted_value: '15:00', confidence: 'high' },
-        { field_name: 'check_out_date', extracted_value: isWroclaw ? '2026-12-09' : '2026-12-07', confidence: 'high' },
-        { field_name: 'check_out_time', extracted_value: isAltus ? '12:00' : '11:00', confidence: 'high' },
-        { field_name: 'room_type', extracted_value: isAltus ? 'Junior Suite' : 'Deluxe Double Room', confidence: 'high' },
-        { field_name: 'guests', extracted_value: '2 Adults', confidence: 'high' },
-        { field_name: 'confirmation_number', extracted_value: isAltus ? 'IMIWHDH' : (isWroclaw ? 'ACCOR-WR9281' : 'STARY-KR4410'), confidence: 'high' },
-        { field_name: 'purchase_site', extracted_value: isAltus ? 'Profitroom / hotelaltuspalace.pl' : (isWroclaw ? 'Booking.com' : 'Booking.com'), confidence: 'high' },
-        { field_name: 'payment_method', extracted_value: isAltus ? 'Credit Card (Paid Upfront)' : (isWroclaw ? 'Visa (*4123)' : 'Visa (*4123)'), confidence: 'high' },
-        { field_name: 'total_cost', extracted_value: isAltus ? '1420.20 PLN' : (isWroclaw ? '1850 PLN' : '2400 PLN'), confidence: 'high' }
+        { field_name: 'hotel_name', extracted_value: baseTitle, confidence: 'low' },
+        { field_name: 'hotel_address', extracted_value: '', confidence: 'low' },
+        { field_name: 'check_in_date', extracted_value: '', confidence: 'low' },
+        { field_name: 'check_out_date', extracted_value: '', confidence: 'low' },
+        { field_name: 'confirmation_number', extracted_value: '', confidence: 'low' },
+        { field_name: 'total_cost', extracted_value: '', confidence: 'low' }
       ]
     };
   }
 
   if (filename.includes('train') || filename.includes('pkp') || filename.includes('rail') || filename.includes('intercity')) {
     return {
-      provider: 'PKP Intercity',
+      provider: '',
       docType: 'rail',
       fields: [
-        { field_name: 'carrier', extracted_value: 'PKP Intercity', confidence: 'high' },
-        { field_name: 'origin_station', extracted_value: 'Krakow Glowny', confidence: 'high' },
-        { field_name: 'destination_station', extracted_value: 'Wroclaw Glowny', confidence: 'high' },
-        { field_name: 'departure_date', extracted_value: '2026-12-07', confidence: 'high' },
-        { field_name: 'departure_time', extracted_value: '11:30', confidence: 'high' },
-        { field_name: 'arrival_date', extracted_value: '2026-12-07', confidence: 'high' },
-        { field_name: 'arrival_time', extracted_value: '14:15', confidence: 'medium' },
-        { field_name: 'train_number', extracted_value: 'IC 1305 "Slask"', confidence: 'high' },
-        { field_name: 'seat', extracted_value: 'Car 3, Seats 24/25 (1st class)', confidence: 'medium' },
-        { field_name: 'confirmation_number', extracted_value: 'PKP-772910', confidence: 'high' },
-        { field_name: 'purchase_site', extracted_value: 'PKP Intercity (intercity.pl)', confidence: 'high' },
-        { field_name: 'payment_method', extracted_value: 'Visa', confidence: 'high' },
-        { field_name: 'total_cost', extracted_value: '190 PLN', confidence: 'medium' }
+        { field_name: 'carrier', extracted_value: '', confidence: 'low' },
+        { field_name: 'origin_station', extracted_value: '', confidence: 'low' },
+        { field_name: 'destination_station', extracted_value: '', confidence: 'low' },
+        { field_name: 'departure_date', extracted_value: '', confidence: 'low' },
+        { field_name: 'departure_time', extracted_value: '', confidence: 'low' },
+        { field_name: 'confirmation_number', extracted_value: '', confidence: 'low' }
       ]
     };
   }
 
-  if (filename.includes('flight') || filename.includes('delta') || filename.includes('lot') || filename.includes('airline')) {
+  if (filename.includes('flight') || filename.includes('airline') || filename.includes('boarding')) {
     return {
-      provider: 'Delta Air Lines',
+      provider: '',
       docType: 'flight',
       fields: [
-        { field_name: 'confirmation_number', extracted_value: 'GUDI3J', confidence: 'high' },
-        { field_name: 'airline', extracted_value: 'Delta Air Lines', confidence: 'high' },
-        { field_name: 'flight_number', extracted_value: 'DL9208', confidence: 'high' },
-        { field_name: 'passengers', extracted_value: 'Ronald Milton Few, Jonathan Kemp', confidence: 'high' },
-        { field_name: 'origin_airport', extracted_value: 'ATL (Atlanta Hartsfield-Jackson)', confidence: 'high' },
-        { field_name: 'destination_airport', extracted_value: 'KRK (Krakow John Paul II)', confidence: 'high' },
-        { field_name: 'departure_date', extracted_value: '2026-12-03', confidence: 'high' },
-        { field_name: 'departure_time', extracted_value: '20:10', confidence: 'high' },
-        { field_name: 'arrival_date', extracted_value: '2026-12-04', confidence: 'high' },
-        { field_name: 'arrival_time', extracted_value: '13:30', confidence: 'high' },
-        { field_name: 'arrival_timezone', extracted_value: 'CET (UTC+1, Poland Local Time)', confidence: 'high' },
-        { field_name: 'purchase_site', extracted_value: 'Delta.com', confidence: 'high' },
-        { field_name: 'payment_method', extracted_value: 'Amex Delta SkyMiles', confidence: 'high' },
-        { field_name: 'total_cost', extracted_value: '$1,980.00 USD', confidence: 'high' },
-        { field_name: 'inbound_leg1_flight', extracted_value: 'DL0074 ATL -> AMS', confidence: 'high' },
-        { field_name: 'inbound_leg1_departs', extracted_value: '2026-12-03 20:10 ATL', confidence: 'high' },
-        { field_name: 'inbound_leg1_arrives', extracted_value: '2026-12-04 10:40 AMS', confidence: 'high' },
-        { field_name: 'inbound_layover_ams', extracted_value: '55 minutes (AMS)', confidence: 'high' },
-        { field_name: 'inbound_leg2_flight', extracted_value: 'DL9208 AMS -> KRK', confidence: 'high' },
-        { field_name: 'inbound_leg2_departs', extracted_value: '2026-12-04 11:35 AMS', confidence: 'high' },
-        { field_name: 'inbound_leg2_arrives', extracted_value: '2026-12-04 13:30 KRK', confidence: 'high' },
-        { field_name: 'return_leg1_flight', extracted_value: 'DL9528 GDN -> AMS', confidence: 'high' },
-        { field_name: 'return_leg1_departs', extracted_value: '2026-12-13 06:45 GDN', confidence: 'high' },
-        { field_name: 'return_leg1_arrives', extracted_value: '2026-12-13 08:40 AMS', confidence: 'high' },
-        { field_name: 'return_layover_ams', extracted_value: '1 hour 20 minutes (AMS)', confidence: 'high' },
-        { field_name: 'return_leg2_flight', extracted_value: 'DL9227 AMS -> ATL', confidence: 'high' },
-        { field_name: 'return_leg2_departs', extracted_value: '2026-12-13 10:00 AMS', confidence: 'high' },
-        { field_name: 'return_leg2_arrives', extracted_value: '2026-12-13 13:35 ATL', confidence: 'high' }
+        { field_name: 'airline', extracted_value: '', confidence: 'low' },
+        { field_name: 'flight_number', extracted_value: '', confidence: 'low' },
+        { field_name: 'origin_airport', extracted_value: '', confidence: 'low' },
+        { field_name: 'destination_airport', extracted_value: '', confidence: 'low' },
+        { field_name: 'departure_date', extracted_value: '', confidence: 'low' },
+        { field_name: 'departure_time', extracted_value: '', confidence: 'low' },
+        { field_name: 'confirmation_number', extracted_value: '', confidence: 'low' }
       ]
     };
   }
 
-  if (filename.includes('restaurant') || filename.includes('reserv') || filename.includes('dining') || filename.includes('table') || filename.includes('resto')) {
+  if (filename.includes('restaurant') || filename.includes('dining') || filename.includes('table')) {
     return {
-      provider: 'Restaurant Reservation',
+      provider: '',
       docType: 'restaurant',
       fields: [
-        { field_name: 'restaurant_name', extracted_value: 'Wierzynek Historic Restaurant', confidence: 'high' },
-        { field_name: 'address', extracted_value: 'Rynek Glowny 15, 31-008 Krakow', confidence: 'high' },
-        { field_name: 'reservation_date', extracted_value: '2026-12-05', confidence: 'high' },
-        { field_name: 'reservation_time', extracted_value: '19:30', confidence: 'high' },
-        { field_name: 'party_size', extracted_value: '2 Guests', confidence: 'high' },
-        { field_name: 'table_type', extracted_value: 'Window table (street view)', confidence: 'medium' },
-        { field_name: 'dietary_notes', extracted_value: 'No restrictions noted', confidence: 'low' },
-        { field_name: 'confirmation_number', extracted_value: 'RSV-WZK-0512', confidence: 'high' },
-        { field_name: 'purchase_site', extracted_value: 'Direct Table Booking', confidence: 'high' },
-        { field_name: 'payment_method', extracted_value: 'Credit Card on File', confidence: 'high' },
-        { field_name: 'deposit_paid', extracted_value: '0 PLN (card held on file)', confidence: 'medium' }
+        { field_name: 'restaurant_name', extracted_value: baseTitle, confidence: 'low' },
+        { field_name: 'address', extracted_value: '', confidence: 'low' },
+        { field_name: 'reservation_date', extracted_value: '', confidence: 'low' },
+        { field_name: 'reservation_time', extracted_value: '', confidence: 'low' },
+        { field_name: 'confirmation_number', extracted_value: '', confidence: 'low' }
       ]
     };
   }
 
-  if (filename.includes('tour') || filename.includes('excursion') || filename.includes('ticket') || filename.includes('auschwitz') || filename.includes('wieliczka') || filename.includes('activity')) {
-    const isWieliczka = filename.includes('wieliczka') || filename.includes('salt');
-    const isAuschwitz = filename.includes('auschwitz') || filename.includes('birkenau');
-    return {
-      provider: isAuschwitz ? 'Auschwitz-Birkenau Memorial Tours' : isWieliczka ? 'Wieliczka Salt Mine' : 'Poland Experience Tours',
-      docType: 'excursion',
-      fields: [
-        { field_name: 'tour_name', extracted_value: isAuschwitz ? 'Auschwitz-Birkenau Memorial Guided Tour' : isWieliczka ? 'Wieliczka Salt Mine UNESCO Tour' : 'Krakow Old Town Walking Tour', confidence: 'high' },
-        { field_name: 'tour_date', extracted_value: isAuschwitz ? '2026-12-06' : '2026-12-06', confidence: 'high' },
-        { field_name: 'start_time', extracted_value: isAuschwitz ? '08:30' : '10:00', confidence: 'high' },
-        { field_name: 'duration', extracted_value: isAuschwitz ? '5 hours' : isWieliczka ? '3 hours' : '2 hours', confidence: 'medium' },
-        { field_name: 'meeting_point', extracted_value: isAuschwitz ? 'Krakow Bus Pickup - Pawia St' : isWieliczka ? 'Wieliczka Salt Mine Entrance, ul. Daniłowicza 10' : 'Rynek Glowny - Main Market Square', confidence: 'high' },
-        { field_name: 'guide_language', extracted_value: 'English (dedicated guide)', confidence: 'high' },
-        { field_name: 'tickets', extracted_value: '2 Adults (General Admission)', confidence: 'high' },
-        { field_name: 'included', extracted_value: isAuschwitz ? 'Guided tour, transport from Krakow, entrance fee' : 'Guided tour, entrance fee', confidence: 'medium' },
-        { field_name: 'confirmation_number', extracted_value: isAuschwitz ? 'AUS-2026-4817' : isWieliczka ? 'WLZ-2026-9032' : `EXC-${Math.floor(100000 + Math.random() * 900000)}`, confidence: 'high' },
-        { field_name: 'purchase_site', extracted_value: 'GetYourGuide', confidence: 'high' },
-        { field_name: 'payment_method', extracted_value: 'Apple Pay', confidence: 'high' },
-        { field_name: 'total_cost', extracted_value: isAuschwitz ? '480 PLN' : isWieliczka ? '360 PLN' : '200 PLN', confidence: 'medium' }
-      ]
-    };
-  }
-
-  // Default booking extraction
   return {
-    provider: 'Poland Travel Booking',
+    provider: '',
     docType: 'excursion',
     fields: [
-      { field_name: 'activity_title', extracted_value: file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '), confidence: 'high' },
-      { field_name: 'supplier', extracted_value: 'Poland Travel Services', confidence: 'medium' },
-      { field_name: 'tour_date', extracted_value: '2026-12-06', confidence: 'medium' },
-      { field_name: 'start_time', extracted_value: '10:00', confidence: 'medium' },
-      { field_name: 'meeting_point', extracted_value: 'Krakow Main Market Square', confidence: 'medium' },
-      { field_name: 'tickets', extracted_value: '2 Adults', confidence: 'medium' },
-      { field_name: 'confirmation_number', extracted_value: `BK-${Math.floor(100000 + Math.random() * 900000)}`, confidence: 'high' }
+      { field_name: 'title', extracted_value: baseTitle, confidence: 'low' },
+      { field_name: 'provider', extracted_value: '', confidence: 'low' },
+      { field_name: 'local_date', extracted_value: '', confidence: 'low' },
+      { field_name: 'local_time', extracted_value: '', confidence: 'low' },
+      { field_name: 'location', extracted_value: '', confidence: 'low' },
+      { field_name: 'confirmation_number', extracted_value: '', confidence: 'low' }
     ]
   };
 }
@@ -206,6 +139,19 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
   const reattachInputRef = useRef(null);
   const localDocBlobs = useRef(new Map());
   const handledDocIdRef = useRef(null);
+
+  useEffect(() => {
+    const blobMap = localDocBlobs.current;
+    return () => {
+      const seen = new Set(blobMap.values());
+      seen.forEach((url) => {
+        if (typeof url === 'string' && url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      blobMap.clear();
+    };
+  }, []);
 
   const handleConfirmDeleteDoc = async () => {
     if (!docToDelete) return;
@@ -409,8 +355,9 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
       }
 
       if (!extractionDone) {
-        const extraction = simulateExtraction(file);
-        await saveExtractedFields(docId, extraction.fields, extraction.provider, extraction.docType);
+        const manualTemplate = buildManualEntryFields(file);
+        await saveExtractedFields(docId, manualTemplate.fields, manualTemplate.provider, manualTemplate.docType);
+        setActionSuccessMessage('Document uploaded. Automatic parsing was unavailable, so please verify or enter the booking fields manually.');
       }
       
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -446,9 +393,31 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
     }
     if (docId) await saveLocalDocumentFile(docId, file);
 
+    let uploadedRemote = false;
+    if (docId) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(
+          getApiUrl(`/api/wayfinder/documents/${encodeURIComponent(docId)}/file`),
+          { method: 'POST', credentials: 'include', body: formData }
+        );
+        uploadedRemote = res.ok;
+        if (uploadedRemote && fetchDocuments) {
+          await fetchDocuments(journeyId);
+        }
+      } catch (err) {
+        console.warn('[DocumentCenter] Remote blob attach failed, using local IndexedDB copy:', err);
+      }
+    }
+
     setPdfPreviewUrl(blobUrl);
     setIframeError(false);
-    setActionSuccessMessage('Original document file attached and stored locally in browser storage.');
+    setActionSuccessMessage(
+      uploadedRemote
+        ? 'Original document file attached to your vault and cached locally.'
+        : 'Original document file attached and stored locally in browser storage.'
+    );
   };
 
   const openReviewModal = async (docId) => {
@@ -549,44 +518,42 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
       }
     }
 
-    const baseUrl = import.meta.env.BASE_URL || '/wayfinder/';
-    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    const lower = fname.toLowerCase();
-
-    // Strict matching for pre-bundled static PDFs - NEVER fall back to Altus Palace for other hotels!
-    const isDelta = lower.includes('delta') || lower.includes('dl9208') || lower.includes('dl9528') || lower.includes('dl9227') || lower.includes('gudi3j');
-    const isGyg = lower.includes('getyourguide') || lower.includes('gyg7vkk692wy') || lower.includes('auschwitz') || lower.includes('wieliczka');
-    const isAltus = lower.includes('altus') || lower.includes('imiwhdh') || lower.includes('profitroom'); // Matches Altus Palace or its Profitroom confirmation code
-
-    let staticFallback = null;
-    if (isDelta) {
-      staticFallback = `${normalizedBase}Poland-2026/docs/Poland_Delta.pdf`;
-    } else if (isGyg) {
-      staticFallback = `${normalizedBase}Poland-2026/docs/GetYourGuide_Ticket_GYG7VKK692WY.pdf`;
-    } else if (isAltus) {
-      staticFallback = `${normalizedBase}Poland-2026/docs/Hotel_Altus_Palace_Wroclaw_Confirmation.pdf`;
-    }
-
-    const candidateUrl = cachedBlob || doc.file_url || staticFallback || null;
-    if (candidateUrl && !candidateUrl.startsWith('blob:') && !candidateUrl.startsWith('data:')) {
-      try {
-        const res = await fetch(candidateUrl, { method: 'HEAD', credentials: 'include' });
-        const ct = (res.headers.get('content-type') || '').toLowerCase();
-        if (!res.ok || ct.includes('text/html')) {
+    const rawCandidate = doc.file_url || (doc.has_blob && doc.id ? `/api/wayfinder/documents/${encodeURIComponent(doc.id)}/file` : null);
+    let resolvedUrl = cachedBlob || null;
+    if (!resolvedUrl && rawCandidate && !rawCandidate.includes('/Poland-2026/docs/')) {
+      if (rawCandidate.startsWith('blob:') || rawCandidate.startsWith('data:')) {
+        resolvedUrl = rawCandidate;
+      } else {
+        try {
+          const res = await fetch(getApiUrl(rawCandidate), { method: 'GET', credentials: 'include' });
+          const ct = (res.headers.get('content-type') || '').toLowerCase();
+          if (!res.ok || ct.includes('text/html')) {
+            setPdfPreviewUrl(null);
+            setIframeError(true);
+            setPdfPreviewDoc(doc);
+            return;
+          }
+          const blob = await res.blob();
+          resolvedUrl = URL.createObjectURL(blob);
+          localDocBlobs.current.set(doc.id, resolvedUrl);
+          if (fname) localDocBlobs.current.set(fname, resolvedUrl);
+        } catch (_) {
           setPdfPreviewUrl(null);
           setIframeError(true);
           setPdfPreviewDoc(doc);
           return;
         }
-      } catch (_) {
-        setPdfPreviewUrl(null);
-        setIframeError(true);
-        setPdfPreviewDoc(doc);
-        return;
       }
     }
 
-    setPdfPreviewUrl(candidateUrl);
+    if (!resolvedUrl) {
+      setPdfPreviewUrl(null);
+      setIframeError(true);
+      setPdfPreviewDoc(doc);
+      return;
+    }
+
+    setPdfPreviewUrl(resolvedUrl);
     setPdfPreviewDoc(doc);
   };
 
@@ -613,28 +580,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
     )
   );
 
-  const displayDocuments = documents.length > 0 ? documents : [
-    {
-      id: 'bundled-delta-poland-2026',
-      filename: 'Poland_Delta.pdf',
-      safe_display_name: 'Poland_Delta.pdf (Inbound DL9208 Confirmation)',
-      detected_doc_type: 'flight',
-      detected_provider: 'Delta Air Lines',
-      processing_status: 'imported',
-      file_size_bytes: 4157,
-      upload_date: '2026-08-28T17:14:46.000Z'
-    },
-    {
-      id: 'doc-gyg-7vkk692wy',
-      filename: 'GetYourGuide_Ticket_GYG7VKK692WY.pdf',
-      safe_display_name: 'GetYourGuide Ticket: Auschwitz & Wieliczka Tour (GYG7VKK692WY)',
-      detected_doc_type: 'excursion',
-      detected_provider: 'GetYourGuide',
-      processing_status: 'imported',
-      file_size_bytes: 3966,
-      upload_date: '2026-10-30T17:00:00.000Z'
-    }
-  ];
+  const displayDocuments = documents;
 
   return (
     <div className="space-y-8">
@@ -1180,24 +1126,13 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                         type="button"
                         onClick={() => {
                           const docId = selectedBooking.source_document_id;
-                          const baseUrl = (import.meta.env.BASE_URL || '/wayfinder/').replace(/\/$/, '');
-                          const titleLower = (selectedBooking.title || '').toLowerCase();
-                          const isAltus = titleLower.includes('altus');
-                          const isDelta = titleLower.includes('delta') || (selectedBooking.confirmation_number || '').toUpperCase() === 'GUDI3J' || titleLower.includes('dl9208') || titleLower.includes('dl9528') || titleLower.includes('dl9227');
-                          const isGyg = (selectedBooking.confirmation_number || '').toUpperCase() === 'GYG7VKK692WY' || titleLower.includes('auschwitz');
-                          const defaultPdf = isAltus
-                            ? 'Hotel_Altus_Palace_Wroclaw_Confirmation.pdf'
-                            : isDelta
-                            ? 'Poland_Delta.pdf'
-                            : isGyg
-                            ? 'GetYourGuide_Ticket_GYG7VKK692WY.pdf'
-                            : null;
                           const foundDoc = documents.find(d => d.id === docId) || {
                             id: docId,
-                            filename: defaultPdf || selectedBooking.title || 'Booking Confirmation',
-                            safe_display_name: selectedBooking.title || (isAltus ? 'Hotel Altus Palace Wrocław Confirmation.pdf' : 'Booking Confirmation'),
+                            filename: selectedBooking.title || 'Booking Confirmation',
+                            safe_display_name: selectedBooking.title || 'Booking Confirmation',
                             mime_type: 'application/pdf',
-                            file_url: defaultPdf ? `${baseUrl}/Poland-2026/docs/${defaultPdf}` : null
+                            has_blob: true,
+                            file_url: `/api/wayfinder/documents/${encodeURIComponent(docId)}/file`
                           };
                           setSelectedBooking(null);
                           openPdfPreview(foundDoc);
@@ -1369,6 +1304,15 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
           </button>
         </div>
         
+        {displayDocuments.length === 0 ? (
+          <div className="glass-panel p-8 rounded-2xl border border-dashed border-white/15 text-center space-y-2">
+            <FileText className="w-8 h-8 text-slate-500 mx-auto" />
+            <div className="text-sm font-semibold text-white">No travel documents uploaded yet</div>
+            <p className="text-xs text-wf-muted max-w-md mx-auto">
+              Upload a flight, hotel, rail, or tour PDF confirmation above, or forward confirmations to your personal booking inbox.
+            </p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {displayDocuments.map(doc => (
               <div key={doc.id} className="glass-panel p-4 rounded-2xl flex flex-col hover-lift group">
@@ -1481,6 +1425,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
               </div>
             ))}
           </div>
+        )}
         </div>
 
         {/* Rename Document Modal */}

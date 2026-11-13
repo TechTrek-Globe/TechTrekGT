@@ -1,4 +1,4 @@
-import { verifyPassword, createToken } from '../../utils/auth.js';
+import { verifyPassword, createToken, buildAuthCookieHeader } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 
 export async function onRequestPost(context) {
@@ -57,6 +57,16 @@ export async function onRequestPost(context) {
     }
 
     // Require email verification before issuing session
+    const userStatus = user.status || 'Active';
+    if (userStatus === 'Suspended' || (userStatus !== 'Active' && userStatus !== 'active')) {
+      return new Response(JSON.stringify({
+        error: 'This account has been suspended. Please contact an administrator.'
+      }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     if (user.email_verified !== 1 && !user.email_verified_at) {
       return new Response(JSON.stringify({
         error: 'Email verification required. Please verify your email before signing in.',
@@ -82,22 +92,23 @@ export async function onRequestPost(context) {
 
     const isAdmin = Boolean(user.is_admin === 1 || user.role === 'admin');
     const apiKeyEnabled = Boolean(user.api_key_enabled === 1 || isAdmin);
+    const tokenVersion = Number(user.token_version ?? 1);
 
-    // Create JWT token
+    // Create minimal JWT token containing zero PII
     const token = await createToken(
-      { userId: user.id, email: user.email, householdId, name: user.name, role: user.role || 'user', isAdmin, apiKeyEnabled },
+      { userId: user.id, tv: tokenVersion },
       env.JWT_SECRET,
       maxAge
     );
-    
-    const cookieOptions = [
-      `auth_token=${token}`,
-      'HttpOnly',
-      'Secure',
-      'SameSite=Strict',
-      'Path=/',
-      `Max-Age=${maxAge}`
-    ].join('; ');
+
+    // Update sign-in telemetry best-effort without blocking authentication
+    try {
+      await env.DB.prepare('UPDATE users SET sign_in_count = COALESCE(sign_in_count, 0) + 1 WHERE id = ?').bind(user.id).run();
+    } catch {
+      // Non-fatal if older D1 schema lacks sign_in_count
+    }
+
+    const cookieOptions = buildAuthCookieHeader(token, maxAge);
 
     return new Response(JSON.stringify({
       success: true,

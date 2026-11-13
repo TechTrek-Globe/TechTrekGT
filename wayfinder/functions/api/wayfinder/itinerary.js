@@ -104,6 +104,64 @@ export async function handleItinerary(context, url, method) {
       return json({ item: sanitizeItem(item) }, 201);
     }
 
+    if (method === 'PUT' && itemId) {
+      const item = await env.DB.prepare(
+        'SELECT * FROM wayfinder_itinerary_items WHERE id = ?'
+      ).bind(itemId).first();
+      if (!item) return json({ error: 'Item not found' }, 404);
+
+      const access = await resolveAgendaAccess(env, item.journey_id, user);
+      if (!isMember(access.role)) return json({ error: 'Item not found' }, 404);
+      if (!canEdit(access.role)) return json({ error: 'You do not have permission to modify this agenda' }, 403);
+
+      const body = await request.json().catch(() => null);
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return json({ error: 'Valid JSON payload required' }, 400);
+      }
+
+      const UPDATABLE_FIELDS = [
+        'title', 'item_type', 'destination_id', 'provider', 'supplier',
+        'confirmation_number', 'booking_reference', 'local_date', 'local_time',
+        'end_date', 'end_time', 'timezone', 'location', 'location_address',
+        'origin', 'destination', 'room_type', 'seat', 'guests', 'tickets',
+        'language', 'duration', 'pickup_window', 'bag_restriction',
+        'mobile_ticket_url', 'activity_details_url', 'purchase_site',
+        'payment_method', 'notes', 'status', 'verification_status', 'visibility'
+      ];
+
+      const setClauses = [];
+      const values = [];
+      for (const field of UPDATABLE_FIELDS) {
+        if (Object.prototype.hasOwnProperty.call(body, field) && body[field] !== undefined) {
+          if (field === 'title' && (!body.title || !String(body.title).trim())) {
+            return json({ error: 'title cannot be empty' }, 400);
+          }
+          setClauses.push(`${field} = ?`);
+          const val = body[field];
+          values.push(val === '' ? null : val);
+        }
+      }
+
+      if (setClauses.length === 0) {
+        return json({ error: 'No updatable fields provided' }, 400);
+      }
+
+      setClauses.push("updated_at = datetime('now')");
+      const auditId = generateId();
+
+      await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE wayfinder_itinerary_items SET ${setClauses.join(', ')} WHERE id = ?`
+        ).bind(...values, itemId),
+        env.DB.prepare(
+          'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action) VALUES (?,?,?,?,?,?)'
+        ).bind(auditId, user.userId, item.journey_id, 'itinerary_item', itemId, 'update')
+      ]);
+
+      const updated = await env.DB.prepare('SELECT * FROM wayfinder_itinerary_items WHERE id = ?').bind(itemId).first();
+      return json({ item: sanitizeItem(updated) });
+    }
+
     if (method === 'DELETE' && itemId) {
       // Verify ownership, or editor+ access on the agenda
       let item = await env.DB.prepare(

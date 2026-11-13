@@ -32,7 +32,8 @@ import { polandJourney } from '../data/poland-2026';
 import { DocumentViewerModal } from './DocumentViewerModal';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
-import { formatDistance } from './Formatters';
+import { useWayfinder } from '../context/WayfinderContext';
+import { formatDistance, formatCompactStopDates } from './Formatters';
 
 function StationDossierModal({ stationKey, onClose }) {
   const station = polandJourney.stationDossiers?.[stationKey];
@@ -301,6 +302,13 @@ function CityTransitSection({ cityId }) {
 export function RouteVisualization() {
   const { isAuthenticated } = useAuth();
   const { settings } = useSettings();
+  const { documents = [], itinerary = [] } = useWayfinder() || {};
+  const inboundFlightDoc = isAuthenticated
+    ? (documents || []).find((d) => (d?.detected_doc_type || '').toLowerCase() === 'flight') || null
+    : null;
+  const inboundFlightItem = isAuthenticated
+    ? (itinerary || []).find((i) => (i?.item_type || '').toLowerCase() === 'flight') || null
+    : null;
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'krakow', 'wroclaw', 'poznan', 'torun', 'gdansk', 'all-transit', 'guide'
   const [activeStationModal, setActiveStationModal] = useState(null);
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
@@ -323,13 +331,17 @@ export function RouteVisualization() {
     return null;
   };
 
+  const cityDatesById = Object.fromEntries(
+    polandJourney.route.map((c) => [c.id, formatCompactStopDates(c.itineraryDates)])
+  );
+
   const tabs = [
-    { id: 'overview', label: 'Full Route & Overview', icon: Map, badge: 'All 4 Legs' },
-    { id: 'krakow', label: 'Kraków', code: 'KRK', icon: Train, badge: 'Stop 01' },
-    { id: 'wroclaw', label: 'Wrocław', code: 'WRO', icon: Train, badge: 'Stop 02' },
-    { id: 'poznan', label: 'Poznań', code: 'POZ', icon: Train, badge: 'Stop 03' },
-    { id: 'torun', label: 'Toruń', code: 'TOR', icon: Train, badge: 'Day Stop' },
-    { id: 'gdansk', label: 'Gdańsk', code: 'GDN', icon: Train, badge: 'Finale' },
+    { id: 'overview', label: 'Full Route & Overview', icon: Map, badge: isAuthenticated ? formatCompactStopDates(polandJourney.dates) : 'All 4 Legs' },
+    { id: 'krakow', label: 'Kraków', code: isAuthenticated ? cityDatesById.krakow : 'KRK', icon: Train, badge: 'Stop 01' },
+    { id: 'wroclaw', label: 'Wrocław', code: isAuthenticated ? cityDatesById.wroclaw : 'WRO', icon: Train, badge: 'Stop 02' },
+    { id: 'poznan', label: 'Poznań', code: isAuthenticated ? cityDatesById.poznan : 'POZ', icon: Train, badge: 'Stop 03' },
+    { id: 'torun', label: 'Toruń', code: isAuthenticated ? cityDatesById.torun : 'TOR', icon: Train, badge: 'Day Stop' },
+    { id: 'gdansk', label: 'Gdańsk', code: isAuthenticated ? cityDatesById.gdansk : 'GDN', icon: Train, badge: 'Finale' },
     { id: 'all-transit', label: 'All City Transit', icon: Bus, badge: 'Matrix' },
     { id: 'guide', label: 'Rail Survival Guide', icon: Info, badge: 'Pro Tips' },
   ];
@@ -368,7 +380,7 @@ export function RouteVisualization() {
       </div>
 
       {/* Primary Clickable City & Section Tabs (Top Navigation) */}
-      <div className="sticky top-14 z-30 py-2 px-3 sm:px-4 rounded-2xl bg-slate-950/95 backdrop-blur-md border border-white/10 shadow-lg w-full overflow-x-auto no-scrollbar no-overscroll-x">
+      <div className="sticky top-14 sm:top-16 z-30 py-2 px-3 sm:px-4 rounded-2xl bg-slate-950/95 border border-white/10 shadow-lg w-full overflow-x-auto no-scrollbar no-overscroll-x">
         <div className="flex items-center space-x-2 min-w-max">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -432,16 +444,18 @@ export function RouteVisualization() {
                       <div>
                         <span className="font-bold text-white">Air Arrival: </span>
                         <span className="text-sky-300 font-mono font-bold">
-                          {isAuthenticated ? 'Delta DL9208 (AMS ➔ KRK)' : 'Kraków Airport (KRK)'}
+                          {isAuthenticated && (inboundFlightItem?.route || inboundFlightItem?.title)
+                            ? (inboundFlightItem.route || inboundFlightItem.title)
+                            : 'Kraków Airport (KRK)'}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 shrink-0">
-                      {isAuthenticated && (
+                      {isAuthenticated && inboundFlightDoc && (
                         <button
                           onClick={() => setIsDocViewerOpen(true)}
                           className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[10px] font-bold border border-sky-500/40 transition-colors flex items-center space-x-1 cursor-pointer"
-                          title="View Delta flight document"
+                          title="View flight confirmation document"
                         >
                           <FileText className="w-3 h-3 text-sky-400" />
                           <span>View Document</span>
@@ -459,10 +473,10 @@ export function RouteVisualization() {
                     <span className="text-amber-300 font-bold">Touchdown: Dec 4, 2026 @ 13:30 CET</span>
                     <span className="text-slate-500">•</span>
                     <span className="text-slate-400">KRK Balice Airport</span>
-                    {isAuthenticated && (
+                    {isAuthenticated && inboundFlightItem?.confirmation_number && (
                       <>
                         <span className="text-slate-500">•</span>
-                        <span className="text-emerald-300 font-mono">Conf: GUDI3J</span>
+                        <span className="text-emerald-300 font-mono">Conf: {inboundFlightItem.confirmation_number}</span>
                       </>
                     )}
                   </div>
@@ -813,10 +827,11 @@ export function RouteVisualization() {
       )}
 
       {/* Universal Document Preview Modal */}
-      {isAuthenticated && (
+      {isAuthenticated && inboundFlightDoc && (
         <DocumentViewerModal
           isOpen={isDocViewerOpen}
           onClose={() => setIsDocViewerOpen(false)}
+          doc={inboundFlightDoc}
         />
       )}
     </div>

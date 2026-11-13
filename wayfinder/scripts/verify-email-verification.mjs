@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import {
   hmacHex,
   constantTimeStringEqual,
-  generateVerificationCode
+  generateVerificationCode,
+  createToken,
+  authenticateRequest
 } from '../functions/utils/auth.js';
 
 let passedCount = 0;
@@ -99,6 +101,94 @@ test('Legacy user with email_verified_at timestamp is permitted to log in', () =
 
   const isVerified = Boolean(user.email_verified === 1 || user.email_verified_at);
   assert.equal(isVerified, true, 'Legacy user with timestamp must be recognized as verified');
+});
+
+console.log('\n--- 3. Session Token Version, Suspension & Credential Conflict Tests ---');
+
+function createAuthMockDb(userRow) {
+  return {
+    prepare(sql) {
+      return {
+        bind(userId) {
+          return {
+            async first() {
+              if (sql.includes('FROM users WHERE id = ?') && userRow && userRow.id === userId) {
+                return userRow;
+              }
+              return null;
+            }
+          };
+        }
+      };
+    }
+  };
+}
+
+test('authenticateRequest accepts valid cookie token matching users.token_version', async () => {
+  const secret = 'jwt-test-secret-001';
+  const db = createAuthMockDb({ id: 'usr-1', email: 'a@example.com', status: 'Active', token_version: 2 });
+  const token = await createToken({ userId: 'usr-1', tv: 2 }, secret);
+  const req = new Request('https://techtrekgt.com/wayfinder/api/auth/me', {
+    headers: { Cookie: `auth_token=${token}` }
+  });
+  const res = await authenticateRequest(req, { JWT_SECRET: secret, DB: db });
+  assert.equal(res.ok, true);
+  assert.equal(res.status, 200);
+  assert.equal(res.payload.userId, 'usr-1');
+});
+
+test('authenticateRequest rejects stale token_version with 401 and clearCookie', async () => {
+  const secret = 'jwt-test-secret-001';
+  const db = createAuthMockDb({ id: 'usr-1', email: 'a@example.com', status: 'Active', token_version: 2 });
+  const staleToken = await createToken({ userId: 'usr-1', tv: 1 }, secret);
+  const req = new Request('https://techtrekgt.com/wayfinder/api/auth/me', {
+    headers: { Cookie: `auth_token=${staleToken}` }
+  });
+  const res = await authenticateRequest(req, { JWT_SECRET: secret, DB: db });
+  assert.equal(res.ok, false);
+  assert.equal(res.status, 401);
+  assert.equal(res.clearCookie, true);
+});
+
+test('authenticateRequest rejects token missing tv claim with 401', async () => {
+  const secret = 'jwt-test-secret-001';
+  const db = createAuthMockDb({ id: 'usr-1', email: 'a@example.com', status: 'Active', token_version: 1 });
+  const legacyToken = await createToken({ userId: 'usr-1' }, secret);
+  const req = new Request('https://techtrekgt.com/wayfinder/api/auth/me', {
+    headers: { Cookie: `auth_token=${legacyToken}` }
+  });
+  const res = await authenticateRequest(req, { JWT_SECRET: secret, DB: db });
+  assert.equal(res.ok, false);
+  assert.equal(res.status, 401);
+  assert.equal(res.clearCookie, true);
+});
+
+test('authenticateRequest rejects Suspended user with 403 and clearCookie', async () => {
+  const secret = 'jwt-test-secret-001';
+  const db = createAuthMockDb({ id: 'usr-susp', email: 's@example.com', status: 'Suspended', token_version: 1 });
+  const token = await createToken({ userId: 'usr-susp', tv: 1 }, secret);
+  const req = new Request('https://techtrekgt.com/wayfinder/api/auth/me', {
+    headers: { Cookie: `auth_token=${token}` }
+  });
+  const res = await authenticateRequest(req, { JWT_SECRET: secret, DB: db });
+  assert.equal(res.ok, false);
+  assert.equal(res.status, 403);
+  assert.equal(res.clearCookie, true);
+});
+
+test('authenticateRequest rejects conflicting Cookie + Bearer credentials with 400', async () => {
+  const secret = 'jwt-test-secret-001';
+  const tokenA = await createToken({ userId: 'usr-1', tv: 1 }, secret);
+  const tokenB = await createToken({ userId: 'usr-2', tv: 1 }, secret);
+  const req = new Request('https://techtrekgt.com/wayfinder/api/auth/me', {
+    headers: {
+      Cookie: `auth_token=${tokenA}`,
+      Authorization: `Bearer ${tokenB}`
+    }
+  });
+  const res = await authenticateRequest(req, { JWT_SECRET: secret, DB: createAuthMockDb(null) });
+  assert.equal(res.ok, false);
+  assert.equal(res.status, 400);
 });
 
 queue.then(() => {

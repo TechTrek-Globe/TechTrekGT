@@ -1,17 +1,17 @@
 export const cityImages = {
-  krakow: '/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.png',
-  wroclaw: '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.png',
-  poznan: '/wayfinder/Poland-2026/images/poznan/markets/poznan.png',
-  torun: '/wayfinder/Poland-2026/images/torun/markets/torun.png',
-  gdansk: '/wayfinder/Poland-2026/images/gdansk/markets/gdansk.png',
+  krakow: '/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.jpg',
+  wroclaw: '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.jpg',
+  poznan: '/wayfinder/Poland-2026/images/poznan/markets/poznan.jpg',
+  torun: '/wayfinder/Poland-2026/images/torun/markets/torun.jpg',
+  gdansk: '/wayfinder/Poland-2026/images/gdansk/markets/gdansk.jpg',
 };
 
 export const marketImages = {
-  'rynek-glowny': '/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.png',
-  'maly-rynek': '/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.png',
-  'kazimierz-wolnica': '/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.png',
-  'podgorze': '/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-podgorski.png',
-  'wroclaw-rynek': '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.png',
+  'rynek-glowny': '/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-glowny.jpg',
+  'maly-rynek': '/wayfinder/Poland-2026/images/krakow/markets/krakow-maly-rynek.jpg',
+  'kazimierz-wolnica': '/wayfinder/Poland-2026/images/krakow/markets/krakow-plac-wolnica.jpg',
+  'podgorze': '/wayfinder/Poland-2026/images/krakow/markets/krakow-rynek-podgorski.jpg',
+  'wroclaw-rynek': '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw.jpg',
   'wroclaw-plac-solny': '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw-plac-solny.jpg',
   'wroclaw-swidnicka': '/wayfinder/Poland-2026/images/wroclaw/markets/wroclaw-swidnicka.jpg',
   'poznan-plac-wolnosci': '/wayfinder/Poland-2026/images/poznan/markets/poznan-plac-wolnosci.jpg',

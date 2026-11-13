@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { Layout } from './components/Layout';
 import { AuthModal } from './components/AuthModal';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { parseWayfinderLocation, resolveCanonicalRedirect, navigateTo } from './utils/router';
 const WayfinderLanding = React.lazy(() => import('./components/WayfinderLanding').then(m => ({ default: m.WayfinderLanding })));
 const PolandLanding = React.lazy(() => import('./components/PolandLanding').then(m => ({ default: m.PolandLanding })));
 const CityPage = React.lazy(() => import('./components/CityPage').then(m => ({ default: m.CityPage })));
@@ -21,6 +22,16 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  const canonicalRedirect = resolveCanonicalRedirect(currentPath);
+
+  useEffect(() => {
+    if (!canonicalRedirect || typeof window === 'undefined') return;
+    const currentFull = window.location.pathname + window.location.search + window.location.hash;
+    if (currentFull !== canonicalRedirect) {
+      navigateTo(canonicalRedirect, { replace: true });
+    }
+  }, [canonicalRedirect]);
+
   // Scroll restoration: scroll to top on route change (unless city route or scroll target is present)
   useEffect(() => {
     const isCityRoute = currentPath.includes('/cities/');
@@ -31,15 +42,7 @@ function App() {
   }, [currentPath]);
 
   const renderRoute = () => {
-    // Route matching with normalized path (preserving casing on raw path segments such as doc IDs)
-    const [rawPathPart, rawSearchPart] = (currentPath || '/wayfinder').split('?');
-    const searchSuffix = rawSearchPart ? `?${rawSearchPart}` : '';
-    const rawNormalizedPath = (rawPathPart === '/' || rawPathPart === '' || rawPathPart === '/index.html')
-      ? '/wayfinder'
-      : (rawPathPart.toLowerCase().startsWith('/wayfinder')
-        ? `/wayfinder${rawPathPart.slice('/wayfinder'.length)}`
-        : `/wayfinder${rawPathPart.startsWith('/') ? rawPathPart : '/' + rawPathPart}`);
-    const normalizedPath = rawNormalizedPath.toLowerCase();
+    const { rawNormalizedPath, normalizedPath } = parseWayfinderLocation(currentPath);
 
     // Root - go straight to Poland landing (single active journey)
     if (normalizedPath === '/wayfinder' || normalizedPath === '/wayfinder/') {
@@ -60,7 +63,7 @@ function App() {
       return <PolandLanding />;
     }
 
-    // Retired standalone pages - redirect to PolandLanding
+    // Retired standalone pages - render canonical PolandLanding while useEffect normalizes URL
     if (
       normalizedPath === '/wayfinder/poland-christmas-2026/route' ||
       normalizedPath === '/wayfinder/poland-christmas-2026/rail' ||
@@ -71,11 +74,10 @@ function App() {
       normalizedPath === '/wayfinder/markets' ||
       normalizedPath === '/wayfinder/stays-and-food'
     ) {
-      window.history.replaceState({}, '', '/wayfinder/poland-christmas-2026');
       return <PolandLanding />;
     }
 
-    // Protected itinerary/timeline aliases redirect to PrivateHub
+    // Protected itinerary/timeline aliases -> PrivateHub
     if (
       normalizedPath === '/wayfinder/poland-christmas-2026/itinerary' ||
       normalizedPath === '/wayfinder/poland-christmas-2026/timeline' ||
@@ -83,7 +85,6 @@ function App() {
       normalizedPath === '/wayfinder/timeline'
     ) {
       const target = '/wayfinder/poland-christmas-2026/private';
-      window.history.replaceState({}, '', `${target}${searchSuffix}`);
       return (
         <ProtectedRoute
           title="Private Itinerary & Bookings"
@@ -94,7 +95,7 @@ function App() {
       );
     }
 
-    // Protected expenses/budget/ledger aliases redirect to PrivateHub expenses tab
+    // Protected expenses/budget/ledger aliases -> PrivateHub expenses tab
     if (
       normalizedPath === '/wayfinder/poland-christmas-2026/expenses' ||
       normalizedPath === '/wayfinder/poland-christmas-2026/budget' ||
@@ -104,7 +105,6 @@ function App() {
       normalizedPath === '/wayfinder/ledger'
     ) {
       const target = '/wayfinder/poland-christmas-2026/private/expenses';
-      window.history.replaceState({}, '', `${target}${searchSuffix}`);
       return (
         <ProtectedRoute
           title="Shared Expense Ledger"
@@ -115,13 +115,12 @@ function App() {
       );
     }
 
-    // Protected packing aliases redirect to PrivateHub packing tab
+    // Protected packing aliases -> PrivateHub packing tab
     if (
       normalizedPath === '/wayfinder/poland-christmas-2026/packing' ||
       normalizedPath === '/wayfinder/packing'
     ) {
       const target = '/wayfinder/poland-christmas-2026/private/packing';
-      window.history.replaceState({}, '', `${target}${searchSuffix}`);
       return (
         <ProtectedRoute
           title="Packing Checklist & Luggage Budget"
@@ -144,7 +143,6 @@ function App() {
         : rawNormalizedPath.slice('/wayfinder/documents'.length);
       const cleanSuffix = rawSuffix === '/' ? '' : rawSuffix.replace(/\/+$/, '');
       const target = `/wayfinder/poland-christmas-2026/private/documents${cleanSuffix}`;
-      window.history.replaceState({}, '', `${target}${searchSuffix}`);
       return (
         <ProtectedRoute
           title="Private Travel Document Vault"
@@ -163,7 +161,6 @@ function App() {
       normalizedPath.startsWith('/wayfinder/poland-christmas-2026/poland-2026/docs/')
     ) {
       const target = '/wayfinder/poland-christmas-2026/private/documents';
-      window.history.replaceState({}, '', `${target}${searchSuffix}`);
       return (
         <ProtectedRoute
           title="Private Travel Document Vault"
@@ -205,7 +202,6 @@ function App() {
       const rawSub = rawNormalizedPath.slice('/wayfinder/private'.length);
       const cleanSub = rawSub === '/' ? '' : rawSub.replace(/\/+$/, '');
       const target = `/wayfinder/poland-christmas-2026/private${cleanSub}`;
-      window.history.replaceState({}, '', `${target}${searchSuffix}`);
       return (
         <ProtectedRoute>
           <PrivateHub currentPath={target} />
@@ -226,7 +222,6 @@ function App() {
 
     if (normalizedPath === '/wayfinder/gmail-callback' || normalizedPath === '/wayfinder/gmail-callback/') {
       const target = '/wayfinder/poland-christmas-2026/private/documents';
-      window.history.replaceState({}, '', target);
       return (
         <ProtectedRoute
           title="Private Travel Document Vault"

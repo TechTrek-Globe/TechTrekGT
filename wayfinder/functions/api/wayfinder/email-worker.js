@@ -9,47 +9,116 @@
 // Called from worker.js:  export default { fetch(...) {}, email(...) {} }
 
 import { generateId } from '../../utils/id.js';
-import { parseBookingWithGemini } from './gemini-parser.js';
+import { parseBookingWithGemini, extractPdfText } from './gemini-parser.js';
+import { getAgendaMembers } from '../../utils/agendaAccess.js';
+import {
+  ensureDocumentBlobsTable,
+  buildBlobStatements,
+  base64ToBytes,
+  bytesToBase64,
+  sha256HexBytes,
+  MAX_D1_BLOB_SIZE,
+} from '../../utils/documentBlobs.js';
 
 // ============================================================
-// Minimal MIME text extractor (no npm deps - pure Workers runtime)
+// Minimal MIME text & attachment extractor (pure Workers runtime)
 // ============================================================
 
-function decodeBase64Url(str) {
+function parseCharset(contentType = '') {
+  const m = String(contentType).match(/charset="?([A-Za-z0-9_\-]+)"?/i);
+  return (m ? m[1] : 'utf-8').toLowerCase();
+}
+
+function decodeBytes(bytes, charset = 'utf-8') {
+  if (!bytes || bytes.byteLength === 0) return '';
   try {
-    const clean = str.replace(/[^A-Za-z0-9+/=]/g, '');
-    return atob(clean);
-  } catch (e) {
-    return str;
+    return new TextDecoder(charset || 'utf-8', { fatal: false }).decode(bytes);
+  } catch {
+    return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
   }
 }
 
-function decodeQP(str) {
-  // Decode quoted-printable soft line breaks and encoded chars
-  return str
-    .replace(/=\r?\n/g, '')
-    .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+function decodeBase64Bytes(str) {
+  try {
+    return base64ToBytes(str);
+  } catch {
+    return new Uint8Array(0);
+  }
 }
 
-// Recursively walk a MIME message stream to extract plain-text and detect attachments (PDF, calendar, etc.)
-function extractMimeContent(headerBlock, bodyBlock) {
+function decodeQPBytes(str) {
+  const unfolded = String(str || '').replace(/=\r?\n/g, '');
+  const out = [];
+  const utf8Enc = new TextEncoder();
+  for (let i = 0; i < unfolded.length; i++) {
+    const ch = unfolded[i];
+    if (ch === '=' && i + 2 < unfolded.length && /^[0-9A-Fa-f]{2}$/.test(unfolded.slice(i + 1, i + 3))) {
+      out.push(parseInt(unfolded.slice(i + 1, i + 3), 16));
+      i += 2;
+      continue;
+    }
+    const code = unfolded.charCodeAt(i);
+    if (code < 128) {
+      out.push(code);
+    } else {
+      const encoded = utf8Enc.encode(unfolded[i]);
+      for (const b of encoded) out.push(b);
+    }
+  }
+  return new Uint8Array(out);
+}
+
+function decodeQPText(str, charset = 'utf-8') {
+  return decodeBytes(decodeQPBytes(str), charset);
+}
+
+export function decodeRfc2047(value = '') {
+  if (!value || typeof value !== 'string' || !value.includes('=?')) return value || '';
+  const collapsed = value.replace(/\?=\s+=\?/g, '?==?');
+  return collapsed.replace(/=\?([^?]+)\?([BQbq])\?([^?]+)\?=/g, (_, charset, encoding, data) => {
+    try {
+      if (encoding.toUpperCase() === 'B') {
+        return decodeBytes(decodeBase64Bytes(data), charset);
+      }
+      const qData = data.replace(/_/g, ' ');
+      return decodeQPText(qData, charset);
+    } catch {
+      return _;
+    }
+  });
+}
+
+function splitHeaderAndBody(raw = '') {
+  const match = String(raw).match(/\r?\n\r?\n/);
+  if (!match || match.index === undefined) {
+    return { headerBlock: raw, bodyBlock: '' };
+  }
+  return {
+    headerBlock: raw.slice(0, match.index),
+    bodyBlock: raw.slice(match.index + match[0].length),
+  };
+}
+
+// Recursively walk a MIME message stream to extract plain-text and decode attachments (PDF, calendar, etc.)
+export function extractMimeContent(headerBlock, bodyBlock) {
   const headers = parseHeaders(headerBlock);
-  const contentType = (headers['content-type'] || '').toLowerCase();
+  const contentTypeRaw = headers['content-type'] || '';
+  const contentType = contentTypeRaw.toLowerCase();
+  const charset = parseCharset(contentTypeRaw);
   const disposition = (headers['content-disposition'] || '').toLowerCase();
 
   // Nested multipart (e.g. multipart/mixed -> multipart/alternative)
   if (contentType.includes('multipart')) {
-    const boundaryMatch = contentType.match(/boundary="?([^";\r\n]+)"?/i);
+    const boundaryMatch = contentTypeRaw.match(/boundary="?([^";\r\n]+)"?/i);
     if (boundaryMatch) {
       const boundary = '--' + boundaryMatch[1];
       const parts = bodyBlock.split(boundary);
       let combined = '';
-      let attachments = [];
+      const attachments = [];
       for (const part of parts) {
-        if (!part.trim() || part.trim() === '--') continue;
-        const partSplit = part.indexOf('\r\n\r\n');
-        const pHeaders = partSplit !== -1 ? part.slice(0, partSplit) : '';
-        const pBody = partSplit !== -1 ? part.slice(partSplit + 4) : '';
+        const trimmed = part.trim();
+        if (!trimmed || trimmed === '--' || trimmed.startsWith('--\n') || trimmed.startsWith('--\r\n')) continue;
+        const { headerBlock: pHeaders, bodyBlock: pBody } = splitHeaderAndBody(part.replace(/^\r?\n/, ''));
         const res = extractMimeContent(pHeaders, pBody);
         if (res.text) combined += ' ' + res.text;
         if (res.attachments?.length) attachments.push(...res.attachments);
@@ -58,26 +127,59 @@ function extractMimeContent(headerBlock, bodyBlock) {
     }
   }
 
-  // Check if attachment
-  const isAttachment = disposition.includes('attachment') || contentType.includes('application/pdf');
-  const filenameMatch = disposition.match(/filename="?([^";\r\n]+)"?/i) || contentType.match(/name="?([^";\r\n]+)"?/i);
-  if (isAttachment && (filenameMatch || contentType.includes('application/pdf'))) {
-    const fname = filenameMatch ? filenameMatch[1] : 'ticket.pdf';
+  const enc = (headers['content-transfer-encoding'] || '').toLowerCase().trim();
+  const rawFilenameMatch = headers['content-disposition']?.match(/filename\*?=(?:UTF-8''|"?)([^";\r\n]+)"?/i)
+    || contentTypeRaw.match(/name="?([^";\r\n]+)"?/i);
+  const decodedFilename = rawFilenameMatch ? decodeRfc2047(decodeURIComponentSafe(rawFilenameMatch[1].trim())) : null;
+  const isPdfPart = contentType.includes('application/pdf') || Boolean(decodedFilename && decodedFilename.toLowerCase().endsWith('.pdf'));
+  const isAttachment = disposition.includes('attachment') || isPdfPart || (Boolean(decodedFilename) && !contentType.includes('text/plain') && !contentType.includes('text/html'));
+
+  if (isAttachment) {
+    const fname = decodedFilename || (isPdfPart ? 'ticket.pdf' : 'attachment.bin');
+    let bytes;
+    if (enc === 'base64') {
+      bytes = decodeBase64Bytes(bodyBlock.replace(/\s/g, ''));
+    } else if (enc === 'quoted-printable') {
+      bytes = decodeQPBytes(bodyBlock);
+    } else {
+      bytes = new TextEncoder().encode(bodyBlock || '');
+    }
+
+    const mimeType = (contentType.split(';')[0].trim() || (isPdfPart ? 'application/pdf' : 'application/octet-stream')).toLowerCase();
+    let attachedText = '';
+    if ((mimeType === 'application/pdf' || fname.toLowerCase().endsWith('.pdf')) && bytes.byteLength > 0 && bytes.byteLength <= MAX_D1_BLOB_SIZE) {
+      try {
+        attachedText = extractPdfText(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)) || '';
+      } catch {
+        attachedText = '';
+      }
+    }
+
+    const base64Clean = bytes.byteLength > 0 && bytes.byteLength <= 4 * 1024 * 1024
+      ? bytesToBase64(bytes)
+      : null;
+
     return {
-      text: '',
+      text: attachedText,
       attachments: [{
         filename: fname,
-        mimeType: contentType.split(';')[0].trim() || 'application/pdf',
-        sizeBytes: bodyBlock.length,
+        mimeType,
+        sizeBytes: bytes.byteLength,
+        bytes,
+        base64: base64Clean,
       }]
     };
   }
 
-  // Single part
-  const enc = (headers['content-transfer-encoding'] || '').toLowerCase();
-  let decoded = enc === 'base64'
-    ? decodeBase64Url(bodyBlock.replace(/\s/g, ''))
-    : enc === 'quoted-printable' ? decodeQP(bodyBlock) : bodyBlock;
+  // Single text part
+  let decoded = '';
+  if (enc === 'base64') {
+    decoded = decodeBytes(decodeBase64Bytes(bodyBlock.replace(/\s/g, '')), charset);
+  } else if (enc === 'quoted-printable') {
+    decoded = decodeQPText(bodyBlock, charset);
+  } else {
+    decoded = bodyBlock || '';
+  }
 
   if (contentType.includes('text/html')) {
     decoded = stripHtmlTags(decoded);
@@ -86,13 +188,22 @@ function extractMimeContent(headerBlock, bodyBlock) {
   return { text: decoded || '', attachments: [] };
 }
 
-async function extractContentFromMime(message) {
+function decodeURIComponentSafe(val) {
+  try {
+    return decodeURIComponent(val);
+  } catch {
+    return val;
+  }
+}
+
+export async function extractContentFromMime(message) {
   let rawText = '';
   try {
     if (typeof message.raw?.text === 'function') {
       rawText = await message.raw.text();
     } else if (message.raw) {
-      rawText = await new Response(message.raw).text();
+      const buf = await new Response(message.raw).arrayBuffer();
+      rawText = decodeBytes(new Uint8Array(buf), 'utf-8');
     }
   } catch (streamErr) {
     console.warn('[email-worker] failed to read raw stream:', streamErr);
@@ -100,14 +211,13 @@ async function extractContentFromMime(message) {
 
   if (!rawText) return { text: '', attachments: [] };
 
-  const headerBodySplit = rawText.indexOf('\r\n\r\n');
-  const headerBlock = headerBodySplit !== -1 ? rawText.slice(0, headerBodySplit) : rawText;
-  const bodyBlock   = headerBodySplit !== -1 ? rawText.slice(headerBodySplit + 4) : '';
-
-  let res = extractMimeContent(headerBlock, bodyBlock);
+  const { headerBlock, bodyBlock } = splitHeaderAndBody(rawText);
+  const res = extractMimeContent(headerBlock, bodyBlock);
   if (!res.text || res.text.length < 20) {
-    // Fallback: strip tags directly from rawText to ensure booking details are never lost
-    res.text = stripHtmlTags(decodeQP(rawText)).replace(/\r?\n+/g, ' ').slice(0, 5000);
+    const qpFallback = stripHtmlTags(decodeQPText(rawText, 'utf-8')).replace(/\r?\n+/g, ' ').trim();
+    if (qpFallback.length > (res.text || '').length) {
+      res.text = qpFallback.slice(0, 5000);
+    }
   }
 
   return res;
@@ -115,12 +225,11 @@ async function extractContentFromMime(message) {
 
 function parseHeaders(block) {
   const result = {};
-  // Unfold multi-line headers
-  const unfolded = block.replace(/\r\n[ \t]+/g, ' ');
+  const unfolded = String(block || '').replace(/\r?\n[ \t]+/g, ' ');
   for (const line of unfolded.split(/\r?\n/)) {
     const colon = line.indexOf(':');
     if (colon !== -1) {
-      const name  = line.slice(0, colon).trim().toLowerCase();
+      const name = line.slice(0, colon).trim().toLowerCase();
       const value = line.slice(colon + 1).trim();
       result[name] = value;
     }
@@ -129,7 +238,7 @@ function parseHeaders(block) {
 }
 
 function stripHtmlTags(html) {
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim();
 }
 
 // ============================================================
@@ -196,7 +305,7 @@ export function parseGetYourGuideEmail(fullText, subject = '', from = '') {
   // Clean raw activity title
   rawActivity = rawActivity.replace(/\s*100%\s*guaranteed/i, '').replace(/\|\s*ticket.*$/i, '').trim();
 
-  let title = 'GetYourGuide: Poland Tour Booking';
+  let title = 'GetYourGuide Activity';
   if (rawActivity.toLowerCase().includes('auschwitz') && (rawActivity.toLowerCase().includes('wieliczka') || rawActivity.toLowerCase().includes('salt'))) {
     title = 'GetYourGuide: Auschwitz-Birkenau & Wieliczka Salt Mine Tour';
   } else if (rawActivity.toLowerCase().includes('auschwitz')) {
@@ -231,9 +340,9 @@ export function parseGetYourGuideEmail(fullText, subject = '', from = '') {
   // 3. Supplier / Operator
   const suppMatch = text.match(/Note from\s+([^\r\n•]+)/i)
     || text.match(/(?:operator|supplier|provided by)\s*[:\-]\s*([^\r\n•]+)/i);
-  const supplier = suppMatch ? suppMatch[1].trim() : 'Mr.Shuttle';
+  const supplier = suppMatch ? suppMatch[1].trim() : null;
 
-  // 4. Cost extraction: "$ 284.76" or "284.76 USD" or "$284.76"
+  // 4. Cost extraction
   let cost = null;
   const costMatch = text.match(/\$\s*([\d,]+(?:\.\d{2})?)/i)
     || text.match(/([\d,]+(?:\.\d{2})?)\s*(?:USD|\$)/i);
@@ -242,39 +351,36 @@ export function parseGetYourGuideEmail(fullText, subject = '', from = '') {
     if (!isNaN(amount) && amount > 0) {
       cost = { amount, currency: 'USD' };
     }
+  } else {
+    cost = extractBookingCost(text);
   }
 
   // 5. Pickup times / Schedule window
-  // "The pickups are between 5:30 and 7:30"
   const pickupMatch = text.match(/pickups are between\s*(\d{1,2}(?::\d{2})?)\s*(?:and|-)\s*(\d{1,2}(?::\d{2})?)/i)
     || text.match(/pickup[:\s]+between\s*(\d{1,2}(?::\d{2})?)\s*(?:and|-)\s*(\d{1,2}(?::\d{2})?)/i)
-    || text.match(/pickup[:\s]+(\d{1,2}:\d{2})/i);
-  
+    || text.match(/pickup[:\s]+(\d{1,2}:\d{2})/i)
+    || text.match(/\bat\s+(\d{1,2}:\d{2})\b/i);
+
   let pickupWindow = null;
-  let localTime = '06:30';
-  let endTime = '17:30';
+  let localTime = null;
+  let endTime = null;
 
   if (pickupMatch) {
     const pStart = pickupMatch[1].includes(':') ? pickupMatch[1] : `${pickupMatch[1]}:00`;
     const pEnd = pickupMatch[2] ? (pickupMatch[2].includes(':') ? pickupMatch[2] : `${pickupMatch[2]}:00`) : null;
-    pickupWindow = pEnd ? `${pStart.padStart(5, '0')} - ${pEnd.padStart(5, '0')}` : pStart;
-    localTime = '06:30'; // Midpoint of 5:30-7:30 hotel pickup
-    if (duration && duration.includes('11')) {
-      endTime = '17:30';
-    }
+    pickupWindow = pEnd ? `${pStart.padStart(5, '0')} - ${pEnd.padStart(5, '0')}` : null;
+    localTime = pStart.padStart(5, '0');
   }
 
   // 6. Booking reference & Confirmation
-  const gygConfMatch = (subj + ' ' + text).match(/GYG[A-Z0-9]{7,12}/i)
-    || text.match(/(?:confirmation|booking|reference)[:\s]+([A-Z0-9]{8,14})/i);
-  const confirmationNumber = gygConfMatch ? (gygConfMatch[0] || gygConfMatch[1]).toUpperCase() : 'GYG7VKK692WY';
+  const gygConfMatch = (subj + ' ' + text).match(/\bGYG[A-Z0-9]{7,12}\b/i)
+    || text.match(/(?:confirmation|booking|reference)[:\s#]+([A-Z0-9]{6,14})\b/i);
+  const confirmationNumber = gygConfMatch ? (gygConfMatch[1] || gygConfMatch[0]).toUpperCase() : null;
 
   const bookingRefMatch = text.match(/bookings?\/([A-Z0-9]{15,40})/i);
   const bookingRef = bookingRefMatch ? bookingRefMatch[1] : null;
 
   // 7. Direct Canonical URLs
-  // Note: Adjust tracking links (l4ab.adj.st) fail with "Url not found" in desktop web browsers.
-  // We extract adj_fallback if present (which contains visitor_id session token for instant guest access)
   let canonicalWebUrl = null;
   const fallbackMatch = text.match(/adj_fallback=([^&\s\)]+)/i);
   if (fallbackMatch) {
@@ -287,7 +393,7 @@ export function parseGetYourGuideEmail(fullText, subject = '', from = '') {
 
   if (!canonicalWebUrl) {
     canonicalWebUrl = bookingRef
-      ? `https://www.getyourguide.com/booking/${bookingRef}?partner_id=931BMKV&visitor_id=H2Z77FVCVCDZ2HHK7HDV52IYZU3RF8IL`
+      ? `https://www.getyourguide.com/booking/${bookingRef}`
       : 'https://www.getyourguide.com/booking';
   }
   const mobileTicketUrl = canonicalWebUrl;
@@ -295,15 +401,16 @@ export function parseGetYourGuideEmail(fullText, subject = '', from = '') {
 
   // 8. Baggage restriction
   const bagMatch = text.match(/(?:maximum size of bags[^\r\n•]+|bags[^\r\n•]+30x20x10[^\r\n•]*)/i);
-  const bagRestriction = bagMatch ? bagMatch[0].trim() : 'Max bag size on Museum grounds: 30x20x10 cm';
+  const bagRestriction = bagMatch ? bagMatch[0].trim() : null;
 
   // 9. Location
-  const location = 'Hotel Pickup (Kraków) -> Auschwitz-Birkenau & Wieliczka';
+  const locMatch = text.match(/(?:meeting\s*point|pickup\s*location|location)[:\s]+([^\r\n]{4,120})/i);
+  const location = locMatch ? locMatch[1].trim() : null;
 
   // 10. Date
-  let localDate = '2026-12-06';
-  const isoMatch = text.match(/2026-(12)-(0[1-9]|[12]\d|3[01])/);
-  if (isoMatch) localDate = isoMatch[0];
+  let localDate = null;
+  const isoMatch = text.match(/\b(20\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))\b/);
+  if (isoMatch) localDate = isoMatch[1];
 
   return {
     item_type: 'excursion',
@@ -316,14 +423,14 @@ export function parseGetYourGuideEmail(fullText, subject = '', from = '') {
     local_time: localTime,
     end_time: endTime,
     location,
-    tickets: tickets || '2 Adults',
-    language: language || 'English',
-    duration: duration || '11 hours',
-    pickup_window: pickupWindow || '05:30 - 07:30',
+    tickets,
+    language,
+    duration,
+    pickup_window: pickupWindow,
     bag_restriction: bagRestriction,
     mobile_ticket_url: mobileTicketUrl,
     activity_details_url: activityDetailsUrl,
-    cost: cost || { amount: 284.76, currency: 'USD' },
+    cost,
     snippet: text.slice(0, 600),
   };
 }
@@ -353,8 +460,6 @@ function cleanTitleAndProvider(rawSubject, body, from) {
     } else {
       title = `Delta Flight: ${cleanedSubject}`;
     }
-    suggestedDate = '2026-12-04';
-    suggestedTime = '13:30';
   }
   // 2. PKP Intercity
   else if (combined.includes('pkp') || combined.includes('intercity') || from.includes('intercity.pl')) {
@@ -362,36 +467,23 @@ function cleanTitleAndProvider(rawSubject, body, from) {
     item_type = 'rail';
     title = `PKP Train: ${cleanedSubject.replace(/^potwierdzenie.*?:/i, '').trim()}`;
   }
-  // 3. Hotel Brovaria & Microbrewery (Poznań)
+  // 3. Hotels
   else if (combined.includes('brovaria')) {
-    provider = 'Hotel Brovaria & Microbrewery (Poznań)';
+    provider = 'Hotel Brovaria';
     item_type = 'hotel';
-    title = 'Hotel Brovaria Poznań (Room Reservation)';
-    suggestedDate = '2026-12-09';
-    suggestedTime = '15:00';
-    suggestedLocation = 'Stary Rynek 73-74, 61-772 Poznań';
-  }
-  // 4. Hotel Experior Boutique - Destigo Hotels (Kraków)
-  else if (combined.includes('experior') || combined.includes('destigo')) {
-    provider = 'Hotel Experior Boutique - Destigo Hotels (Kraków)';
+    title = `Hotel Brovaria: ${cleanedSubject.replace(/confirmation.*$/i, '').trim() || 'Reservation'}`;
+  } else if (combined.includes('experior') || combined.includes('destigo')) {
+    provider = 'Hotel Experior Boutique';
     item_type = 'hotel';
-    title = 'Hotel Experior Boutique Kraków (Check-in)';
-    suggestedDate = '2026-12-04';
-    suggestedTime = '15:00';
-    suggestedLocation = 'Kraków, Poland';
-  }
-  // 5. General Hotel / Lodging
-  else if (combined.includes('hotel') || combined.includes('booking.com') || combined.includes('accor') || combined.includes('altus') || combined.includes('stary') || combined.includes('profitroom') || combined.includes('imiwhdh')) {
+    title = `Hotel Experior Boutique: ${cleanedSubject.replace(/confirmation.*$/i, '').trim() || 'Reservation'}`;
+  } else if (combined.includes('hotel') || combined.includes('booking.com') || combined.includes('accor') || combined.includes('altus') || combined.includes('stary') || combined.includes('profitroom')) {
     item_type = 'hotel';
     if (combined.includes('booking.com')) provider = 'Booking.com';
     else if (combined.includes('accor') || combined.includes('bridge')) provider = 'Accor / The Bridge Wrocław';
-    else if (combined.includes('altus') || combined.includes('profitroom') || combined.includes('imiwhdh')) provider = 'Hotel Altus Palace Wrocław';
-    else if (combined.includes('stary')) provider = 'Hotel Stary Kraków';
+    else if (combined.includes('altus') || combined.includes('profitroom')) provider = 'Hotel Altus Palace';
+    else if (combined.includes('stary')) provider = 'Hotel Stary';
     else provider = 'Hotel Accommodation';
     title = `Hotel: ${cleanedSubject.replace(/confirmation.*$/i, '').trim() || provider}`;
-    suggestedDate = (combined.includes('altus') || combined.includes('profitroom') || combined.includes('imiwhdh')) ? '2026-12-07' : '2026-12-04';
-    suggestedTime = '15:00';
-    suggestedLocation = (combined.includes('altus') || combined.includes('profitroom') || combined.includes('imiwhdh')) ? 'ul. Wierzbowa 15, 50-056 Wrocław' : 'Poland';
   }
   // 4. Viator / Tripadvisor
   else if (combined.includes('viator') || combined.includes('tripadvisor') || from.includes('viator') || from.includes('tripadvisor')) {
@@ -438,25 +530,39 @@ export function extractBookingFields(subject, body, from) {
     /(?:check.in|arrival|from|departs?|date)[:\s]+([A-Za-z]+\s+\d{1,2},?\s*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{1,2}[A-Za-z]{3}\d{2,4})/i
   );
 
-  // Date extraction
+  // Date extraction (ISO -> DD.MM.YYYY -> DDMMMYY -> Month DD)
   let localDate = null;
-  const isoMatch = lower.match(/2026-(12)-(0[1-9]|[12]\d|3[01])/);
+  const isoMatch = lower.match(/\b(20\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))\b/);
   if (isoMatch) {
-    localDate = isoMatch[0];
+    localDate = isoMatch[1];
   } else {
-    // Check airline format e.g. 03DEC26, 04DEC26, 03DEC
-    const deltaMatch = lower.match(/(\d{1,2})(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(?:26|2026)?/i);
-    if (deltaMatch) {
-      const dayNum = parseInt(deltaMatch[1], 10);
-      const mStr = deltaMatch[2].toLowerCase();
-      const monthMap = { dec: '12', nov: '11', jan: '01', feb: '02' };
-      const m = monthMap[mStr] || '12';
-      localDate = `2026-${m}-${String(dayNum).padStart(2, '0')}`;
+    const euroMatch = lower.match(/\b(0?[1-9]|[12]\d|3[01])[./](0?[1-9]|1[0-2])[./](20\d{2})\b/);
+    if (euroMatch) {
+      localDate = `${euroMatch[3]}-${String(euroMatch[2]).padStart(2, '0')}-${String(euroMatch[1]).padStart(2, '0')}`;
     } else {
-      const decMatch = lower.match(/(?:dec(?:ember)?\.?\s+([12]\d|3[01]|0[1-9]|[1-9])(?:st|nd|rd|th)?)|(?:([12]\d|3[01]|0[1-9]|[1-9])(?:st|nd|rd|th)?\s+dec(?:ember)?)/i);
-      if (decMatch) {
-        const dayNum = parseInt(decMatch[1] || decMatch[2], 10);
-        localDate = `2026-12-${String(dayNum).padStart(2, '0')}`;
+      const monthNames = {
+        january: '01', jan: '01', february: '02', feb: '02', march: '03', mar: '03',
+        april: '04', apr: '04', may: '05', june: '06', jun: '06', july: '07', jul: '07',
+        august: '08', aug: '08', september: '09', sep: '09', october: '10', oct: '10',
+        november: '11', nov: '11', december: '12', dec: '12'
+      };
+      const compactMatch = lower.match(/(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(20\d{2}|\d{2})?/i);
+      const writtenMatchA = lower.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\.?\s+([12]\d|3[01]|0?[1-9])(?:st|nd|rd|th)?(?:,?\s*(20\d{2}))?/i);
+      const writtenMatchB = lower.match(/\b([12]\d|3[01]|0?[1-9])(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b(?:,?\s*(20\d{2}))?/i);
+      if (writtenMatchA) {
+        const m = monthNames[writtenMatchA[1].toLowerCase()];
+        const yr = writtenMatchA[3] || String(new Date().getFullYear());
+        localDate = `${yr}-${m}-${String(writtenMatchA[2]).padStart(2, '0')}`;
+      } else if (writtenMatchB) {
+        const m = monthNames[writtenMatchB[2].toLowerCase()];
+        const yr = writtenMatchB[3] || String(new Date().getFullYear());
+        localDate = `${yr}-${m}-${String(writtenMatchB[1]).padStart(2, '0')}`;
+      } else if (compactMatch) {
+        const dayNum = parseInt(compactMatch[1], 10);
+        const m = monthNames[compactMatch[2].toLowerCase()];
+        const rawYr = compactMatch[3];
+        const yr = rawYr ? (rawYr.length === 2 ? `20${rawYr}` : rawYr) : String(new Date().getFullYear());
+        localDate = `${yr}-${m}-${String(dayNum).padStart(2, '0')}`;
       }
     }
   }
@@ -470,7 +576,7 @@ export function extractBookingFields(subject, body, from) {
     provider,
     confirmation_number: confirmationNumber,
     raw_checkin: checkinMatch ? checkinMatch[1] : null,
-    local_date: localDate || suggestedDate || '2026-12-06',
+    local_date: localDate || suggestedDate || null,
     local_time: suggestedTime || null,
     end_time: null,
     location: suggestedLocation || null,
@@ -484,6 +590,11 @@ export function extractBookingFields(subject, body, from) {
 // ============================================================
 
 export async function handleInboundEmail(message, env) {
+  let inbox = null;
+  let subject = 'Email booking';
+  let from = '';
+  let messageId = '';
+
   try {
     if (!env.DB) {
       console.error('[email-worker] DB binding not available');
@@ -503,7 +614,6 @@ export async function handleInboundEmail(message, env) {
     const tokenMatch = cleanTo.match(/tt(\d{6})/i) || headersTo.match(/tt(\d{6})/i) || deliveredTo.match(/tt(\d{6})/i);
     const token = tokenMatch ? tokenMatch[1] : null;
 
-    let inbox = null;
     if (token) {
       inbox = await env.DB.prepare(
         'SELECT * FROM wayfinder_email_inboxes WHERE inbox_token = ? AND is_active = 1'
@@ -521,9 +631,9 @@ export async function handleInboundEmail(message, env) {
       return;
     }
 
-    // Verify journey still exists and has an active owner
+    // Verify journey still exists and load owner for dynamic member splits
     const journey = await env.DB.prepare(
-      'SELECT id, start_date, end_date FROM wayfinder_journeys WHERE id = ?'
+      'SELECT id, created_by, start_date, end_date FROM wayfinder_journeys WHERE id = ?'
     ).bind(inbox.journey_id).first();
 
     if (!journey) {
@@ -531,11 +641,12 @@ export async function handleInboundEmail(message, env) {
       return;
     }
 
-    // Parse subject and from from the message envelope
-    const subject = message.headers?.get('subject') || 'Email booking';
-    const from    = message.from || message.headers?.get('from') || '';
+    // Parse RFC 2047 subject, from, and Message-ID from the message envelope
+    subject = decodeRfc2047(message.headers?.get('subject') || 'Email booking');
+    from = message.from || message.headers?.get('from') || '';
+    messageId = (message.headers?.get('message-id') || '').trim().slice(0, 200);
 
-    // Extract plain-text body and attachments from MIME stream
+    // Extract plain-text body and attachments (including PDF text) from MIME stream
     let bodyText = '';
     let attachments = [];
     try {
@@ -548,12 +659,19 @@ export async function handleInboundEmail(message, env) {
 
     let fields = extractBookingFields(subject, bodyText, from);
 
-    // Stage 2: Intelligent Gemini 2.5 Flash / 3.8 Flash fallback
-    // If regex extraction missed the confirmation number, item_type is generic 'other', or date is defaulted
+    // Stage 2: Intelligent Gemini structured fallback (including first PDF attachment when present)
+    const primaryBinaryAttachment = attachments.find(a => a.base64 && (a.mimeType === 'application/pdf' || a.mimeType?.startsWith('image/')));
     const isLowConfidence = !fields.confirmation_number || fields.item_type === 'other' || !fields.local_date;
-    if (isLowConfidence && bodyText.trim().length > 20) {
+    if (isLowConfidence && (bodyText.trim().length > 20 || primaryBinaryAttachment)) {
       try {
-        const geminiExtraction = await parseBookingWithGemini(env, bodyText, subject, from, { userId: inbox.user_id });
+        const geminiExtraction = await parseBookingWithGemini(
+          env,
+          bodyText,
+          subject,
+          from,
+          { userId: inbox.user_id },
+          primaryBinaryAttachment || null
+        );
         if (geminiExtraction) {
           if (geminiExtraction.item_type && geminiExtraction.item_type !== 'other') {
             fields.item_type = geminiExtraction.item_type;
@@ -607,21 +725,35 @@ export async function handleInboundEmail(message, env) {
       fields.mobile_ticket_url ? `Mobile Tickets: ${fields.mobile_ticket_url}` : null,
       fields.activity_details_url ? `Activity Details: ${fields.activity_details_url}` : null,
       fields.raw_checkin ? `Check-in: ${fields.raw_checkin}` : null,
-      `Source: email-forward`,
+      messageId ? `Message-ID: ${messageId}` : null,
+      'Source: email-forward',
       `From: ${from}`,
       '',
       fields.snippet,
     ].filter(Boolean).join('\n');
 
-    // Idempotency guard: prevent duplicate 16-row batch writes if Cloudflare retries delivery or user forwards twice
-    const resolvedDate = fields.local_date || journey.start_date || '2026-12-03';
-    if (fields.confirmation_number) {
-      const existingByConf = await env.DB.prepare(
+    const resolvedDate = fields.local_date || journey.start_date || new Date().toISOString().slice(0, 10);
+
+    // Idempotency guard 1: exact email Message-ID deduplication (handles Cloudflare retries & forwards)
+    if (messageId) {
+      const existingByMsgId = await env.DB.prepare(
         `SELECT id FROM wayfinder_itinerary_items
-         WHERE journey_id = ? AND user_id = ? AND (confirmation_number = ? OR notes LIKE ?)`
-      ).bind(inbox.journey_id, inbox.user_id, fields.confirmation_number, `%Confirmation: ${fields.confirmation_number}%`).first();
-      if (existingByConf) {
-        console.log(`[email-worker] duplicate confirmation ${fields.confirmation_number} ignored (${existingByConf.id})`);
+         WHERE journey_id = ? AND user_id = ? AND notes LIKE ?`
+      ).bind(inbox.journey_id, inbox.user_id, `%Message-ID: ${messageId}%`).first();
+      if (existingByMsgId) {
+        console.log(`[email-worker] duplicate Message-ID ${messageId} ignored (${existingByMsgId.id})`);
+        return;
+      }
+    }
+
+    // Idempotency guard 2: leg-aware dedupe (allows multi-leg flights sharing one PNR on different legs/dates/titles)
+    if (fields.confirmation_number) {
+      const existingByLeg = await env.DB.prepare(
+        `SELECT id FROM wayfinder_itinerary_items
+         WHERE journey_id = ? AND user_id = ? AND confirmation_number = ? AND local_date = ? AND LOWER(title) = LOWER(?)`
+      ).bind(inbox.journey_id, inbox.user_id, fields.confirmation_number, resolvedDate, fields.title).first();
+      if (existingByLeg) {
+        console.log(`[email-worker] duplicate confirmation leg ${fields.confirmation_number} ignored (${existingByLeg.id})`);
         return;
       }
     } else {
@@ -635,33 +767,63 @@ export async function handleInboundEmail(message, env) {
       }
     }
 
-    const itemId  = generateId();
+    const itemId = generateId();
     const auditId = generateId();
-    let docId = null;
+    const docIds = [];
+    const docBatchStmts = [];
+    const postDocStmts = [];
+    const nowIso = new Date().toISOString();
 
-    const batchStmts = [];
+    let purchaseSite = fields.purchase_site || null;
+    if (!purchaseSite) {
+      const lowerAll = (subject + ' ' + bodyText + ' ' + from).toLowerCase();
+      if (lowerAll.includes('getyourguide')) purchaseSite = 'GetYourGuide';
+      else if (lowerAll.includes('booking.com')) purchaseSite = 'Booking.com';
+      else if (lowerAll.includes('hotels.com')) purchaseSite = 'Hotels.com';
+      else if (lowerAll.includes('delta')) purchaseSite = 'Delta.com';
+      else if (lowerAll.includes('pkp') || lowerAll.includes('intercity')) purchaseSite = 'PKP Intercity';
+      else if (fields.provider) purchaseSite = fields.provider;
+    }
 
-    // If an attachment is found (PDF, voucher, ticket), record in wayfinder_documents
-    if (attachments.length > 0) {
-      const att = attachments[0];
-      docId = generateId();
+    let paymentMethod = fields.payment_method || null;
+    if (!paymentMethod) {
+      const lowerAll = (subject + ' ' + bodyText).toLowerCase();
+      if (lowerAll.includes('amex') || lowerAll.includes('american express')) paymentMethod = 'American Express';
+      else if (lowerAll.includes('visa')) paymentMethod = 'Visa';
+      else if (lowerAll.includes('mastercard') || lowerAll.includes('master card')) paymentMethod = 'Mastercard';
+      else if (lowerAll.includes('apple pay')) paymentMethod = 'Apple Pay';
+      else if (lowerAll.includes('paypal')) paymentMethod = 'PayPal';
+    }
+
+    // Persist ALL valid attachments (documents + D1 blob chunks + extraction jobs)
+    for (let attIdx = 0; attIdx < attachments.length; attIdx++) {
+      const att = attachments[attIdx];
+      const attDocId = generateId();
+      docIds.push(attDocId);
       const jobId = generateId();
-      const nowIso = new Date().toISOString();
+      const attBytes = att.bytes instanceof Uint8Array ? att.bytes : null;
+      const canStoreBlob = Boolean(attBytes && attBytes.byteLength > 0 && attBytes.byteLength <= MAX_D1_BLOB_SIZE);
+      const fileHash = canStoreBlob ? await sha256HexBytes(attBytes) : null;
+      const storageStatus = canStoreBlob
+        ? 'd1_blob'
+        : (attBytes && attBytes.byteLength > MAX_D1_BLOB_SIZE ? 'oversized' : 'metadata_only');
 
-      batchStmts.push(
+      docBatchStmts.push(
         env.DB.prepare(
           `INSERT INTO wayfinder_documents
-           (id, user_id, journey_id, original_filename, safe_display_name, mime_type, file_size_bytes, storage_key, storage_status, processing_status, detected_provider, detected_doc_type, security_scan_status, retention_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_r2', 'imported', ?, ?, 'pending', 'active')`
+           (id, user_id, journey_id, original_filename, safe_display_name, mime_type, file_size_bytes, file_hash, storage_key, storage_status, processing_status, detected_provider, detected_doc_type, security_scan_status, retention_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'imported', ?, ?, 'pending', 'active')`
         ).bind(
-          docId,
+          attDocId,
           inbox.user_id,
           inbox.journey_id,
-          att.filename || 'ticket.pdf',
+          att.filename || `attachment-${attIdx + 1}.pdf`,
           att.filename ? `${fields.title} (${att.filename})` : `${fields.title} (Ticket Attachment)`,
           att.mimeType || 'application/pdf',
           att.sizeBytes || 0,
-          `attachments/${inbox.journey_id}/${docId}/${att.filename || 'ticket.pdf'}`,
+          fileHash,
+          `attachments/${inbox.journey_id}/${attDocId}/${att.filename || `attachment-${attIdx + 1}.pdf`}`,
+          storageStatus,
           fields.provider || 'Travel Booking',
           fields.item_type || 'hotel'
         ),
@@ -669,55 +831,48 @@ export async function handleInboundEmail(message, env) {
           `INSERT INTO wayfinder_extraction_jobs
            (id, document_id, user_id, status, completed_at, reviewed_at, reviewed_by, review_decision, created_at)
            VALUES (?, ?, ?, 'approved', ?, ?, ?, 'approved', ?)`
-        ).bind(jobId, docId, inbox.user_id, nowIso, nowIso, inbox.user_id, nowIso)
+        ).bind(jobId, attDocId, inbox.user_id, nowIso, nowIso, inbox.user_id, nowIso)
       );
 
-      let purchaseSite = fields.purchase_site || null;
-      if (!purchaseSite) {
-        const lowerAll = (subject + ' ' + bodyText + ' ' + from).toLowerCase();
-        if (lowerAll.includes('getyourguide')) purchaseSite = 'GetYourGuide';
-        else if (lowerAll.includes('booking.com')) purchaseSite = 'Booking.com';
-        else if (lowerAll.includes('hotels.com')) purchaseSite = 'Hotels.com';
-        else if (lowerAll.includes('delta')) purchaseSite = 'Delta.com';
-        else if (lowerAll.includes('pkp') || lowerAll.includes('intercity')) purchaseSite = 'PKP Intercity';
-        else if (fields.provider) purchaseSite = fields.provider;
+      if (canStoreBlob) {
+        await ensureDocumentBlobsTable(env.DB);
+        const blobStmts = buildBlobStatements(env.DB, {
+          documentId: attDocId,
+          userId: inbox.user_id,
+          bytes: attBytes,
+          mimeType: att.mimeType || 'application/pdf',
+          sha256Hash: fileHash,
+        });
+        docBatchStmts.push(...blobStmts);
       }
 
-      let paymentMethod = fields.payment_method || null;
-      if (!paymentMethod) {
-        const lowerAll = (subject + ' ' + bodyText).toLowerCase();
-        if (lowerAll.includes('amex') || lowerAll.includes('american express')) paymentMethod = 'American Express';
-        else if (lowerAll.includes('visa')) paymentMethod = 'Visa';
-        else if (lowerAll.includes('mastercard') || lowerAll.includes('master card')) paymentMethod = 'Mastercard';
-        else if (lowerAll.includes('apple pay')) paymentMethod = 'Apple Pay';
-        else if (lowerAll.includes('paypal')) paymentMethod = 'PayPal';
-      }
+      if (attIdx === 0) {
+        const extractedEntries = [
+          { name: fields.item_type === 'hotel' ? 'hotel_name' : fields.item_type === 'flight' ? 'airline' : 'activity_title', val: fields.title },
+          fields.confirmation_number ? { name: 'confirmation_number', val: fields.confirmation_number } : null,
+          fields.local_date ? { name: fields.item_type === 'hotel' ? 'check_in_date' : 'start_date', val: fields.local_date } : null,
+          fields.local_time ? { name: fields.item_type === 'hotel' ? 'check_in_time' : 'start_time', val: fields.local_time } : null,
+          fields.location ? { name: 'location', val: fields.location } : null,
+          fields.cost ? { name: 'total_cost', val: `${fields.cost.amount} ${fields.cost.currency}` } : null,
+          purchaseSite ? { name: 'purchase_site', val: purchaseSite } : null,
+          paymentMethod ? { name: 'payment_method', val: paymentMethod } : null
+        ].filter(Boolean);
 
-      // Populate extracted fields so review modal immediately reflects full details
-      const extractedEntries = [
-        { name: fields.item_type === 'hotel' ? 'hotel_name' : fields.item_type === 'flight' ? 'airline' : 'activity_title', val: fields.title },
-        fields.confirmation_number ? { name: 'confirmation_number', val: fields.confirmation_number } : null,
-        fields.local_date ? { name: fields.item_type === 'hotel' ? 'check_in_date' : 'start_date', val: fields.local_date } : null,
-        fields.local_time ? { name: fields.item_type === 'hotel' ? 'check_in_time' : 'start_time', val: fields.local_time } : null,
-        fields.location ? { name: 'location', val: fields.location } : null,
-        fields.cost ? { name: 'total_cost', val: `${fields.cost.amount} ${fields.cost.currency}` } : null,
-        purchaseSite ? { name: 'purchase_site', val: purchaseSite } : null,
-        paymentMethod ? { name: 'payment_method', val: paymentMethod } : null
-      ].filter(Boolean);
-
-      for (const entry of extractedEntries) {
-        const fldId = generateId();
-        batchStmts.push(
-          env.DB.prepare(
-            `INSERT INTO wayfinder_extracted_fields
-             (id, extraction_job_id, document_id, field_name, extracted_value, display_value, confidence, verification_status, user_value)
-             VALUES (?, ?, ?, ?, ?, ?, 'high', 'user_verified', ?)`
-          ).bind(fldId, jobId, docId, entry.name, entry.val, entry.val, entry.val)
-        );
+        for (const entry of extractedEntries) {
+          docBatchStmts.push(
+            env.DB.prepare(
+              `INSERT INTO wayfinder_extracted_fields
+               (id, extraction_job_id, document_id, field_name, extracted_value, display_value, confidence, verification_status, user_value)
+               VALUES (?, ?, ?, ?, ?, ?, 'high', 'user_verified', ?)`
+            ).bind(generateId(), jobId, attDocId, entry.name, entry.val, entry.val, entry.val)
+          );
+        }
       }
     }
 
-    batchStmts.push(
+    const primaryDocId = docIds[0] || null;
+
+    postDocStmts.push(
       env.DB.prepare(
         `INSERT INTO wayfinder_itinerary_items
          (id, journey_id, user_id, item_type, title, provider, supplier,
@@ -732,7 +887,7 @@ export async function handleInboundEmail(message, env) {
         itemId, inbox.journey_id, inbox.user_id,
         fields.item_type, fields.title, fields.provider || null, fields.supplier || null,
         fields.confirmation_number || null, fields.booking_reference || null,
-        fields.local_date || journey.start_date || '2026-12-03',
+        resolvedDate,
         fields.local_time || null,
         fields.end_date || null,
         fields.end_time || null,
@@ -744,83 +899,122 @@ export async function handleInboundEmail(message, env) {
         fields.bag_restriction || null,
         fields.mobile_ticket_url || null,
         fields.activity_details_url || null,
-        docId,
-        fields.purchase_site || (from?.toLowerCase().includes('getyourguide') ? 'GetYourGuide' : null),
-        fields.payment_method || null,
+        primaryDocId,
+        purchaseSite,
+        paymentMethod,
         notes
       ),
       env.DB.prepare(
         `UPDATE wayfinder_email_inboxes
          SET emails_received = emails_received + 1, last_received_at = ?
          WHERE id = ?`
-      ).bind(new Date().toISOString(), inbox.id),
+      ).bind(nowIso, inbox.id),
       env.DB.prepare(
         'INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_email, metadata_summary, details) VALUES (?,?,?,?,?,?,?,?,?)'
       ).bind(auditId, inbox.user_id, inbox.journey_id, 'itinerary_item', itemId, 'email_import',
-             from || null, `subject=${subject.slice(0, 120)}; item_type=${fields.item_type}`,
-             JSON.stringify({ from, subject: subject.slice(0, 200), item_type: fields.item_type }))
+             from || null, `subject=${subject.slice(0, 120)}; item_type=${fields.item_type}; attachments=${attachments.length}`,
+             JSON.stringify({ from, subject: subject.slice(0, 200), item_type: fields.item_type, message_id: messageId || null, attachments: attachments.length }))
     );
 
     if (fields.cost && fields.cost.amount > 0) {
       const expenseId = generateId();
-      const splitId1 = generateId();
-      const splitId2 = generateId();
       const rawAmt = fields.cost.amount;
       const cur = fields.cost.currency || 'USD';
       let amountUsd = rawAmt;
       if (cur === 'PLN') amountUsd = Math.round((rawAmt / 4.0) * 100) / 100;
       else if (cur === 'EUR') amountUsd = Math.round((rawAmt * 1.08) * 100) / 100;
-      const split1 = Math.floor((rawAmt / 2) * 100) / 100;
-      const split2 = Number((rawAmt - split1).toFixed(2));
       const expenseCat = mapDocTypeToExpenseCategory(fields.item_type);
-      const nowIso = new Date().toISOString();
 
-      const expenseSite = fields.purchase_site || (from?.toLowerCase().includes('getyourguide') ? 'GetYourGuide' : (subject?.toLowerCase().includes('booking.com') ? 'Booking.com' : null));
-      const expensePayMethod = fields.payment_method || null;
+      const payerRow = await env.DB.prepare(
+        'SELECT id, name, email FROM users WHERE id = ?'
+      ).bind(inbox.user_id).first().catch(() => null);
+      const payerName = payerRow?.name || payerRow?.email || 'Traveler';
 
-      batchStmts.push(
+      const rawMembers = await getAgendaMembers(env, journey);
+      const members = rawMembers.length > 0
+        ? rawMembers
+        : [{ id: inbox.user_id, name: payerName }];
+      const totalCents = Math.round(rawAmt * 100);
+      const count = members.length;
+      const baseCents = Math.floor(totalCents / count);
+      const remCents = totalCents - baseCents * count;
+      const basePct = Math.round((10000 / count)) / 100;
+
+      postDocStmts.push(
         env.DB.prepare(
           `INSERT INTO wayfinder_expenses
            (id, journey_id, itinerary_item_id, document_id, user_id, paid_by_name, paid_by_user_id,
             category, description, amount_original, currency_original, amount_usd,
             purchase_site, payment_method,
             paid_status, verification_status, created_at)
-           VALUES (?, ?, ?, ?, ?, 'Jonathan Kemp', ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'verified', ?)`
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'verified', ?)`
         ).bind(
           expenseId,
           inbox.journey_id,
           itemId,
-          docId,
+          primaryDocId,
           inbox.user_id,
+          payerName,
           inbox.user_id,
           expenseCat,
           fields.title,
           rawAmt,
           cur,
           amountUsd,
-          expenseSite,
-          expensePayMethod,
+          purchaseSite,
+          paymentMethod,
           nowIso
-        ),
-        env.DB.prepare(
-          `INSERT INTO wayfinder_expense_splits
-           (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
-           VALUES (?, ?, ?, 'Jonathan Kemp', ?, 50, ?)`
-        ).bind(splitId1, expenseId, inbox.user_id, split1, nowIso),
-        env.DB.prepare(
-          `INSERT INTO wayfinder_expense_splits
-           (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
-           VALUES (?, ?, 'usr-ronald-few', 'Ronald Milton Few', ?, 50, ?)`
-        ).bind(splitId2, expenseId, split2, nowIso)
+        )
       );
+
+      for (let idx = 0; idx < count; idx++) {
+        const m = members[idx];
+        const owed = (baseCents + (idx < remCents ? 1 : 0)) / 100;
+        const pct = idx === count - 1 ? Math.round((100 - basePct * (count - 1)) * 100) / 100 : basePct;
+        postDocStmts.push(
+          env.DB.prepare(
+            `INSERT INTO wayfinder_expense_splits
+             (id, expense_id, user_id, user_name, amount_owed, percentage, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(generateId(), expenseId, m.id, m.name || m.email || 'Collaborator', owed, pct, nowIso)
+        );
+      }
     }
 
-    await env.DB.batch(batchStmts);
+    // Commit document rows & blobs first (respecting D1 batch parameter/statement budgets), then item & expense rows
+    const allStmts = [...docBatchStmts, ...postDocStmts];
+    for (let i = 0; i < allStmts.length; i += 80) {
+      await env.DB.batch(allStmts.slice(i, i + 80));
+    }
 
-    console.log(`[email-worker] imported ${fields.item_type} item ${itemId} for journey ${inbox.journey_id}`);
+    console.log(`[email-worker] imported ${fields.item_type} item ${itemId} (docs=${docIds.length}) for journey ${inbox.journey_id}`);
 
   } catch (err) {
     console.error('[email-worker] fatal error:', err);
-    // Do not re-throw - silently absorb to prevent delivery bounce loops
+    if (env?.DB) {
+      try {
+        await env.DB.prepare(
+          `INSERT INTO wayfinder_audit_events
+           (id, user_id, journey_id, entity_type, entity_id, action, target_email, metadata_summary, details)
+           VALUES (?, ?, ?, 'email_inbound', ?, 'email_import_failed', ?, ?, ?)`
+        ).bind(
+          generateId(),
+          inbox?.user_id || null,
+          inbox?.journey_id || null,
+          messageId || generateId(),
+          from || null,
+          `subject=${String(subject || '').slice(0, 120)}; error=${String(err?.message || 'Unknown').slice(0, 140)}`,
+          JSON.stringify({
+            from: from || null,
+            subject: String(subject || '').slice(0, 200),
+            message_id: messageId || null,
+            error: String(err?.message || 'Processing failed').slice(0, 300),
+          })
+        ).run();
+      } catch (auditErr) {
+        console.error('[email-worker] failed to persist audit failure event:', auditErr);
+      }
+    }
+    // Do not re-throw - silently absorb after audit logging to prevent delivery bounce loops
   }
 }

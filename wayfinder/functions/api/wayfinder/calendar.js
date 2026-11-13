@@ -8,25 +8,8 @@
 // 5. GET  /api/wayfinder/calendar/feed/:token.ics - Live public subscription feed
 
 import { generateId } from '../../utils/id.js';
+import { resolveAgendaAccess, isMember } from '../../utils/agendaAccess.js';
 import { polandJourney } from '../../../src/data/poland-2026.js';
-
-// Curated accommodations fallback
-const CURATED_ACCOMMODATIONS = [
-  {
-    id: 'wroclaw-altus-palace-2026',
-    title: 'Altus Palace Wrocław',
-    hotel_name: 'Altus Palace Wrocław',
-    location: 'Wierzbowa 15, 50-056 Wrocław, Poland',
-    guest_name: 'Jon',
-    check_in_date: '2026-12-07',
-    check_in_time: '15:00',
-    check_out_date: '2026-12-09',
-    check_out_time: '11:00',
-    phone: '+48 717475000',
-    email: 'info@hotelaltuspalace.pl',
-    website_url: 'https://www.hotelaltuspalace.pl'
-  }
-];
 
 // RFC 5545 Line Folding: Max 75 octets per line, folded with CRLF + space
 function foldLine(line) {
@@ -231,13 +214,27 @@ function isGenericHotelPlaceholder(event) {
 // Assemble all events for a journey and optional user
 async function gatherEvents({ db, journeyId = 'poland-christmas-2026', userId = null }) {
   const events = [];
-  const publicDays = polandJourney.itinerary || [];
+  let canonicalJourneyId = journeyId;
+  let access = { journey: null, role: null };
 
-  // Determine dates with confirmed accommodations to suppress placeholder duplicates
-  const confirmedHotelDates = new Set();
-  for (const acc of CURATED_ACCOMMODATIONS) {
-    if (acc.check_in_date) confirmedHotelDates.add(acc.check_in_date);
+  if (db) {
+    try {
+      access = await resolveAgendaAccess({ DB: db }, journeyId, userId ? { userId } : null);
+      if (access.journey) {
+        canonicalJourneyId = access.journey.id;
+        if (!isMember(access.role) && access.journey.visibility !== 'public') {
+          return [];
+        }
+      }
+    } catch (e) {
+      console.warn('[calendar] failed resolving agenda access:', e.message);
+    }
   }
+
+  const isPolandDefault = canonicalJourneyId === 'poland-christmas-2026' ||
+    access.journey?.slug === 'poland-christmas-2026' ||
+    journeyId === 'poland-christmas-2026';
+  const publicDays = isPolandDefault ? (polandJourney.itinerary || []) : [];
 
   // 1. Public Itinerary Days (Day Summary & Schedule Milestones)
   for (const day of publicDays) {
@@ -256,11 +253,6 @@ async function gatherEvents({ db, journeyId = 'poland-christmas-2026', userId = 
     // Scheduled activities for the day
     if (Array.isArray(day.schedule)) {
       day.schedule.forEach((item, idx) => {
-        // Suppress generic hotel placeholder if confirmed accommodation exists on this date
-        if (confirmedHotelDates.has(day.date) && isGenericHotelPlaceholder(item)) {
-          return;
-        }
-
         const itemType = (item.itemType || 'activity').toLowerCase();
         let durationMins = 90;
         let categoryTag = 'ACTIVITY';
@@ -304,94 +296,31 @@ async function gatherEvents({ db, journeyId = 'poland-christmas-2026', userId = 
     }
   }
 
-  // 2. Flight DL9208 Inbound Touchdown Event
-  if (polandJourney.flightArrival) {
-    const f = polandJourney.flightArrival;
-    const fArrivalDate = f.arrivalDate || '2026-12-04';
-    const fArrivalTime = f.arrivalTime || '13:30';
-    const { endDate: fEndDate, endTime: fEndTime } = addMinutesWithDate(fArrivalDate, fArrivalTime, 60);
-    events.push({
-      uid: 'wf-poland2026-flight-dl9208@techtrekgt.com',
-      allDay: false,
-      startDate: fArrivalDate,
-      startTime: fArrivalTime,
-      endDate: fEndDate,
-      endTime: fEndTime,
-      summary: `Flight Arrival: ${f.flightNumber} (${f.carrier})`,
-      description: `Flight: ${f.flightNumber}\nRoute: ${f.inboundLeg2}\nConfirmation: ${f.confirmationNumber}\nPassengers: ${f.passengers}\nLayover: ${f.layover}\n${f.checkInSync}`,
-      location: `${f.airport} (${f.airportCode})`,
-      categories: 'FLIGHT,ARRIVAL'
-    });
-  }
-
-  // 3. Authenticated User's Private D1 Itinerary Items
+  // 2. Authenticated Agenda Private D1 Itinerary Items
   let privateD1Items = [];
-  if (db && userId) {
+  if (db && userId && (!access.journey || isMember(access.role))) {
     try {
-      const d1Items = await db.prepare(`
-        SELECT * FROM wayfinder_itinerary_items
-        WHERE (journey_id = ? OR journey_id = 'poland-christmas-2026')
-          AND user_id = ?
-          AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
-        ORDER BY local_date ASC, local_time ASC
-      `).bind(journeyId, userId).all();
+      const d1Items = access.journey
+        ? await db.prepare(`
+            SELECT * FROM wayfinder_itinerary_items
+            WHERE (journey_id = ? OR journey_id = ?)
+              AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
+            ORDER BY local_date ASC, local_time ASC
+          `).bind(canonicalJourneyId, journeyId).all()
+        : await db.prepare(`
+            SELECT * FROM wayfinder_itinerary_items
+            WHERE journey_id = ?
+              AND user_id = ?
+              AND (notes IS NULL OR notes NOT LIKE '%gmail:%')
+            ORDER BY local_date ASC, local_time ASC
+          `).bind(journeyId, userId).all();
       privateD1Items = d1Items.results || [];
     } catch (e) {
       console.warn('[calendar] failed to fetch private D1 itinerary items:', e.message);
     }
   }
 
-  // 4. Accommodations (Altus Palace Wrocław & Curated Hotels)
-  // Deduplicate against user's private hotel bookings to prevent duplicate calendar check-in events
-  for (const acc of CURATED_ACCOMMODATIONS) {
-    const accTitle = (acc.hotel_name || acc.title || '').toLowerCase();
-    const alreadyCoveredByD1 = privateD1Items.some((item) => {
-      const type = (item.item_type || '').toLowerCase();
-      if (type !== 'hotel') return false;
-      const title = (item.title || item.location || '').toLowerCase();
-      return (
-        (accTitle.includes('altus') && title.includes('altus')) ||
-        (accTitle && title.includes(accTitle)) ||
-        (title && accTitle.includes(title))
-      );
-    });
-
-    if (alreadyCoveredByD1) continue;
-
-    // Check-in event
-    const checkInTime = acc.check_in_time || '15:00';
-    const { endDate: ciEndDate, endTime: ciEndTime } = addMinutesWithDate(acc.check_in_date, checkInTime, 60);
-    events.push({
-      uid: `wf-hotel-checkin-${acc.id}@techtrekgt.com`,
-      allDay: false,
-      startDate: acc.check_in_date,
-      startTime: checkInTime,
-      endDate: ciEndDate,
-      endTime: ciEndTime,
-      summary: `Hotel Check-in: ${acc.title}`,
-      description: `Accommodation: ${acc.hotel_name}\nGuest: ${acc.guest_name}\nPhone: ${acc.phone}\nEmail: ${acc.email}\nWeb: ${acc.website_url}`,
-      location: acc.location,
-      categories: 'HOTEL,LODGING'
-    });
-
-    // Check-out event
-    const checkOutTime = acc.check_out_time || '11:00';
-    const { endDate: coEndDate, endTime: coEndTime } = addMinutesWithDate(acc.check_out_date, checkOutTime, 30);
-    events.push({
-      uid: `wf-hotel-checkout-${acc.id}@techtrekgt.com`,
-      allDay: false,
-      startDate: acc.check_out_date,
-      startTime: checkOutTime,
-      endDate: coEndDate,
-      endTime: coEndTime,
-      summary: `Hotel Check-out: ${acc.title}`,
-      description: `Departing ${acc.hotel_name}.\nCheck-out deadline: ${checkOutTime}`,
-      location: acc.location,
-      categories: 'HOTEL,LODGING'
-    });
-  }
-
-  // 5. Append Private D1 Itinerary Events
+  // 3. Append Private D1 Itinerary Events
   for (const item of privateD1Items) {
     if (!item.local_date) continue;
 
@@ -485,7 +414,6 @@ export async function handleCalendarFeed(context, url, method) {
       `).bind(token).first();
     } catch (lookupErr) {
       if (String(lookupErr?.message || '').includes('no such table')) {
-        await ensureCalendarTable(env.DB);
         tokenRow = null;
       } else {
         throw lookupErr;
@@ -588,7 +516,12 @@ export async function handleCalendarToken(context, url, method) {
       await ensureCalendarTable(env.DB);
     }
 
-    const journeyId = url.searchParams.get('journey_id') || 'poland-christmas-2026';
+    const requestedJourneyId = url.searchParams.get('journey_id') || 'poland-christmas-2026';
+    const access = await resolveAgendaAccess(env, requestedJourneyId, user);
+    if (!access.journey || !isMember(access.role)) {
+      return json({ error: 'Journey not found' }, 404);
+    }
+    const journeyId = access.journey.id;
 
     // GET /api/wayfinder/calendar/token - Fetch active token and subscribe URLs
     if (method === 'GET') {
@@ -596,11 +529,10 @@ export async function handleCalendarToken(context, url, method) {
       try {
         existing = await env.DB.prepare(`
           SELECT * FROM wayfinder_calendar_tokens
-          WHERE user_id = ? AND journey_id = ?
-        `).bind(user.userId, journeyId).first();
+          WHERE user_id = ? AND (journey_id = ? OR journey_id = ?)
+        `).bind(user.userId, journeyId, requestedJourneyId).first();
       } catch (getErr) {
         if (String(getErr?.message || '').includes('no such table')) {
-          await ensureCalendarTable(env.DB);
           existing = null;
         } else {
           throw getErr;
@@ -637,8 +569,8 @@ export async function handleCalendarToken(context, url, method) {
 
       const existing = await env.DB.prepare(`
         SELECT * FROM wayfinder_calendar_tokens
-        WHERE user_id = ? AND journey_id = ?
-      `).bind(user.userId, journeyId).first();
+        WHERE user_id = ? AND (journey_id = ? OR journey_id = ?)
+      `).bind(user.userId, journeyId, requestedJourneyId).first();
 
       if (existing && !rotate) {
         // Return existing active token
@@ -690,8 +622,8 @@ export async function handleCalendarToken(context, url, method) {
       await env.DB.prepare(`
         UPDATE wayfinder_calendar_tokens
         SET is_active = 0
-        WHERE user_id = ? AND journey_id = ?
-      `).bind(user.userId, journeyId).run();
+        WHERE user_id = ? AND (journey_id = ? OR journey_id = ?)
+      `).bind(user.userId, journeyId, requestedJourneyId).run();
 
       return json({ success: true, revoked: true });
     }
@@ -699,7 +631,7 @@ export async function handleCalendarToken(context, url, method) {
     return json({ error: `Method ${method} not allowed` }, 405);
   } catch (err) {
     console.error('[calendar] token error:', err);
-    return json({ error: 'Internal server error', details: err.message }, 500);
+    return json({ error: 'Internal server error' }, 500);
   }
 }
 

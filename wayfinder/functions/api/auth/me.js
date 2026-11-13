@@ -1,61 +1,37 @@
-import { verifyToken, getTokenFromRequest } from '../../utils/auth.js';
+import { authenticateRequest, buildClearCookieHeader } from '../../utils/auth.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
 
   try {
-    const token = getTokenFromRequest(request);
-    if (!token) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Missing token' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    const payload = await verifyToken(token, env.JWT_SECRET);
-
-    if (!payload) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or expired token' }), {
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Set-Cookie': 'auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0'
-        }
-      });
-    }
-
-    let userDetails = {
-      id: payload.userId,
-      email: payload.email,
-      name: payload.name,
-      role: payload.role || 'user',
-      isAdmin: Boolean(payload.isAdmin || payload.role === 'admin'),
-      apiKeyEnabled: Boolean(payload.apiKeyEnabled || payload.isAdmin || payload.role === 'admin')
-    };
-    if (env.DB) {
-      try {
-        const dbUser = await env.DB.prepare('SELECT id, email, name, role, is_admin, api_key_enabled, security_question, security_answer_hash FROM users WHERE id = ?').bind(payload.userId).first();
-        if (dbUser) {
-          const isAdmin = Boolean(dbUser.is_admin === 1 || dbUser.role === 'admin');
-          userDetails = {
-            id: dbUser.id,
-            email: dbUser.email,
-            name: dbUser.name,
-            role: dbUser.role || 'user',
-            isAdmin,
-            apiKeyEnabled: Boolean(dbUser.api_key_enabled === 1 || isAdmin),
-            securityQuestion: dbUser.security_question || null,
-            hasSecurityQuestion: Boolean(dbUser.security_question && dbUser.security_answer_hash)
-          };
-        }
-      } catch (e) {
-        // Fallback to JWT payload if query fails
+    const auth = await authenticateRequest(request, env);
+    if (!auth.ok) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (auth.clearCookie) {
+        headers['Set-Cookie'] = buildClearCookieHeader();
       }
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
+        headers
+      });
     }
+
+    const dbUser = auth.dbUser;
+    const isAdmin = Boolean(dbUser.is_admin === 1 || dbUser.role === 'admin');
+    const userDetails = {
+      id: dbUser.id,
+      email: dbUser.email,
+      name: dbUser.name,
+      role: dbUser.role || 'user',
+      isAdmin,
+      apiKeyEnabled: Boolean(dbUser.api_key_enabled === 1 || isAdmin),
+      securityQuestion: dbUser.security_question || null,
+      hasSecurityQuestion: Boolean(dbUser.security_question && dbUser.security_answer_hash)
+    };
 
     return new Response(JSON.stringify({
       success: true,
-      user: userDetails,
-      householdId: payload.householdId
+      user: userDetails
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

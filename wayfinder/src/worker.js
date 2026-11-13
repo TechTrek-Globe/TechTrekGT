@@ -3,7 +3,7 @@
 // - Routes /api/wayfinder/* to wayfinder API handlers (auth required)
 // - Serves SPA assets for all other paths
 
-import { verifyToken, getTokenFromRequest } from '../functions/utils/auth.js';
+import { authenticateRequest, buildClearCookieHeader } from '../functions/utils/auth.js';
 import { onRequestPost as loginHandler }  from '../functions/api/auth/login.js';
 import { onRequestPost as logoutHandler } from '../functions/api/auth/logout.js';
 import { onRequestGet  as meHandler }     from '../functions/api/auth/me.js';
@@ -29,6 +29,7 @@ import { handleExpenses }      from '../functions/api/wayfinder/expenses.js';
 import { handleInboundEmail }  from '../functions/api/wayfinder/email-worker.js';
 import { handleAdmin }         from '../functions/api/wayfinder/admin.js';
 import { handleAgendaShares } from '../functions/api/wayfinder/agenda-shares.js';
+import { handleBookmarks }    from '../functions/api/wayfinder/bookmarks.js';
 
 const ALLOWED_ORIGINS = [
   'https://techtrekgt.com',
@@ -44,6 +45,7 @@ function corsHeaders(origin) {
     'Access-Control-Allow-Headers':     'Content-Type, Authorization, X-Idempotency-Key',
     'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Max-Age':           '86400',
+    'Vary':                             'Origin',
   };
 }
 
@@ -81,22 +83,70 @@ function addSecurityHeaders(response, isLocal = false) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers: h });
 }
 
+function withAssetCacheHeaders(response, subPath) {
+  const ct = response.headers.get('content-type') || '';
+  if (ct.includes('text/html') || (!response.ok && response.status !== 304)) {
+    return response;
+  }
+  const h = new Headers(response.headers);
+  if (subPath.startsWith('/assets/')) {
+    h.set('Cache-Control', 'public, max-age=31536000, immutable');
+  } else if (
+    subPath.startsWith('/Poland-2026/images/') ||
+    /^\/(?:favicon|icon-|apple-touch-icon|manifest|robots\.txt)/.test(subPath)
+  ) {
+    h.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: h,
+  });
+}
+
+function applyResponseHeaders(response, origin, isLocal, includeCors = false) {
+  const secResp = addSecurityHeaders(response, isLocal);
+  const h = new Headers(secResp.headers);
+  if (includeCors) {
+    for (const [key, val] of Object.entries(corsHeaders(origin))) {
+      h.set(key, val);
+    }
+  } else if (!(h.get('cache-control') || '').includes('public')) {
+    h.set('Vary', 'Origin');
+  }
+  return new Response(secResp.body, {
+    status: secResp.status,
+    statusText: secResp.statusText,
+    headers: h,
+  });
+}
+
 async function requireAuth(request, env) {
-  const token = getTokenFromRequest(request);
-  const payload = await verifyToken(token, env.JWT_SECRET);
-  if (!payload) {
+  const auth = await authenticateRequest(request, env);
+  if (!auth.ok) {
     const headers = { 'Content-Type': 'application/json' };
-    if (token) {
-      headers['Set-Cookie'] = 'auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0';
+    if (auth.clearCookie) {
+      headers['Set-Cookie'] = buildClearCookieHeader();
     }
     return {
       ok: false,
-      error: new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
+      error: new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
         headers,
       }),
     };
   }
+  const dbUser = auth.dbUser;
+  const isAdmin = dbUser ? Boolean(dbUser.is_admin === 1 || dbUser.role === 'admin') : Boolean(auth.payload.isAdmin);
+  const payload = dbUser ? {
+    ...auth.payload,
+    userId: dbUser.id,
+    email: dbUser.email,
+    name: dbUser.name,
+    role: dbUser.role || 'user',
+    isAdmin,
+    apiKeyEnabled: Boolean(dbUser.api_key_enabled === 1 || isAdmin),
+  } : auth.payload;
   return { ok: true, payload };
 }
 
@@ -106,11 +156,7 @@ export default {
     const path   = url.pathname;
     const method = request.method;
     const origin = request.headers.get('Origin') || '';
-    const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
-
-    if (method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders(origin) });
-    }
+    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || origin.includes('localhost') || origin.includes('127.0.0.1');
 
     // Normalize subpath /wayfinder or /wayfinder/ for API routing
     let apiPath = path;
@@ -119,6 +165,13 @@ export default {
     } else if (apiPath === '/wayfinder/api') {
       apiPath = '/api';
     }
+    const isApiRoute = apiPath.startsWith('/api/');
+
+    if (method === 'OPTIONS') {
+      return applyResponseHeaders(new Response(null, { status: 204 }), origin, isLocal, true);
+    }
+
+    const execute = async () => {
 
     // --- Public auth routes ---
     if (apiPath === '/api/auth/login'  && method === 'POST') return loginHandler({ request, env, ctx });
@@ -164,12 +217,6 @@ export default {
         const user = auth.payload;
         return handleCalendarExport({ request, env, ctx, user }, url, method);
       }
-      if (apiPath.startsWith('/api/wayfinder/expenses') && method === 'GET') {
-        const auth = await requireAuth(request, env);
-        const user = auth.ok ? auth.payload : null;
-        return handleExpenses({ request, env, ctx, user }, url, method);
-      }
-
       const auth = await requireAuth(request, env);
       if (!auth.ok) return auth.error;
 
@@ -186,6 +233,7 @@ export default {
       if (apiPath.startsWith('/api/wayfinder/packing'))        return handlePacking(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/expenses'))       return handleExpenses(context, url, method);
       if (apiPath.startsWith('/api/wayfinder/calendar'))       return handleCalendarToken(context, url, method);
+      if (apiPath.startsWith('/api/wayfinder/bookmarks'))      return handleBookmarks(context, url, method);
 
       return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,
@@ -195,14 +243,28 @@ export default {
 
     // --- Serve SPA assets ---
     let assetReq = request;
+    let subPath = path;
     if (path === '/wayfinder' || path.startsWith('/wayfinder/')) {
       const assetUrl = new URL(request.url);
-      const subPath = path.slice('/wayfinder'.length);
-      assetUrl.pathname = subPath === '' ? '/' : subPath;
+      subPath = path.slice('/wayfinder'.length) || '/';
+      assetUrl.pathname = subPath;
       assetReq = new Request(assetUrl.toString(), request);
     }
-    const assetResp = await env.ASSETS.fetch(assetReq);
-    return addSecurityHeaders(assetResp, isLocal);
+    const assetRes = await env.ASSETS.fetch(assetReq);
+    return withAssetCacheHeaders(assetRes, subPath);
+    };
+
+    try {
+      const response = await execute();
+      return applyResponseHeaders(response, origin, isLocal, isApiRoute);
+    } catch (err) {
+      console.error('[worker] Unhandled request error:', err);
+      const errResp = new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return applyResponseHeaders(errResp, origin, isLocal, isApiRoute);
+    }
   },
 
   // Cloudflare Email Routing handler

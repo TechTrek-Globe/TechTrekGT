@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, Lock, Mail, User, UserPlus, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useWayfinder } from '../context/WayfinderContext';
 import { getApiUrl } from '../utils/api';
 import { PRESET_SECURITY_QUESTIONS } from './AuthModal';
 
@@ -40,6 +41,7 @@ function readToken() {
 
 export function InviteClaim() {
   const { user, isAuthenticated, isLoading, login, register, logout } = useAuth();
+  const { refreshAgendaAccess } = useWayfinder();
   const [token] = useState(readToken);
   const [info, setInfo] = useState(null);
   const [failure, setFailure] = useState('');
@@ -102,6 +104,7 @@ export function InviteClaim() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Could not accept invitation (HTTP ${res.status})`);
       try { sessionStorage.removeItem(PENDING_KEY); } catch (e) { /* ignore */ }
+      await refreshAgendaAccess();
       setClaimed(true);
       setTimeout(() => navigate(SHARED_AGENDA_PATH), 900);
     } catch (err) {

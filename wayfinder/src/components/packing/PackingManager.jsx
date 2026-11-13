@@ -42,17 +42,51 @@ export function PackingManager() {
   const pendingPutTimersRef = useRef(new Map());
   const pendingPutPayloadsRef = useRef(new Map());
 
-  useEffect(() => {
+  const flushPendingPuts = useCallback((useKeepalive = false) => {
     const timers = pendingPutTimersRef.current;
     const payloads = pendingPutPayloadsRef.current;
-    return () => {
-      for (const timerId of timers.values()) {
-        clearTimeout(timerId);
-      }
-      timers.clear();
-      payloads.clear();
-    };
+    if (payloads.size === 0) return;
+
+    const entries = Array.from(payloads.entries());
+    for (const [itemId, finalPatch] of entries) {
+      const timerId = timers.get(itemId);
+      if (timerId) clearTimeout(timerId);
+      timers.delete(itemId);
+      payloads.delete(itemId);
+      if (!finalPatch) continue;
+
+      void resilientFetch(getApiUrl(`/api/wayfinder/packing/${itemId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        keepalive: Boolean(useKeepalive),
+        body: JSON.stringify(finalPatch)
+      }, {
+        entityType: 'packing',
+        entityId: itemId,
+        action: 'Flush pending packing update'
+      }).catch((err) => {
+        console.error('Failed to flush packing item:', err);
+      });
+    }
   }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPendingPuts(true);
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+      flushPendingPuts(true);
+    };
+  }, [flushPendingPuts]);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('all'); // all, open, packed

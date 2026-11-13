@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, CalendarClock, Backpack, Coins, ShieldCheck, Lock } from 'lucide-react';
+import { Home, CalendarClock, Backpack, Coins, ShieldCheck, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useWayfinder } from '../context/WayfinderContext';
 
@@ -34,15 +34,20 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
   const pathOnly = (currentPath || '').split('?')[0].split('#')[0].toLowerCase();
   const isDocs = pathOnly.includes('/documents');
   const isPacking = pathOnly.includes('/packing');
-  const isSchedule = currentPath.includes('scroll=journey-sequence') || currentPath.includes('#journey-sequence') || (pathOnly.startsWith(`${BASE}/private`) && !isDocs && !isPacking);
-  const isCities = !isSchedule && (pathOnly.startsWith(`${BASE}/cities`) || pathOnly === BASE || pathOnly === `${BASE}/` || pathOnly === '/wayfinder' || pathOnly === '/wayfinder/' || pathOnly === '/');
-  const isPractical = pathOnly.startsWith(`${BASE}/practical`);
+  const isExpenses = pathOnly.includes('/expenses') || pathOnly.includes('/budget') || pathOnly.includes('/ledger');
   const { isAuthenticated, setIsAuthModalOpen } = useAuth();
   const { agendaAccess } = useWayfinder();
+  const isSchedule = currentPath.includes('scroll=journey-sequence') || currentPath.includes('#journey-sequence') || (pathOnly.startsWith(`${BASE}/private`) && !isDocs && !isPacking && !isExpenses);
+  const isHome = !isSchedule && (pathOnly.startsWith(`${BASE}/cities`) || pathOnly === BASE || pathOnly === `${BASE}/` || pathOnly === '/wayfinder' || pathOnly === '/wayfinder/' || pathOnly === '/');
+  const isPractical = pathOnly.startsWith(`${BASE}/practical`);
   const hubPath = agendaAccess.permissions.documents ? `${BASE}/private/documents` : `${BASE}/private`;
 
   const handleScheduleClick = (e) => {
     e.preventDefault();
+    if (isAuthenticated) {
+      pushRoute(e, `${BASE}/private`);
+      return;
+    }
     const isMain = pathOnly === BASE || pathOnly === `${BASE}/` || pathOnly === '/wayfinder' || pathOnly === '/wayfinder/' || pathOnly === '/';
     if (isMain) {
       const el = document.getElementById('journey-sequence');
@@ -63,16 +68,16 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
     >
       <div className="flex items-stretch gap-1 px-2 py-1.5">
         <TabItem
-          icon={MapPin}
-          label="Cities"
+          icon={Home}
+          label="Home"
           href={BASE}
-          isActive={isCities}
+          isActive={isHome}
           onClick={(e) => pushRoute(e, BASE)}
         />
         <TabItem
           icon={CalendarClock}
           label="Schedule"
-          href={`${BASE}?scroll=journey-sequence`}
+          href={isAuthenticated ? `${BASE}/private` : `${BASE}?scroll=journey-sequence`}
           isActive={isSchedule}
           onClick={handleScheduleClick}
         />
@@ -96,7 +101,7 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
             icon={ShieldCheck}
             label="Hub"
             href={hubPath}
-            isActive={isDocs || isPacking}
+            isActive={isDocs || isPacking || isExpenses}
             onClick={(e) => pushRoute(e, hubPath)}
             colorActive="text-sky-400"
             bgActive="bg-sky-500/15"

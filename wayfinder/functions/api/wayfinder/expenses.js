@@ -1,13 +1,36 @@
 // TechTrek Wayfinder - Multi-Currency Expense Ledger API
 // Manages trip expenses, participant split allocations, and settle-up payments.
 
-import { resolveAgendaAccess, canEdit, canViewSensitive } from '../../utils/agendaAccess.js';
+import { resolveAgendaAccess, canEdit, canViewSensitive, getAgendaMembers } from '../../utils/agendaAccess.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'Content-Type': 'application/json' }
   });
+}
+
+function chunkArray(items, size = 80) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+function buildEqualSplits(totalAmount, members) {
+  if (!Array.isArray(members) || members.length === 0) return [];
+  const totalCents = Math.round(Number(totalAmount || 0) * 100);
+  const count = members.length;
+  const baseCents = Math.floor(totalCents / count);
+  const remCents = totalCents - baseCents * count;
+  const basePct = Math.round((10000 / count)) / 100;
+  return members.map((m, idx) => ({
+    userId: m.id,
+    userName: m.name || m.email || 'Member',
+    amount: (baseCents + (idx < remCents ? 1 : 0)) / 100,
+    pct: idx === count - 1 ? Math.round((100 - basePct * (count - 1)) * 100) / 100 : basePct,
+  }));
 }
 
 // Ensure database tables exist (isolate-scoped self-healing without hot-path ALTER TABLE)
@@ -131,24 +154,26 @@ export async function handleExpenses(context, url, method) {
           SELECT * FROM wayfinder_expenses
           WHERE journey_id = ? OR journey_id = ?
           ORDER BY created_at DESC
-        `).bind(journeyId, journey.id).all(),
+        `).bind(journey.id, journey.slug).all(),
         db.prepare(`
           SELECT * FROM wayfinder_expense_settlements
           WHERE journey_id = ? OR journey_id = ?
           ORDER BY settled_date DESC, created_at DESC
-        `).bind(journeyId, journey.id).all()
+        `).bind(journey.id, journey.slug).all()
       ]);
 
       const expenses = expensesQuery.results || [];
 
-      // Fetch all splits for these expenses
+      // Fetch all splits for these expenses in SQLite bind-safe chunks
       let splits = [];
       if (expenses.length > 0) {
-        const splitsQuery = await db.prepare(`
-          SELECT * FROM wayfinder_expense_splits
-          WHERE expense_id IN (${expenses.map(() => '?').join(',')})
-        `).bind(...expenses.map(e => e.id)).all();
-        splits = splitsQuery.results || [];
+        for (const idChunk of chunkArray(expenses.map(e => e.id), 80)) {
+          const splitsQuery = await db.prepare(`
+            SELECT * FROM wayfinder_expense_splits
+            WHERE expense_id IN (${idChunk.map(() => '?').join(',')})
+          `).bind(...idChunk).all();
+          splits.push(...(splitsQuery.results || []));
+        }
       }
 
       // Group splits by expense_id
@@ -164,7 +189,7 @@ export async function handleExpenses(context, url, method) {
       }));
 
       return json({
-        journey_id: journeyId,
+        journey_id: journey.id,
         expenses: enrichedExpenses,
         settlements: settlementsQuery.results || []
       });
@@ -202,7 +227,7 @@ export async function handleExpenses(context, url, method) {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, ?, ?, datetime('now'))
         `).bind(
           settleId,
-          journeyId,
+          journey.id,
           from_user_id,
           from_user_name,
           to_user_id,
@@ -222,8 +247,8 @@ export async function handleExpenses(context, url, method) {
           db.prepare(`
             UPDATE wayfinder_expense_splits 
             SET is_settled = 1, settled_at = datetime('now'), settle_method = ?
-            WHERE id = ? AND expense_id IN (SELECT id FROM wayfinder_expenses WHERE journey_id = ?)
-          `).bind(payMethod, split_id, journey.id)
+            WHERE id = ? AND expense_id IN (SELECT id FROM wayfinder_expenses WHERE journey_id = ? OR journey_id = ?)
+          `).bind(payMethod, split_id, journey.id, journey.slug)
         );
       }
 
@@ -241,14 +266,14 @@ export async function handleExpenses(context, url, method) {
 
       if (splitId) {
         await db.batch([
-          db.prepare('UPDATE wayfinder_expense_splits SET is_settled = 0, settled_at = NULL, settle_method = NULL WHERE id = ? AND expense_id IN (SELECT id FROM wayfinder_expenses WHERE journey_id = ?)').bind(splitId, journey.id),
-          db.prepare('DELETE FROM wayfinder_expense_settlements WHERE split_id = ? AND journey_id = ?').bind(splitId, journey.id)
+          db.prepare('UPDATE wayfinder_expense_splits SET is_settled = 0, settled_at = NULL, settle_method = NULL WHERE id = ? AND expense_id IN (SELECT id FROM wayfinder_expenses WHERE journey_id = ? OR journey_id = ?)').bind(splitId, journey.id, journey.slug),
+          db.prepare('DELETE FROM wayfinder_expense_settlements WHERE split_id = ? AND (journey_id = ? OR journey_id = ?)').bind(splitId, journey.id, journey.slug)
         ]);
         return json({ success: true, un_settled_split: splitId });
       }
 
       if (settleId) {
-        const stl = await db.prepare('SELECT * FROM wayfinder_expense_settlements WHERE id = ? AND journey_id = ?').bind(settleId, journey.id).first();
+        const stl = await db.prepare('SELECT * FROM wayfinder_expense_settlements WHERE id = ? AND (journey_id = ? OR journey_id = ?)').bind(settleId, journey.id, journey.slug).first();
         if (!stl) return json({ error: 'Settlement not found' }, 404);
         const delStmts = [];
         if (stl && stl.split_id) {
@@ -262,113 +287,91 @@ export async function handleExpenses(context, url, method) {
       return json({ error: 'settlement_id or split_id required' }, 400);
     }
 
-    // 3. POST /api/wayfinder/expenses/preset - Seed curated trip expenses
+    // 3. POST /api/wayfinder/expenses/preset - Seed sample planning expenses for active members
     if (method === 'POST' && isPresetAction) {
       if (!canEdit(access.role)) {
         return json({ error: 'Permission denied: viewers have read-only access' }, 403);
       }
 
+      const rawMembers = await getAgendaMembers(env, journey);
+      const members = rawMembers.length > 0
+        ? rawMembers
+        : [{ id: user.userId, name: user.name || user.email || 'Traveler', role: 'owner' }];
+      const primaryPayer = members.find((m) => m.id === user.userId) || members[0];
+      const secondaryPayer = members[1] || primaryPayer;
+
       const presets = [
         {
-          desc: 'Delta Transatlantic Flights: ATL -> AMS -> KRK (x2 Pax)',
+          desc: 'Transatlantic Airfare (Example Template)',
           cat: 'flight',
-          amount: 1980.00,
+          amount: 1200.00,
           cur: 'USD',
-          paidBy: 'Ronald Milton Few',
-          payerId: 'usr-ronald-few',
-          site: 'Delta.com',
-          method: 'Amex Delta SkyMiles',
-          splits: [
-            { userId: user.userId, userName: 'Jonathan Kemp', amount: 990.00, pct: 50 },
-            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 990.00, pct: 50 }
-          ]
+          payer: secondaryPayer,
+          site: 'Airline Direct',
+          method: 'Credit Card'
         },
         {
-          desc: 'Hotel Experior Boutique Kraków (3 Nights Dec 4-7)',
+          desc: 'Krakow City Center Hotel Stay (Example Template)',
           cat: 'lodging',
-          amount: 366.43,
-          cur: 'USD',
-          paidBy: 'Jonathan Kemp',
-          payerId: user.userId,
-          site: 'Booking.com',
-          method: 'Visa (*4123)',
-          splits: [
-            { userId: user.userId, userName: 'Jonathan Kemp', amount: 183.22, pct: 50 },
-            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 183.21, pct: 50 }
-          ]
-        },
-        {
-          desc: 'Hotel Altus Palace Wrocław (2 Nights Dec 7-9)',
-          cat: 'lodging',
-          amount: 2400.00,
+          amount: 1400.00,
           cur: 'PLN',
-          paidBy: 'Jonathan Kemp',
-          payerId: user.userId,
-          site: 'Hotels.com',
-          method: 'Mastercard',
-          splits: [
-            { userId: user.userId, userName: 'Jonathan Kemp', amount: 1200.00, pct: 50 },
-            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 1200.00, pct: 50 }
-          ]
+          payer: primaryPayer,
+          site: 'Hotel Direct',
+          method: 'Credit Card'
         },
         {
-          desc: 'Hotel Brovaria Poznań (1 Night Dec 9-10)',
+          desc: 'Wroclaw Boutique Stay (Example Template)',
           cat: 'lodging',
-          amount: 450.00,
+          amount: 1100.00,
           cur: 'PLN',
-          paidBy: 'Jonathan Kemp',
-          payerId: user.userId,
-          site: 'Brovaria Direct',
-          method: 'Visa',
-          splits: [
-            { userId: user.userId, userName: 'Jonathan Kemp', amount: 225.00, pct: 50 },
-            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 225.00, pct: 50 }
-          ]
+          payer: primaryPayer,
+          site: 'Booking Platform',
+          method: 'Credit Card'
         },
         {
-          desc: 'GetYourGuide: Auschwitz-Birkenau & Wieliczka Salt Mine Tour',
+          desc: 'PKP Intercity Rail Transfers (Example Template)',
+          cat: 'transit',
+          amount: 320.00,
+          cur: 'PLN',
+          payer: secondaryPayer,
+          site: 'PKP Intercity',
+          method: 'Apple Pay'
+        },
+        {
+          desc: 'Guided Heritage Excursion (Example Template)',
           cat: 'activity',
-          amount: 284.76,
+          amount: 240.00,
           cur: 'USD',
-          paidBy: 'Jonathan Kemp',
-          payerId: user.userId,
-          site: 'GetYourGuide',
-          method: 'Apple Pay',
-          splits: [
-            { userId: user.userId, userName: 'Jonathan Kemp', amount: 142.38, pct: 50 },
-            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 142.38, pct: 50 }
-          ]
+          payer: primaryPayer,
+          site: 'Tour Operator',
+          method: 'Apple Pay'
         },
         {
-          desc: 'Wrocław Rynek Market: Mulled Wine & Grilled Sausage Dinner',
+          desc: 'Christmas Market Dining & Mulled Wine (Example Template)',
           cat: 'dining',
           amount: 140.00,
           cur: 'PLN',
-          paidBy: 'Ronald Milton Few',
-          payerId: 'usr-ronald-few',
-          site: 'Wrocław Christmas Market',
-          method: 'Cash (PLN)',
-          splits: [
-            { userId: user.userId, userName: 'Jonathan Kemp', amount: 70.00, pct: 50 },
-            { userId: 'usr-ronald-few', userName: 'Ronald Milton Few', amount: 70.00, pct: 50 }
-          ]
+          payer: secondaryPayer,
+          site: 'Christmas Market',
+          method: 'Cash (PLN)'
         }
       ];
 
       const existingDescs = await db.prepare(
-        `SELECT description FROM wayfinder_expenses WHERE journey_id = ? OR journey_id = 'poland-christmas-2026'`
-      ).bind(journeyId).all();
+        'SELECT description FROM wayfinder_expenses WHERE journey_id = ? OR journey_id = ?'
+      ).bind(journey.id, journey.slug).all();
       const existingSet = new Set((existingDescs.results || []).map(r => r.description));
       const toInsert = presets.filter(p => !existingSet.has(p.desc));
 
       if (toInsert.length === 0) {
-        return json({ success: true, seeded: 0, message: 'All preset expenses already seeded' });
+        return json({ success: true, seeded: 0, message: 'All template expenses already added' });
       }
 
       const presetStmts = [];
       for (const p of toInsert) {
         const newId = `exp-preset-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-        const payerId = p.payerId || (p.paidBy === 'Jonathan Kemp' ? user.userId : 'usr-ronald-few');
+        const payer = p.payer || primaryPayer;
+        const splits = buildEqualSplits(p.amount, members);
 
         let amountUsd = p.amount;
         if (p.cur === 'PLN') amountUsd = Math.round((p.amount / 4.0) * 100) / 100;
@@ -382,10 +385,10 @@ export async function handleExpenses(context, url, method) {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, datetime('now'))
           `).bind(
             newId,
-            journeyId,
-            payerId,
-            p.paidBy,
-            payerId,
+            journey.id,
+            payer.id,
+            payer.name,
+            payer.id,
             p.cat,
             p.desc,
             p.amount,
@@ -396,7 +399,7 @@ export async function handleExpenses(context, url, method) {
           )
         );
 
-        for (const s of p.splits) {
+        for (const s of splits) {
           const splitId = `spl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
           presetStmts.push(
             db.prepare(`
@@ -408,7 +411,9 @@ export async function handleExpenses(context, url, method) {
         }
       }
 
-      await db.batch(presetStmts);
+      for (const stmtChunk of chunkArray(presetStmts, 80)) {
+        await db.batch(stmtChunk);
+      }
       return json({ success: true, seeded: toInsert.length });
     }
 
@@ -437,7 +442,7 @@ export async function handleExpenses(context, url, method) {
       }
 
       const payerUserId = paid_by_user_id || paid_by_id || user.userId;
-      const payerName = paid_by_name || user.email || 'You';
+      const payerName = paid_by_name || user.name || user.email || 'Member';
       const newExpenseId = `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
       let amountUsd = Number(amount_original);
@@ -452,7 +457,7 @@ export async function handleExpenses(context, url, method) {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, datetime('now'))
         `).bind(
           newExpenseId,
-          journeyId,
+          journey.id,
           payerUserId,
           payerName,
           payerUserId,
@@ -502,7 +507,7 @@ export async function handleExpenses(context, url, method) {
       if (!targetExpenseId) {
         return json({ error: 'expense ID is required for update' }, 400);
       }
-      const ownedExpense = await db.prepare('SELECT id FROM wayfinder_expenses WHERE id = ? AND journey_id = ?').bind(targetExpenseId, journey.id).first();
+      const ownedExpense = await db.prepare('SELECT id FROM wayfinder_expenses WHERE id = ? AND (journey_id = ? OR journey_id = ?)').bind(targetExpenseId, journey.id, journey.slug).first();
       if (!ownedExpense) return json({ error: 'Expense not found' }, 404);
 
       const {
@@ -624,7 +629,7 @@ export async function handleExpenses(context, url, method) {
       if (!canEdit(access.role)) {
         return json({ error: 'Permission denied: viewers have read-only access' }, 403);
       }
-      const ownedExpense = await db.prepare('SELECT id FROM wayfinder_expenses WHERE id = ? AND journey_id = ?').bind(expenseId, journey.id).first();
+      const ownedExpense = await db.prepare('SELECT id FROM wayfinder_expenses WHERE id = ? AND (journey_id = ? OR journey_id = ?)').bind(expenseId, journey.id, journey.slug).first();
       if (!ownedExpense) return json({ error: 'Expense not found' }, 404);
 
       await db.batch([
@@ -638,6 +643,6 @@ export async function handleExpenses(context, url, method) {
     return json({ error: 'Method not allowed' }, 405);
   } catch (err) {
     console.error('[expenses] error:', err);
-    return json({ error: err.message || 'Internal server error' }, 500);
+    return json({ error: 'Internal server error' }, 500);
   }
 }

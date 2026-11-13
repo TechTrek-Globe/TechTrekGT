@@ -42,9 +42,46 @@ const WMO_MAP = {
   99: { main: 'Thunderstorm',  desc: 'Thunderstorm with heavy hail' }
 };
 
-// In-memory module cache (isolate-scoped)
+// In-memory module cache (isolate-scoped, bounded FIFO/LRU)
 const memoryCache = new Map();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const MAX_CACHE_ENTRIES = 100;
+const FETCH_TIMEOUT_MS = 5000;
+
+function getCachedWeather(cacheKey) {
+  const cached = memoryCache.get(cacheKey);
+  if (!cached) return null;
+  if (Date.now() >= cached.expiresAt) {
+    memoryCache.delete(cacheKey);
+    return null;
+  }
+  return cached;
+}
+
+const OPEN_METEO_HEADERS = {
+  Accept: 'application/json',
+  'User-Agent': 'TechTrekGT-Wayfinder/1.0 (+https://techtrekgt.com/wayfinder)',
+};
+
+function setCachedWeather(cacheKey, data, ttlMs = CACHE_TTL_MS, isFallback = false) {
+  const nowMs = Date.now();
+  for (const [key, entry] of memoryCache.entries()) {
+    if (nowMs >= entry.expiresAt) memoryCache.delete(key);
+  }
+  while (memoryCache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    memoryCache.delete(oldestKey);
+  }
+  memoryCache.set(cacheKey, { data, isFallback, expiresAt: nowMs + ttlMs });
+}
+
+function isValidIsoDate(dateStr) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
 
 function normalizeCitySlug(str) {
   if (!str) return 'krakow';
@@ -114,6 +151,13 @@ export async function handleWeather(context, url, method) {
   let lng = parseFloat(url.searchParams.get('lng'));
   const dateParam = url.searchParams.get('date')?.trim(); // YYYY-MM-DD
 
+  if (dateParam && !isValidIsoDate(dateParam)) {
+    return new Response(JSON.stringify({ error: 'Invalid date parameter. Expected YYYY-MM-DD.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   // Fallback to city coordinates if lat/lng are missing
   if (isNaN(lat) || isNaN(lng)) {
     lat = cityConfig.lat;
@@ -128,16 +172,37 @@ export async function handleWeather(context, url, method) {
   }
 
   const cacheKey = `${lat.toFixed(2)}_${lng.toFixed(2)}_${dateParam || 'current'}`;
-  const cached = memoryCache.get(cacheKey);
-  if (cached && Date.now() < cached.expiresAt) {
-    return new Response(JSON.stringify(cached.data), {
+  const cachedEntry = getCachedWeather(cacheKey);
+  if (cachedEntry) {
+    return new Response(JSON.stringify(cachedEntry.data), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=3600, s-maxage=10800',
+        'Cache-Control': cachedEntry.isFallback
+          ? 'public, max-age=300, s-maxage=300'
+          : 'public, max-age=3600, s-maxage=10800',
         'X-Cache': 'HIT-MEMORY',
       },
     });
+  }
+
+  let edgeCache = null;
+  let edgeCacheReq = null;
+  try {
+    if (typeof caches !== 'undefined' && caches.default) {
+      edgeCache = caches.default;
+      const cacheUrl = new URL(url.origin + url.pathname);
+      cacheUrl.searchParams.set('k', cacheKey);
+      edgeCacheReq = new Request(cacheUrl.toString(), { method: 'GET' });
+      const cachedEdge = await edgeCache.match(edgeCacheReq);
+      if (cachedEdge) {
+        const hit = new Response(cachedEdge.body, cachedEdge);
+        hit.headers.set('X-Cache', 'HIT-EDGE');
+        return hit;
+      }
+    }
+  } catch {
+    edgeCache = null;
   }
 
   try {
@@ -146,12 +211,14 @@ export async function handleWeather(context, url, method) {
     let diffDays = targetDate ? (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24) : null;
 
     let result = null;
+    let upstreamStatus = 'none';
 
     // 1. Target within active forecast window (-1 to +16 days) or no date provided
     if (diffDays === null || (diffDays >= -1 && diffDays <= 16)) {
       const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum,precipitation_probability_max,snowfall_sum,sunrise,sunset&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto&forecast_days=16`;
       
-      const res = await fetch(forecastUrl);
+      const res = await fetch(forecastUrl, { headers: OPEN_METEO_HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      upstreamStatus = `forecast-${res.status}`;
       if (res.ok) {
         const data = await res.json();
 
@@ -231,17 +298,25 @@ export async function handleWeather(context, url, method) {
     if (!result && diffDays !== null && diffDays > 16) {
       const targetMonth = targetDate.getUTCMonth(); // 0-11
       const targetDay = targetDate.getUTCDate();
-      
-      // Query Open-Meteo Archive for the same calendar window last year (2025)
-      const refYear = 2025;
-      const refStart = new Date(Date.UTC(refYear, targetMonth, Math.max(1, targetDay - 2)));
-      const refEnd = new Date(Date.UTC(refYear, targetMonth, Math.min(28, targetDay + 2)));
+
+      // Query Open-Meteo Archive for a 5-day calendar window centered on the target day in a completed prior year
+      const refYear = Math.min(now.getUTCFullYear() - 1, targetDate.getUTCFullYear() - 1);
+      const archiveCutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 5));
+      let refStart = new Date(Date.UTC(refYear, targetMonth, targetDay - 2));
+      let refEnd = new Date(Date.UTC(refYear, targetMonth, targetDay + 2));
+      if (refEnd > archiveCutoff) {
+        refEnd = archiveCutoff;
+        if (refStart > refEnd) {
+          refStart = new Date(refEnd.getTime() - 4 * 86400000);
+        }
+      }
       const startStr = refStart.toISOString().slice(0, 10);
       const endStr = refEnd.toISOString().slice(0, 10);
 
       const archiveUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${startStr}&end_date=${endStr}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,weathercode&timezone=auto`;
       
-      const archRes = await fetch(archiveUrl);
+      const archRes = await fetch(archiveUrl, { headers: OPEN_METEO_HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      upstreamStatus = `archive-${archRes.status}`;
 
       if (archRes.ok) {
         const archData = await archRes.json();
@@ -292,6 +367,7 @@ export async function handleWeather(context, url, method) {
     }
 
     // 3. Fallback per-city if external Open-Meteo is temporarily unreachable
+    const fromUpstream = Boolean(result);
     if (!result) {
       result = {
         type: 'climate',
@@ -315,16 +391,34 @@ export async function handleWeather(context, url, method) {
       };
     }
 
-    memoryCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });
+    setCachedWeather(cacheKey, result, fromUpstream ? CACHE_TTL_MS : 5 * 60 * 1000, !fromUpstream);
 
-    return new Response(JSON.stringify(result), {
+    const response = new Response(JSON.stringify(result), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=3600, s-maxage=10800',
-        'X-Cache': 'MISS-FETCH',
+        'Cache-Control': fromUpstream
+          ? 'public, max-age=3600, s-maxage=10800'
+          : 'public, max-age=300, s-maxage=300',
+        'X-Cache': fromUpstream ? 'MISS-FETCH' : 'FALLBACK',
+        'X-Weather-Upstream': upstreamStatus,
       },
     });
+
+    if (edgeCache && edgeCacheReq) {
+      try {
+        const toCache = response.clone();
+        if (context?.ctx?.waitUntil) {
+          context.ctx.waitUntil(edgeCache.put(edgeCacheReq, toCache));
+        } else {
+          await edgeCache.put(edgeCacheReq, toCache);
+        }
+      } catch {
+        // Ignore edge Cache API put failures
+      }
+    }
+
+    return response;
 
   } catch (err) {
     console.error('[weather-worker] error fetching weather:', err);

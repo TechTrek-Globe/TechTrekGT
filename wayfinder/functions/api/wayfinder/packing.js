@@ -39,11 +39,11 @@ const POLAND_WINTER_2026_PRESET = [
   { category: 'electronics', name: '10,000mAh Cold-Resistant USB-C Power Bank', quantity: 1, weight_grams: 240, bag_type: 'carryon', notes: 'Lithium battery - MUST remain in cabin carry-on' },
   { category: 'electronics', name: '65W GaN Multi-Port USB-C Fast Charger', quantity: 1, weight_grams: 160, bag_type: 'carryon', notes: 'Charges laptop, phone, and camera from one hotel socket' },
   { category: 'electronics', name: 'Braided USB-C & Lightning Cables (1m & 2m)', quantity: 3, weight_grams: 35, bag_type: 'carryon', notes: 'Durable nylon braiding resistant to cold-cracking' },
-  { category: 'electronics', name: 'Noise-Canceling Wireless Earbuds / Headphones', quantity: 1, weight_grams: 180, bag_type: 'personal', notes: 'Essential for transatlantic flight DL9208 and PKP trains' },
+  { category: 'electronics', name: 'Noise-Canceling Wireless Earbuds / Headphones', quantity: 1, weight_grams: 180, bag_type: 'personal', notes: 'Essential for transatlantic flights and PKP trains' },
 
   // Travel Documents & Money
   { category: 'documents', name: 'Passport & Waterproof Document Sleeve', quantity: 1, weight_grams: 80, bag_type: 'personal', notes: 'Keep physical document + color photocopy in personal bag' },
-  { category: 'documents', name: 'Delta Flight DL9208 Confirmation & Boarding Passes', quantity: 1, weight_grams: 20, bag_type: 'personal', notes: 'Saved in Wayfinder Vault and printed backup' },
+  { category: 'documents', name: 'Flight Confirmation & Boarding Passes', quantity: 1, weight_grams: 20, bag_type: 'personal', notes: 'Saved in Wayfinder Vault and printed backup' },
   { category: 'documents', name: 'PKP Intercity Rail Reservations (1st Class)', quantity: 1, weight_grams: 20, bag_type: 'personal', notes: 'Printed barcodes for conductor inspection aboard IC/EIP' },
   { category: 'documents', name: 'Emergency Polish Złoty Cash (300-500 PLN)', quantity: 1, weight_grams: 30, bag_type: 'personal', notes: 'For small market stalls, restrooms, and church donations' },
   { category: 'documents', name: 'International Travel Medical Insurance Card', quantity: 1, weight_grams: 25, bag_type: 'personal', notes: 'Emergency assistance contacts and policy number' },
@@ -203,12 +203,13 @@ export async function handlePacking(context, url, method) {
       await ensureTable(env.DB);
     }
 
-    const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId') || 'poland-christmas-2026';
+    const requestedJourneyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId') || 'poland-christmas-2026';
 
     // Collaborator scope: owner + accepted collaborators see each other's packing items
-    const access = await resolveAgendaAccess(env, journeyId, user);
+    const access = await resolveAgendaAccess(env, requestedJourneyId, user);
     if (!access.journey) return json({ error: 'Journey not found' }, 404);
     if (!isMember(access.role)) return json({ error: 'Forbidden' }, 403);
+    const journeyId = access.journey.id;
     const scopeIds = await getCollaboratorIds(env, access.journey);
     const scopeSql = scopeIds.length ? ` OR user_id IN (${scopeIds.map(() => '?').join(',')})` : '';
     if (method !== 'GET' && !canEdit(access.role)) {
@@ -221,12 +222,11 @@ export async function handlePacking(context, url, method) {
       try {
         rows = await env.DB.prepare(
           `SELECT * FROM wayfinder_packing_items 
-           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})
+           WHERE (journey_id = ? OR journey_id = ?) AND (user_id = ? OR is_shared = 1${scopeSql})
            ORDER BY sort_order ASC, category ASC, created_at ASC`
-        ).bind(journeyId, user.userId, ...scopeIds).all();
+        ).bind(journeyId, requestedJourneyId, user.userId, ...scopeIds).all();
       } catch (getErr) {
         if (String(getErr?.message || '').includes('no such table')) {
-          await ensureTable(env.DB);
           rows = { results: [] };
         } else {
           throw getErr;
@@ -253,8 +253,8 @@ export async function handlePacking(context, url, method) {
       if (action === 'apply_preset') {
         const existingRows = await env.DB.prepare(
           `SELECT category, name FROM wayfinder_packing_items
-           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})`
-        ).bind(journeyId, user.userId, ...scopeIds).all();
+           WHERE (journey_id = ? OR journey_id = ?) AND (user_id = ? OR is_shared = 1${scopeSql})`
+        ).bind(journeyId, requestedJourneyId, user.userId, ...scopeIds).all();
 
         const existingKeys = new Set(
           (existingRows.results || []).map(
@@ -291,15 +291,15 @@ export async function handlePacking(context, url, method) {
           );
         }
 
-        if (statements.length > 0) {
-          await env.DB.batch(statements);
+        for (let i = 0; i < statements.length; i += 80) {
+          await env.DB.batch(statements.slice(i, i + 80));
         }
 
         const freshRows = await env.DB.prepare(
           `SELECT * FROM wayfinder_packing_items 
-           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})
+           WHERE (journey_id = ? OR journey_id = ?) AND (user_id = ? OR is_shared = 1${scopeSql})
            ORDER BY sort_order ASC, category ASC, created_at ASC`
-        ).bind(journeyId, user.userId, ...scopeIds).all();
+        ).bind(journeyId, requestedJourneyId, user.userId, ...scopeIds).all();
 
         const items = (freshRows.results || []).map(safeItem);
         return json({
@@ -316,14 +316,14 @@ export async function handlePacking(context, url, method) {
       // Action: Clear All Packed Items
       if (action === 'clear_packed') {
         await env.DB.prepare(
-          `DELETE FROM wayfinder_packing_items WHERE journey_id = ? AND user_id = ? AND is_packed = 1`
-        ).bind(journeyId, user.userId).run();
+          `DELETE FROM wayfinder_packing_items WHERE (journey_id = ? OR journey_id = ?) AND user_id = ? AND is_packed = 1`
+        ).bind(journeyId, requestedJourneyId, user.userId).run();
 
         const freshRows = await env.DB.prepare(
           `SELECT * FROM wayfinder_packing_items 
-           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})
+           WHERE (journey_id = ? OR journey_id = ?) AND (user_id = ? OR is_shared = 1${scopeSql})
            ORDER BY sort_order ASC, category ASC, created_at ASC`
-        ).bind(journeyId, user.userId, ...scopeIds).all();
+        ).bind(journeyId, requestedJourneyId, user.userId, ...scopeIds).all();
 
         const items = (freshRows.results || []).map(safeItem);
         return json({ success: true, items, stats: computeStats(items) });
@@ -337,20 +337,20 @@ export async function handlePacking(context, url, method) {
         if (targetCategory) {
           await env.DB.prepare(
             `UPDATE wayfinder_packing_items SET is_packed = ?, updated_at = datetime('now')
-             WHERE journey_id = ? AND user_id = ? AND category = ?`
-          ).bind(targetState, journeyId, user.userId, targetCategory).run();
+             WHERE (journey_id = ? OR journey_id = ?) AND user_id = ? AND category = ?`
+          ).bind(targetState, journeyId, requestedJourneyId, user.userId, targetCategory).run();
         } else {
           await env.DB.prepare(
             `UPDATE wayfinder_packing_items SET is_packed = ?, updated_at = datetime('now')
-             WHERE journey_id = ? AND user_id = ?`
-          ).bind(targetState, journeyId, user.userId).run();
+             WHERE (journey_id = ? OR journey_id = ?) AND user_id = ?`
+          ).bind(targetState, journeyId, requestedJourneyId, user.userId).run();
         }
 
         const freshRows = await env.DB.prepare(
           `SELECT * FROM wayfinder_packing_items 
-           WHERE journey_id = ? AND (user_id = ? OR is_shared = 1${scopeSql})
+           WHERE (journey_id = ? OR journey_id = ?) AND (user_id = ? OR is_shared = 1${scopeSql})
            ORDER BY sort_order ASC, category ASC, created_at ASC`
-        ).bind(journeyId, user.userId, ...scopeIds).all();
+        ).bind(journeyId, requestedJourneyId, user.userId, ...scopeIds).all();
 
         const items = (freshRows.results || []).map(safeItem);
         return json({ success: true, items, stats: computeStats(items) });
@@ -466,7 +466,7 @@ export async function handlePacking(context, url, method) {
     return json({ error: `Method ${method} not allowed` }, 405);
   } catch (err) {
     console.error('[packing] error:', err);
-    return json({ error: 'Internal server error', details: err.message }, 500);
+    return json({ error: 'Internal server error' }, 500);
   }
 }
 

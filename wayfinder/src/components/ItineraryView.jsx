@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useDeferredValue } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useWayfinder } from '../context/WayfinderContext';
 import { polandJourney } from '../data/poland-2026';
 import { 
   ArrowLeft, ArrowRight, Calendar, Clock, MapPin, Train, Plane, Building, 
   Sparkles, Utensils, Landmark, Compass, Coffee, FileText, ChevronRight, Filter, Lock,
-  BedDouble, Ticket, Users, Map, ChevronUp, ChevronDown, GripVertical, RotateCcw, ExternalLink
+  BedDouble, Ticket, Users, Map, ChevronUp, ChevronDown, GripVertical, RotateCcw, ExternalLink,
+  Search, X
 } from 'lucide-react';
 
 import { PrivateBookingCard } from './itinerary/PrivateBookingCard';
@@ -27,8 +28,15 @@ import { FormatTime } from './Formatters';
 
 export function ItineraryView() {
   const { isAuthenticated, setIsAuthModalOpen } = useAuth();
-  const { itinerary: privateItems = [], accommodations = [] } = useWayfinder();
-  const [selectedCity, setSelectedCity] = useState('all');
+  const { itinerary: privateItems = [], accommodations = [], documents = [] } = useWayfinder();
+  const [selectedCity, setSelectedCity] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('day')) return 'all';
+      return p.get('city') || 'all';
+    }
+    return 'all';
+  });
   const [selectedDay, setSelectedDay] = useState(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search).get('day');
@@ -120,26 +128,153 @@ export function ItineraryView() {
     setCustomOrder(getCustomTimelineOrder());
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const [selectedType, setSelectedType] = useState('all');
+  const searchInputRef = useRef(null);
+  const didInitialDayScrollRef = useRef(false);
+
   useEffect(() => {
+    const handleSlashShortcut = (e) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) {
+        return;
+      }
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener('keydown', handleSlashShortcut);
+    return () => window.removeEventListener('keydown', handleSlashShortcut);
+  }, []);
+
+  useEffect(() => {
+    let scrollTimer = null;
     const handleUrlChange = () => {
       const params = new URLSearchParams(window.location.search);
       const dayParam = params.get('day');
+      const cityParam = params.get('city');
+      setSelectedDay(dayParam || 'all');
       if (dayParam) {
-        setSelectedDay(dayParam);
         setSelectedCity('all');
-        setTimeout(() => {
-          const el = document.getElementById(`day-${dayParam}`);
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 150);
+        if (!didInitialDayScrollRef.current) {
+          didInitialDayScrollRef.current = true;
+          clearTimeout(scrollTimer);
+          scrollTimer = setTimeout(() => {
+            const el = document.getElementById(`day-${dayParam}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 150);
+        }
+      } else {
+        setSelectedCity(cityParam || 'all');
       }
     };
 
     handleUrlChange();
     window.addEventListener('popstate', handleUrlChange);
-    return () => window.removeEventListener('popstate', handleUrlChange);
+    return () => {
+      clearTimeout(scrollTimer);
+      window.removeEventListener('popstate', handleUrlChange);
+    };
   }, []);
+
+  const [scrollSpyDay, setScrollSpyDay] = useState(null);
+  const cityBarRef = useRef(null);
+  const dayBarRef = useRef(null);
+  const publicDays = polandJourney.itinerary || [];
+
+  useEffect(() => {
+    if (selectedDay !== 'all') {
+      setScrollSpyDay(null);
+      return;
+    }
+
+    let rafId = null;
+    const updateScrollSpy = () => {
+      rafId = null;
+      const visibleSections = [];
+      for (const dayItem of publicDays) {
+        const el = document.getElementById(`day-${dayItem.day}`);
+        if (el) {
+          visibleSections.push({ day: dayItem.day, rect: el.getBoundingClientRect() });
+        }
+      }
+
+      if (visibleSections.length === 0) {
+        setScrollSpyDay((prev) => (prev === null ? prev : null));
+        return;
+      }
+
+      const anchor = window.innerWidth >= 768 ? 245 : 145;
+      if (visibleSections[0].rect.top > anchor + 80) {
+        setScrollSpyDay((prev) => (prev === null ? prev : null));
+        return;
+      }
+
+      let nextActive = visibleSections[0].day;
+      for (const sec of visibleSections) {
+        if (sec.rect.top <= anchor) {
+          nextActive = sec.day;
+        } else {
+          break;
+        }
+      }
+
+      const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24;
+      if (nearBottom) {
+        const lastSec = visibleSections[visibleSections.length - 1];
+        if (lastSec.rect.top < window.innerHeight * 0.75) {
+          nextActive = lastSec.day;
+        }
+      }
+
+      setScrollSpyDay((prev) => (prev === nextActive ? prev : nextActive));
+    };
+
+    const handleScrollOrResize = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(updateScrollSpy);
+    };
+
+    updateScrollSpy();
+    rafId = window.requestAnimationFrame(updateScrollSpy);
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true });
+    window.addEventListener('resize', handleScrollOrResize, { passive: true });
+
+    return () => {
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', handleScrollOrResize);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [selectedCity, selectedDay, selectedType, deferredSearchQuery]);
+
+  const highlightedDay = selectedDay !== 'all' ? Number(selectedDay) : scrollSpyDay;
+  const activeScrollDayObj = highlightedDay != null ? publicDays.find((d) => d.day === highlightedDay) : null;
+  const highlightedCityId = selectedCity !== 'all' ? selectedCity : (activeScrollDayObj?.cityId || null);
+
+  useEffect(() => {
+    const scrollPillIntoBar = (barEl, selector) => {
+      if (!barEl) return;
+      const pill = barEl.querySelector(selector);
+      if (!pill) return;
+      const pillLeft = pill.offsetLeft;
+      const pillRight = pillLeft + pill.offsetWidth;
+      const viewLeft = barEl.scrollLeft;
+      const viewRight = viewLeft + barEl.clientWidth;
+      if (pillLeft < viewLeft + 8 || pillRight > viewRight - 8) {
+        barEl.scrollTo({ left: Math.max(0, pillLeft - 16), behavior: 'smooth' });
+      }
+    };
+    if (highlightedCityId) {
+      scrollPillIntoBar(cityBarRef.current, `[data-city-pill="${highlightedCityId}"]`);
+    }
+    if (highlightedDay != null) {
+      scrollPillIntoBar(dayBarRef.current, `[data-day-pill="${highlightedDay}"]`);
+    }
+  }, [highlightedCityId, highlightedDay]);
 
   const pushRoute = (e, path) => {
     if (e) e.preventDefault();
@@ -147,13 +282,19 @@ export function ItineraryView() {
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
-  const publicDays = polandJourney.itinerary || [];
-
   const filteredDays = publicDays.filter((dayItem) => {
     const matchesCity = selectedCity === 'all' || dayItem.cityId === selectedCity || dayItem.cityIds?.includes(selectedCity) || (selectedCity === 'torun' && dayItem.cityName.includes('Toruń'));
     const matchesDay = selectedDay === 'all' || dayItem.day.toString() === selectedDay.toString();
     return matchesCity && matchesDay;
   });
+
+  const hasActiveFilters = selectedCity !== 'all' || selectedDay !== 'all' || selectedType !== 'all' || Boolean(searchQuery.trim());
+  const resetFilters = () => {
+    setSelectedCity('all');
+    setSelectedDay('all');
+    setSelectedType('all');
+    setSearchQuery('');
+  };
 
   const getIconForType = (type) => {
     switch (type) {
@@ -216,7 +357,7 @@ export function ItineraryView() {
       setIsAuthModalOpen(true);
       return;
     }
-    const matchedDoc = getTravelDocForScheduleItem(data, dayItem);
+    const matchedDoc = getTravelDocForScheduleItem(data, dayItem, documents);
     if (!matchedDoc) return;
     setViewerDoc(matchedDoc);
     setIsDocViewerOpen(true);
@@ -317,12 +458,13 @@ export function ItineraryView() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-amber-400">
             <Filter className="w-3.5 h-3.5" />
-            <span>Filter by City Stop</span>
+            <span>Filter Itinerary</span>
           </div>
 
-          {(selectedCity !== 'all' || selectedDay !== 'all') && (
+          {hasActiveFilters && (
             <button
-              onClick={() => { setSelectedCity('all'); setSelectedDay('all'); }}
+              type="button"
+              onClick={resetFilters}
               className="text-xs text-wf-muted hover:text-white underline font-medium"
             >
               Reset Filters
@@ -330,45 +472,139 @@ export function ItineraryView() {
           )}
         </div>
 
+        {/* Search & Activity Type Filter Row */}
+        <div className="flex flex-col sm:flex-row gap-2.5">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search itinerary stops, trains, hotels, foods... (Press /)"
+              aria-label="Search itinerary"
+              className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-900/90 border border-white/10 focus:border-amber-400/60 focus:outline-none text-xs text-white placeholder:text-slate-500 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              { id: 'all', label: 'All Types' },
+              { id: 'flight', label: 'Flights' },
+              { id: 'rail', label: 'Rail' },
+              { id: 'hotel', label: 'Hotels' },
+              { id: 'market', label: 'Markets' },
+              { id: 'sight', label: 'Sights' },
+              { id: 'food', label: 'Food' }
+            ].map((typeOpt) => (
+              <button
+                key={typeOpt.id}
+                type="button"
+                onClick={() => setSelectedType(typeOpt.id)}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  selectedType === typeOpt.id
+                    ? 'bg-sky-500 text-slate-950 shadow-sm shadow-sky-500/30'
+                    : 'bg-slate-900/80 text-slate-300 border border-white/10 hover:border-white/20'
+                }`}
+              >
+                {typeOpt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Sticky City & Day Navigation Bar (locks under Private Hub bar on desktop) */}
+      <div className="md:sticky md:top-[116px] z-20 bg-slate-950/95 p-3 rounded-2xl border border-amber-500/20 shadow-xl space-y-2.5">
         {/* City Filter Pills */}
-        <div className="flex flex-wrap gap-1.5">
+        <div ref={cityBarRef} className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
           <button
-            onClick={() => setSelectedCity('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedCity === 'all' ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30' : 'bg-slate-900/80 text-slate-300 border border-white/10 hover:border-white/20'}`}
+            onClick={() => {
+              if (selectedCity === 'all' && scrollSpyDay !== null) {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else {
+                setSelectedCity('all');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              highlightedCityId === null
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
+                : selectedCity === 'all'
+                  ? 'bg-slate-900/90 text-amber-300 border border-amber-500/40 hover:border-amber-400/60'
+                  : 'bg-slate-900/80 text-slate-300 border border-white/10 hover:border-white/20'
+            }`}
           >
-            All Cities (10 Days)
+            All Cities (Dec 3-13)
           </button>
-          {polandJourney.route.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setSelectedCity(c.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 ${selectedCity === c.id ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30' : 'bg-slate-900/80 text-slate-300 border border-white/10 hover:border-white/20'}`}
-            >
-              <span>{c.name}</span>
-              <span className="text-[10px] opacity-75 font-mono">({c.itineraryDates ? c.itineraryDates.split(',')[0] : c.travelDays})</span>
-            </button>
-          ))}
+          {polandJourney.route.map((c) => {
+            const isCityHighlighted = highlightedCityId === c.id;
+            return (
+              <button
+                key={c.id}
+                data-city-pill={c.id}
+                onClick={() => setSelectedCity(c.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 whitespace-nowrap shrink-0 ${
+                  isCityHighlighted
+                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
+                    : 'bg-slate-900/80 text-slate-300 border border-white/10 hover:border-white/20'
+                }`}
+              >
+                <span>{c.name}</span>
+                <span className="text-[10px] opacity-75 font-mono">({c.itineraryDates ? c.itineraryDates.split(',')[0] : c.travelDays})</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Day Number Quick-Scroller */}
-        <div className="pt-2 border-t border-white/10 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+        <div ref={dayBarRef} className="pt-2 border-t border-white/10 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
           <span className="text-[10px] uppercase font-black tracking-wider text-slate-400 mr-1 shrink-0">Day:</span>
           <button
-            onClick={() => setSelectedDay('all')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-colors ${selectedDay === 'all' ? 'bg-wf-blue text-white' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}
+            onClick={() => {
+              if (selectedDay === 'all' && scrollSpyDay !== null) {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else {
+                setSelectedDay('all');
+              }
+            }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-colors ${
+              highlightedDay === null
+                ? 'bg-wf-blue text-white'
+                : selectedDay === 'all'
+                  ? 'bg-white/5 text-sky-300 border border-sky-400/40 hover:bg-white/10'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+            }`}
           >
             All
           </button>
-          {publicDays.map((d) => (
-            <button
-              key={d.day}
-              onClick={() => setSelectedDay(d.day.toString())}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-colors ${selectedDay === d.day.toString() ? 'bg-wf-blue text-white shadow-sm' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}
-              title={`${d.displayDate} - ${d.cityName}`}
-            >
-              D{d.day} <span className="text-[10px] opacity-70 font-normal">({d.cityName.slice(0, 4)})</span>
-            </button>
-          ))}
+          {publicDays.map((d) => {
+            const isDayHighlighted = highlightedDay === d.day;
+            return (
+              <button
+                key={d.day}
+                data-day-pill={d.day}
+                onClick={() => setSelectedDay(d.day.toString())}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-colors ${
+                  isDayHighlighted
+                    ? 'bg-wf-blue text-white shadow-sm shadow-sky-500/30'
+                    : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                }`}
+                title={`${d.displayDate} - ${d.cityName}`}
+              >
+                D{d.day} <span className="text-[10px] opacity-70 font-normal">({d.cityName.slice(0, 4)})</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -391,21 +627,84 @@ export function ItineraryView() {
 
       {/* Timeline Day List */}
       <div className="space-y-12">
-        {filteredDays.length === 0 ? (
+        {(() => {
+          const isItemFilterActive = Boolean(deferredSearchQuery.trim()) || selectedType !== 'all';
+          const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
+
+          const matchesTimelineFilter = (timelineItem, dayItem) => {
+            const d = timelineItem.data || {};
+            if (selectedType !== 'all') {
+              if (timelineItem.type === 'accommodation') {
+                if (selectedType !== 'hotel') return false;
+              } else {
+                const rawType = String(d.itemType || d.item_type || timelineItem.type || '').toLowerCase();
+                if (selectedType === 'rail') {
+                  if (rawType !== 'rail' && rawType !== 'train' && rawType !== 'transit') return false;
+                } else if (selectedType === 'hotel') {
+                  if (rawType !== 'hotel' && rawType !== 'accommodation' && rawType !== 'lodging') return false;
+                } else if (selectedType === 'sight') {
+                  if (rawType !== 'sight' && rawType !== 'attraction' && rawType !== 'landmark') return false;
+                } else if (rawType !== selectedType) {
+                  return false;
+                }
+              }
+            }
+
+            if (normalizedQuery) {
+              const haystack = [
+                d.title,
+                d.description,
+                d.location,
+                d.provider,
+                d.notes,
+                d.badge,
+                d.name,
+                d.address,
+                dayItem.cityName,
+                dayItem.title,
+                dayItem.date
+              ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+              if (!haystack.includes(normalizedQuery)) return false;
+            }
+
+            return true;
+          };
+
+          const visibleDayEntries = filteredDays
+            .map((dayItem) => {
+              const dayTimelineItems = buildUnifiedDayTimeline(
+                dayItem,
+                isAuthenticated ? getPrivateItemsForDay(dayItem.date, dayItem.day) : [],
+                isAuthenticated ? getAccommodationsForDay(dayItem.date) : [],
+                isAuthenticated,
+                customOrder[dayItem.day]
+              );
+              const indexedItems = dayTimelineItems
+                .map((timelineItem, idx) => ({ timelineItem, idx }))
+                .filter(({ timelineItem }) => !isItemFilterActive || matchesTimelineFilter(timelineItem, dayItem));
+              return { dayItem, dayTimelineItems, indexedItems };
+            })
+            .filter(({ indexedItems }) => !isItemFilterActive || indexedItems.length > 0);
+
+          return visibleDayEntries.length === 0 ? (
           <div className="text-center py-12 text-wf-muted bg-white/5 rounded-2xl border border-white/5">
             <p>No itinerary items match the selected filter criteria.</p>
             <button
-              onClick={() => { setSelectedCity('all'); setSelectedDay('all'); }}
+              type="button"
+              onClick={resetFilters}
               className="mt-3 px-4 py-2 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold"
             >
               View Full 10-Day Timeline
             </button>
           </div>
         ) : (
-          filteredDays.map((dayItem) => (
+          visibleDayEntries.map(({ dayItem, dayTimelineItems, indexedItems }) => (
             <div key={dayItem.day} id={`day-${dayItem.day}`} className="relative scroll-mt-24">
-              {/* Sticky Day Header */}
-              <div className="sticky top-14 sm:top-16 z-20 bg-slate-950/95 backdrop-blur-md py-3 border-b border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-lg mb-6 rounded-t-2xl px-2">
+              {/* Day Header */}
+              <div className="relative z-10 bg-slate-950/95 py-3 border-b border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-lg mb-6 rounded-t-2xl px-2">
                 <div className="flex items-center space-x-3">
                   <span className="px-2.5 py-1 rounded-xl bg-amber-500 text-slate-950 font-black text-xs sm:text-sm tracking-tight shadow-md">
                     Day 0{dayItem.day}
@@ -467,27 +766,18 @@ export function ItineraryView() {
 
               {/* Day Schedule Event Cards */}
               <div className="space-y-4 pl-4 sm:pl-6 border-l-2 border-amber-500/30 ml-3 sm:ml-4">
-                {(() => {
-                  const dayTimelineItems = buildUnifiedDayTimeline(
-                    dayItem,
-                    isAuthenticated ? getPrivateItemsForDay(dayItem.date, dayItem.day) : [],
-                    isAuthenticated ? getAccommodationsForDay(dayItem.date) : [],
-                    isAuthenticated,
-                    customOrder[dayItem.day]
-                  );
-
-                  return dayTimelineItems.map((timelineItem, idx) => {
+                {indexedItems.map(({ timelineItem, idx }) => {
                     const isDragging = draggedItem?.day === dayItem.day && draggedItem?.index === idx;
                     const isDropTarget = dropTarget?.day === dayItem.day && dropTarget?.index === idx;
 
                     const isTrainItem = isConfirmedIntercityRail(timelineItem.data);
                     const isFlightItem = isFlightScheduleItem(timelineItem.data);
                     const travelDomId = getTravelDomIdForScheduleItem(timelineItem.data, dayItem.day);
-                    const travelDoc = isAuthenticated ? getTravelDocForScheduleItem(timelineItem.data, dayItem) : null;
+                    const travelDoc = isAuthenticated ? getTravelDocForScheduleItem(timelineItem.data, dayItem, documents) : null;
                     const isTravelCard = Boolean(travelDoc);
                     const destination = getItemDestination(timelineItem.data, dayItem.cityId);
 
-                    const reorderControls = (
+                    const reorderControls = isItemFilterActive ? null : (
                       <div 
                         className="flex items-center space-x-0.5 bg-slate-950/80 px-1 py-0.5 rounded-xl border border-white/10 shrink-0 shadow-sm"
                         onClick={(e) => e.stopPropagation()}
@@ -698,11 +988,16 @@ export function ItineraryView() {
                                     title="Click to view flight ticket and confirmation"
                                   >
                                     <Plane className="w-3.5 h-3.5 text-sky-400 group-hover/btn:scale-110 transition-transform" />
-                                    <span>View Delta Flight Confirmation</span>
+                                    <span>View Flight Confirmation</span>
                                   </button>
-                                  <span className="text-[11px] text-slate-400 font-mono">
-                                    {travelDoc.details?.flightLeg ? `${travelDoc.details.flightLeg} • ` : ''}Conf: <strong className="text-emerald-300">{travelDoc.details?.confirmation || 'GUDI3J'}</strong>
-                                  </span>
+                                  {(travelDoc.details?.flightLeg || travelDoc.details?.confirmation) && (
+                                    <span className="text-[11px] text-slate-400 font-mono">
+                                      {travelDoc.details?.flightLeg ? `${travelDoc.details.flightLeg} • ` : ''}
+                                      {travelDoc.details?.confirmation ? (
+                                        <>Conf: <strong className="text-emerald-300">{travelDoc.details.confirmation}</strong></>
+                                      ) : null}
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -710,12 +1005,12 @@ export function ItineraryView() {
                         )}
                       </div>
                     );
-                  });
-                })()}
+                  })}
               </div>
             </div>
           ))
-        )}
+        );
+        })()}
       </div>
 
       {/* Footer Navigation CTA */}

@@ -2,8 +2,6 @@
 // Merges public schedule items, private D1 bookings, and confirmed accommodations into a strict chronological sequence.
 // Suppresses generic hotel placeholder suggestions when a confirmed accommodation exists.
 
-import { confirmedFlightEvents } from '../data/poland-2026.js';
-
 export function parseTimeToMinutes(timeStr) {
   if (!timeStr) return 720; // default midday 12:00
   const match = String(timeStr).match(/(\d{1,2}):(\d{2})/);
@@ -115,28 +113,25 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
     return type === 'rail' || type === 'train';
   });
 
+  // 1d. Detect if any confirmed private flight booking exists for this day
+  const hasConfirmedFlight = effectivePrivate.some((p) => {
+    const type = (p.item_type || p.docType || p.detected_doc_type || '').toLowerCase();
+    return type === 'flight';
+  });
+
   // 2. Filter and adapt public schedule:
-  // - If authenticated, upgrade flight arrival/departure to confirmed flight details
   // - If unauthenticated, ensure no private confirmed details, passenger names, or confirmation codes are shown
   // - Suppress generic hotel placeholders if confirmed hotel is active
+  // - Suppress generic flight placeholders if confirmed flight booking is active on this day
   // - Suppress redundant day trip ideas if confirmed excursion is booked for same destination
   // - Suppress daytime city sights that collide with an all-day excursion window
   const baseSchedule = (dayItem.schedule || []).map((event) => {
     if (isAuthenticated) {
-      if (dayItem.day === 1 && (event.itemType === 'flight' || event.title?.includes('Arrival'))) {
-        return confirmedFlightEvents?.day1Arrival || event;
-      }
-      if (dayItem.day === 10 && event.itemType === 'flight' && (event.title?.includes('GDN') || event.title?.includes('Departure'))) {
-        return confirmedFlightEvents?.day10Departure || event;
-      }
-      if (dayItem.day === 10 && event.itemType === 'flight' && (event.title?.includes('Atlanta') || event.title?.includes('Homeward'))) {
-        return confirmedFlightEvents?.day10Homeward || event;
-      }
       return event;
     }
 
     // Unauthenticated sanitization guard: ensure no confirmed titles, passenger names, or confirmation codes leak
-    if (event.itemType === 'flight' || (event.title || '').includes('DL9208') || (event.title || '').includes('Confirmed Arrival')) {
+    if (event.itemType === 'flight' || (event.title || '').includes('Confirmed Arrival')) {
       return {
         ...event,
         title: 'Target Arrival: Kraków Airport (KRK)',
@@ -154,6 +149,9 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
     if (hasConfirmedRail && isGenericRailPlaceholder(event)) {
       return false;
     }
+    if (hasConfirmedFlight && event.itemType === 'flight') {
+      return false;
+    }
     if (excursions.some((exc) => isRedundantExcursionIdea(event, exc))) {
       return false;
     }
@@ -163,17 +161,12 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
     return true;
   });
 
-  // 3. Detect if a public flight arrival event exists for this day
-  const hasPublicFlightArrival = filteredSchedule.some(
-    (ev) => ev.itemType === 'flight' || (ev.title || '').includes('DL9208') || (ev.title || '').includes('Confirmed Arrival')
-  );
-
   // Filter private D1 bookings:
   // - Ignore raw PDF attachments (title ending in .pdf or .png)
-  // - Suppress redundant private flight items if confirmed flight arrival milestone is already present on this day
-  // - Deduplicate redundant hotel and rail bookings in private items
+  // - Deduplicate redundant flight, hotel, and rail bookings in private items
   const seenHotelKeys = new Set();
   const seenRailKeys = new Set();
+  const seenFlightKeys = new Set();
   const filteredPrivate = effectivePrivate.filter((priv) => {
     const title = (priv.title || '').trim().toLowerCase();
     if (title.endsWith('.pdf') || title.endsWith('.png')) {
@@ -182,8 +175,15 @@ export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodati
     const type = (priv.item_type || priv.docType || priv.detected_doc_type || '').toLowerCase();
     const isHotel = type === 'hotel' || type === 'accommodation' || type === 'lodging';
     const isRail = type === 'rail' || type === 'train';
-    if (hasPublicFlightArrival && (type === 'flight' || title.includes('flight: atl to krk') || title.includes('dl9208'))) {
-      return false;
+    const isFlight = type === 'flight';
+    if (isFlight) {
+      const conf = (priv.confirmation_number || '').trim().toLowerCase();
+      const docId = priv.source_document_id || '';
+      const flightKey = docId ? `flight:doc:${docId}` : (conf ? `flight:conf:${conf}:${priv.local_date}` : `flight:${title}:${priv.local_date}`);
+      if (seenFlightKeys.has(flightKey)) {
+        return false;
+      }
+      seenFlightKeys.add(flightKey);
     }
     if (isHotel) {
       const docId = priv.source_document_id || '';
@@ -408,11 +408,9 @@ export function isFlightScheduleItem(itemData) {
   const title = itemData.title || '';
   return (
     itemType === 'flight' ||
-    title.includes('DL9208') ||
-    title.includes('DL9528') ||
-    title.includes('DL9227') ||
     title.includes('Return Flight') ||
-    title.includes('Homeward Flight')
+    title.includes('Homeward Flight') ||
+    title.toLowerCase().includes('flight')
   );
 }
 
@@ -425,9 +423,9 @@ export function getTravelDomIdForScheduleItem(itemData, dayNumber) {
     if (dayNumber === 1) return 'travel-flight-krk';
     if (dayNumber === 10) {
       if (
-        titleLower.includes('dl9227') ||
         titleLower.includes('atlanta') ||
         titleLower.includes('homeward') ||
+        titleLower.includes('ams') ||
         timeStr.startsWith('10')
       ) {
         return 'travel-flight-atl';
@@ -462,167 +460,56 @@ export function getTravelDomIdForScheduleItem(itemData, dayNumber) {
   return null;
 }
 
-export function getTravelDocForScheduleItem(data, dayItem) {
-  if (!data || !dayItem) return null;
-  const titleLower = (data.title || '').toLowerCase();
-  const timeStr = data.time || data.local_time || '';
+function formatMatchedDocument(doc, data) {
+  if (!doc) return null;
+  return {
+    ...doc,
+    filename: doc.filename || doc.safe_display_name || doc.original_filename || 'Document',
+    details: {
+      ...(doc.details || {}),
+      ...(data?.confirmation_number ? { confirmation: data.confirmation_number } : {}),
+      ...(data?.provider ? { provider: data.provider } : {})
+    }
+  };
+}
+
+export function getTravelDocForScheduleItem(data, dayItem, documents = []) {
+  if (!data || !dayItem || !Array.isArray(documents) || documents.length === 0) return null;
+
+  if (data.source_document_id) {
+    const direct = documents.find((d) => d && d.id === data.source_document_id);
+    if (direct) return formatMatchedDocument(direct, data);
+  }
+
+  const conf = (data.confirmation_number || '').trim().toUpperCase();
+  if (conf) {
+    const byConf = documents.find((d) => {
+      const hay = `${d?.safe_display_name || ''} ${d?.original_filename || ''}`.toUpperCase();
+      return hay.includes(conf);
+    });
+    if (byConf) return formatMatchedDocument(byConf, data);
+  }
 
   if (isConfirmedIntercityRail(data)) {
-    if (dayItem.day === 4) {
-      return {
-        id: '967d6a06-610d-4c56-a95f-d4ca5a5d1769',
-        filename: 'Bilet - WN71563945.pdf',
-        safe_display_name: 'PKP Intercity IC 58 Galicja: Kraków Gł. - Wrocław Gł.',
-        item_type: 'rail',
-        detected_doc_type: 'rail',
-        details: {
-          confirmation: 'WN 71563945',
-          trainNumber: 'IC 58 Galicja',
-          route: 'Kraków Główny ➔ Wrocław Główny',
-          departureTime: '11:50',
-          arrivalTime: '14:50',
-          date: 'Monday, Dec 7, 2026',
-          seats: 'Carriage 272, Seats 34 & 36 (1st Class)',
-          passengers: 'Ronald Milton Few, Jonathan Kemp',
-          provider: 'PKP Intercity S.A.',
-          fare: '128.00 PLN (~$34.13 USD)',
-          location: 'Kraków Główny Central Station',
-          targetCity: 'Kraków ➔ Wrocław (Day 4 Rail Transfer) | Poland Christmas 2026'
-        }
-      };
-    }
-    if (dayItem.day === 6) {
-      return {
-        id: 'pkp-wroclaw-poznan',
-        filename: 'PKP_Intercity_Wroclaw_Poznan.pdf',
-        safe_display_name: 'PKP Intercity IC: Wrocław Główny ➔ Poznań Główny',
-        item_type: 'rail',
-        detected_doc_type: 'rail',
-        details: {
-          confirmation: 'SCHEDULED-PKP-06',
-          trainNumber: 'PKP Intercity IC Direct',
-          route: 'Wrocław Główny ➔ Poznań Główny',
-          departureTime: '10:35',
-          arrivalTime: '12:15',
-          date: 'Wednesday, Dec 9, 2026',
-          seats: '1st Class Assigned Seating (Quiet Zone)',
-          passengers: '2 Adults',
-          provider: 'PKP Intercity S.A.',
-          location: 'Wrocław Główny Central Station',
-          targetCity: 'Wrocław ➔ Poznań (Day 6 Rail Transfer) | Poland Christmas 2026'
-        }
-      };
-    }
-    if (dayItem.day === 7 && (timeStr.startsWith('08') || titleLower.includes('poznań') || titleLower.includes('poznan'))) {
-      return {
-        id: 'pkp-poznan-torun',
-        filename: 'PKP_Morning_Poznan_Torun.pdf',
-        safe_display_name: 'PKP Morning Rail: Poznań Główny ➔ Toruń Główny',
-        item_type: 'rail',
-        detected_doc_type: 'rail',
-        details: {
-          confirmation: 'SCHEDULED-PKP-07A',
-          trainNumber: 'PKP Morning Rail (Day Stop)',
-          route: 'Poznań Główny ➔ Toruń Główny',
-          departureTime: '08:30',
-          arrivalTime: '10:15',
-          date: 'Thursday, Dec 10, 2026',
-          seats: '1st Class Seating',
-          passengers: '2 Adults',
-          provider: 'PKP Intercity S.A.',
-          location: 'Poznań Główny',
-          targetCity: 'Poznań ➔ Toruń (Day 7 Morning Rail) | Poland Christmas 2026'
-        }
-      };
-    }
-    if (dayItem.day === 7 && (timeStr.startsWith('15') || titleLower.includes('gdańsk') || titleLower.includes('gdansk') || titleLower.includes('coastal'))) {
-      return {
-        id: 'pkp-torun-gdansk',
-        filename: 'PKP_Coastal_Torun_Gdansk.pdf',
-        safe_display_name: 'PKP Coastal Rail: Toruń Główny ➔ Gdańsk Główny',
-        item_type: 'rail',
-        detected_doc_type: 'rail',
-        details: {
-          confirmation: 'SCHEDULED-PKP-07B',
-          trainNumber: 'PKP Coastal Intercity',
-          route: 'Toruń Główny ➔ Gdańsk Główny',
-          departureTime: '15:45',
-          arrivalTime: '17:30',
-          date: 'Thursday, Dec 10, 2026',
-          seats: '1st Class Seating',
-          passengers: '2 Adults',
-          provider: 'PKP Intercity S.A.',
-          location: 'Toruń Główny',
-          targetCity: 'Toruń ➔ Gdańsk (Day 7 Coastal Rail) | Poland Christmas 2026'
-        }
-      };
-    }
-    return null;
+    const dayHints = {
+      4: ['krakow', 'kraków', 'wroclaw', 'wrocław', 'galicja'],
+      6: ['wroclaw', 'wrocław', 'poznan', 'poznań'],
+      7: (data.title || '').toLowerCase().includes('gdansk') || (data.title || '').toLowerCase().includes('gdańsk')
+        ? ['torun', 'toruń', 'gdansk', 'gdańsk']
+        : ['poznan', 'poznań', 'torun', 'toruń']
+    }[dayItem.day] || [];
+
+    const railDocs = documents.filter((d) => (d?.detected_doc_type || '').toLowerCase() === 'rail');
+    const matchedRail = railDocs.find((d) => {
+      const hay = `${d?.safe_display_name || ''} ${d?.original_filename || ''}`.toLowerCase();
+      return dayHints.some((hint) => hay.includes(hint));
+    }) || (railDocs.length === 1 ? railDocs[0] : null);
+    return matchedRail ? formatMatchedDocument(matchedRail, data) : null;
   }
 
   if (isFlightScheduleItem(data)) {
-    if (dayItem.day === 1) {
-      return {
-        id: 'delta-poland-2026',
-        filename: 'Poland_Delta.pdf',
-        safe_display_name: 'Delta Air Lines: Inbound Flight Confirmation (DL0074 / DL9208)',
-        item_type: 'flight',
-        detected_doc_type: 'flight',
-        details: {
-          confirmation: 'GUDI3J',
-          provider: 'Delta Air Lines / KLM Cityhopper',
-          passengers: 'Ronald Milton Few, Jonathan Kemp',
-          touchdown: 'Dec 4, 2026 at 13:30 CET (Local Poland Time)',
-          flightLeg: 'DL9208 (AMS ➔ KRK)',
-          originLeg: 'DL0074 (ATL ➔ AMS, departs Dec 3 at 20:10 EST)',
-          layover: '55 minutes at Amsterdam Schiphol (AMS)',
-          lodgingSync: 'Arrives in Kraków Old Town/Kazimierz at ~14:45-15:15 CET via 17m SKA1 train, matching standard 15:00 check-in.',
-          targetCity: 'Target City: Kraków (Stop 01) | Poland Christmas 2026'
-        }
-      };
-    }
-    if (dayItem.day === 10) {
-      if (titleLower.includes('dl9227') || titleLower.includes('atlanta') || titleLower.includes('homeward') || timeStr.startsWith('10')) {
-        return {
-          id: 'delta-dl9227-ams-atl',
-          filename: 'Poland_Delta.pdf',
-          safe_display_name: 'Delta Air Lines DL9227: Amsterdam (AMS) ➔ Atlanta (ATL)',
-          item_type: 'flight',
-          detected_doc_type: 'flight',
-          details: {
-            confirmation: 'GUDI3J',
-            provider: 'Delta Air Lines',
-            passengers: 'Ronald Milton Few, Jonathan Kemp',
-            flightLeg: 'DL9227 (AMS ➔ ATL)',
-            departureTime: 'Dec 13, 2026 @ 10:00 CET',
-            touchdown: 'Dec 13, 2026 at 13:35 EST (Atlanta)',
-            originLeg: 'Connects from DL9528 (GDN ➔ AMS, arrives 08:40 CET)',
-            layover: '1h 20m international transit at Amsterdam Schiphol (AMS)',
-            lodgingSync: 'Direct transatlantic return from Amsterdam Schiphol to Atlanta Hartsfield-Jackson (ATL).',
-            targetCity: 'Return Leg: Amsterdam (AMS) ➔ Atlanta (ATL) | Poland Christmas 2026'
-          }
-        };
-      }
-      return {
-        id: 'delta-dl9528-gdn-ams',
-        filename: 'Poland_Delta.pdf',
-        safe_display_name: 'Delta / KLM DL9528: Gdańsk (GDN) ➔ Amsterdam (AMS)',
-        item_type: 'flight',
-        detected_doc_type: 'flight',
-        details: {
-          confirmation: 'GUDI3J',
-          provider: 'Delta Air Lines / KLM Cityhopper',
-          passengers: 'Ronald Milton Few, Jonathan Kemp',
-          flightLeg: 'DL9528 (GDN ➔ AMS)',
-          departureTime: 'Dec 13, 2026 @ 06:45 CET',
-          touchdown: 'Dec 13, 2026 at 08:40 CET (Amsterdam Schiphol)',
-          originLeg: 'Departs Gdańsk Lech Wałęsa Airport (GDN)',
-          layover: '1h 20m connection in AMS onto DL9227 (AMS ➔ ATL at 10:00 CET)',
-          lodgingSync: '04:30 transfer from Gdańsk (~35-40 min taxi/Bolt to GDN) ahead of 06:45 departure.',
-          targetCity: 'Departure Stop: Gdańsk (GDN) | Poland Christmas 2026'
-        }
-      };
-    }
+    const flightDoc = documents.find((d) => (d?.detected_doc_type || '').toLowerCase() === 'flight');
+    return flightDoc ? formatMatchedDocument(flightDoc, data) : null;
   }
 
   return null;

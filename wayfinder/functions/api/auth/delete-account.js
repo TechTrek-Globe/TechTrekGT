@@ -1,18 +1,29 @@
 // Self-service account deletion endpoint for authenticated users
-import { verifyToken, getTokenFromRequest } from '../../utils/auth.js';
+import { authenticateRequest, buildClearCookieHeader } from '../../utils/auth.js';
 import { deleteUserAccount } from '../../utils/deleteAccount.js';
 
 export async function onRequestPost({ request, env, user: passedUser }) {
   let user = passedUser;
   if (!user) {
-    const token = getTokenFromRequest(request);
-    user = await verifyToken(token, env.JWT_SECRET);
+    const auth = await authenticateRequest(request, env);
+    if (!auth.ok) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (auth.clearCookie) headers['Set-Cookie'] = buildClearCookieHeader();
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
+        headers
+      });
+    }
+    user = { ...auth.payload, userId: auth.dbUser?.id || auth.payload.userId };
   }
 
   if (!user || !user.userId) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': buildClearCookieHeader()
+      }
     });
   }
 
@@ -25,15 +36,6 @@ export async function onRequestPost({ request, env, user: passedUser }) {
       });
     }
 
-    const cookieOptions = [
-      'auth_token=',
-      'HttpOnly',
-      'Secure',
-      'SameSite=Strict',
-      'Path=/',
-      'Max-Age=0'
-    ].join('; ');
-
     return new Response(JSON.stringify({
       success: true,
       message: 'Your account and associated travel data have been permanently deleted.'
@@ -41,7 +43,7 @@ export async function onRequestPost({ request, env, user: passedUser }) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Set-Cookie': cookieOptions
+        'Set-Cookie': buildClearCookieHeader()
       }
     });
   } catch (err) {

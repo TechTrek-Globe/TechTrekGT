@@ -242,3 +242,17 @@ export function FormatText({ text }) {
   return <>{formatted}</>;
 }
 
+/**
+ * Formats full stop date ranges into compact labels (e.g. "Dec 4 - Dec 7, 2026" -> "Dec 4-7").
+ */
+export function formatCompactStopDates(itineraryDates) {
+  if (!itineraryDates) return '';
+  const withoutYear = String(itineraryDates).split(',')[0].trim();
+  const match = withoutYear.match(/^([A-Za-z]+)\s+(\d+)\s*-\s*([A-Za-z]+)\s+(\d+)$/);
+  if (match) {
+    const [, m1, d1, m2, d2] = match;
+    return m1 === m2 ? `${m1} ${d1}-${d2}` : `${m1} ${d1}-${m2} ${d2}`;
+  }
+  return withoutYear;
+}
+

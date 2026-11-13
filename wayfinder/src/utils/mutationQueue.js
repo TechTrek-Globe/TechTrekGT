@@ -34,6 +34,12 @@ function emitQueueUpdate(count) {
   }
 }
 
+function emitSyncStatus(detail) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('wayfinder:sync-status', { detail }));
+  }
+}
+
 /**
  * Enqueue a mutation for offline persistence.
  * @param {Object} params
@@ -164,12 +170,36 @@ export async function replayQueue(onProgress) {
               detail: { item, status: res.status }
             }));
           }
+        } else if (res.status === 401) {
+          // Preserve pending mutations when session expires so user work is never dropped
+          item.status = 'auth_required';
+          item.lastError = 'Sign in required to sync pending changes.';
+          await saveLocalMutation(item);
+          failedCount++;
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('wayfinder:auth-expired', {
+              detail: { status: 401, reason: 'queue_replay' }
+            }));
+          }
+          emitSyncStatus({
+            status: 'needs_attention',
+            reason: 'auth_required',
+            httpStatus: 401,
+            message: 'Session expired. Sign in again to sync pending changes.',
+          });
+          break;
         } else if (res.status >= 400 && res.status < 500) {
           // Unrecoverable client error (e.g. 404 deleted entity, 400 invalid schema)
-          // Drop to prevent permanently poisoning the queue
+          // Drop to prevent permanently poisoning the queue and surface warning
           console.warn(`[MutationQueue] Discarding invalid mutation ${item.id} (HTTP ${res.status}):`, item);
           await deleteLocalMutation(item.id);
           failedCount++;
+          emitSyncStatus({
+            status: 'needs_attention',
+            reason: 'client_error',
+            httpStatus: res.status,
+            message: `Sync issue on "${item.action || item.method}" (HTTP ${res.status}).`,
+          });
         } else {
           // Server error 5xx: keep in queue up to MAX_ATTEMPTS (5), then drop poison pill
           const nextAttempts = (item.attempts || 0) + 1;
@@ -201,6 +231,10 @@ export async function replayQueue(onProgress) {
 
     const remaining = await getLocalMutations();
     emitQueueUpdate(remaining.length);
+
+    if (syncedCount > 0 && failedCount === 0 && remaining.length === 0) {
+      emitSyncStatus({ status: 'synced', reason: null, message: null });
+    }
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('wayfinder:sync-complete', {
@@ -257,6 +291,11 @@ export async function resilientFetch(url, options = {}, meta = {}) {
   // 2. Online: Attempt network fetch
   try {
     const res = await fetch(url, options);
+    if (res.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('wayfinder:auth-expired', {
+        detail: { status: 401, url }
+      }));
+    }
     return res;
   } catch (err) {
     // 3. Network failure caught (e.g. Failed to fetch, DNS drop, tunnel closed)

@@ -1,6 +1,9 @@
 // Universal Account Deletion Helper for TechTrekGT Wayfinder
 // Thoroughly cleans up all user references, invitations, tokens, documents, and shares across SQLite tables.
 
+import { ensureDocumentBlobsTable } from './documentBlobs.js';
+import { ensureBookmarksTable } from '../api/wayfinder/bookmarks.js';
+
 export async function deleteUserAccount(db, targetUserId, actorUserId) {
   if (!targetUserId || typeof targetUserId !== 'string') {
     return { ok: false, error: 'Target user ID is required', status: 400 };
@@ -18,7 +21,13 @@ export async function deleteUserAccount(db, targetUserId, actorUserId) {
   const email = targetUser.email;
   const isSelf = targetUserId === actorUserId;
 
-  // 2. Prepare atomic batch statements
+  // 2. Ensure auxiliary tables exist before atomic cascading batch cleanup
+  await Promise.all([
+    ensureDocumentBlobsTable(db),
+    ensureBookmarksTable(db),
+  ]);
+
+  // 3. Prepare atomic batch statements
   const stmts = [
     // Clear agenda shares where user is a participant
     db.prepare('DELETE FROM wayfinder_agenda_shares WHERE user_id = ?').bind(targetUserId),
@@ -38,6 +47,7 @@ export async function deleteUserAccount(db, targetUserId, actorUserId) {
 
     // Clear packing items
     db.prepare('DELETE FROM wayfinder_packing_items WHERE user_id = ?').bind(targetUserId),
+    db.prepare('DELETE FROM wayfinder_bookmarks WHERE user_id = ?').bind(targetUserId),
 
     // Clear expense splits and debt settlements
     db.prepare('DELETE FROM wayfinder_expense_splits WHERE user_id = ?').bind(targetUserId),
@@ -50,22 +60,27 @@ export async function deleteUserAccount(db, targetUserId, actorUserId) {
     // Clear documents, extracted fields, extraction jobs, and personal expenses
     db.prepare('DELETE FROM wayfinder_extracted_fields WHERE document_id IN (SELECT id FROM wayfinder_documents WHERE user_id = ?)').bind(targetUserId),
     db.prepare('DELETE FROM wayfinder_extraction_jobs WHERE user_id = ? OR document_id IN (SELECT id FROM wayfinder_documents WHERE user_id = ?)').bind(targetUserId, targetUserId),
+    db.prepare('DELETE FROM wayfinder_document_blobs WHERE user_id = ? OR document_id IN (SELECT id FROM wayfinder_documents WHERE user_id = ?)').bind(targetUserId, targetUserId),
     db.prepare('DELETE FROM wayfinder_documents WHERE user_id = ?').bind(targetUserId),
     db.prepare('DELETE FROM wayfinder_expenses WHERE user_id = ?').bind(targetUserId),
 
-    // Clear private itinerary items
+    // Clear private itinerary items and private journeys created exclusively by targetUserId
     db.prepare("DELETE FROM wayfinder_itinerary_items WHERE user_id = ? AND visibility = 'private'").bind(targetUserId),
+    db.prepare("DELETE FROM wayfinder_journeys WHERE created_by = ? AND visibility = 'private'").bind(targetUserId),
 
-    // Reassign any journeys created by this user to 'system' so public itineraries persist
-    db.prepare("UPDATE wayfinder_journeys SET created_by = 'system' WHERE created_by = ?").bind(targetUserId),
+    // Reassign non-private journeys to the acting admin or NULL so public/shared itineraries persist without FK breakage
+    db.prepare('UPDATE wayfinder_journeys SET created_by = ? WHERE created_by = ?').bind(isSelf || !actorUserId ? null : actorUserId, targetUserId),
 
-    // Log deletion event in audit log
+    // Detach prior audit rows from deleted user before removing the user row
+    db.prepare('UPDATE wayfinder_audit_events SET user_id = NULL WHERE user_id = ?').bind(targetUserId),
+
+    // Log deletion event in audit log (actorUserId when admin-initiated, NULL on self-delete)
     db.prepare(`
       INSERT INTO wayfinder_audit_events (id, user_id, journey_id, entity_type, entity_id, action, target_user_id, target_email, metadata_summary, details)
       VALUES (?, ?, 'system', 'user', ?, 'account_deleted', ?, ?, ?, ?)
     `).bind(
       crypto.randomUUID(),
-      actorUserId || 'system',
+      isSelf || !actorUserId ? null : actorUserId,
       targetUserId,
       targetUserId,
       email,

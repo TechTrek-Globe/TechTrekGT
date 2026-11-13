@@ -11,10 +11,10 @@ export function CityMarketsTab({
   toggleItinerary, 
   isAuthenticated 
 }) {
-  if (!city.markets || city.markets.length === 0) return null;
+  const marketsList = city?.markets || [];
 
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || marketsList.length === 0) return;
     const checkAndScroll = () => {
       const hash = window.location.hash?.replace('#', '');
       const params = new URLSearchParams(window.location.search);
@@ -43,7 +43,9 @@ export function CityMarketsTab({
       window.removeEventListener('hashchange', checkAndScroll);
       window.removeEventListener('popstate', checkAndScroll);
     };
-  }, [city.markets, setActiveMarketTab]);
+  }, [city.markets, marketsList.length, setActiveMarketTab]);
+
+  if (marketsList.length === 0) return null;
 
   return (
     <div id="markets-section" className="space-y-6 animate-fade-in scroll-mt-32">

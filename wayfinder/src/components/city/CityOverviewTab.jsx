@@ -7,6 +7,12 @@ import { useAuth } from '../../context/AuthContext';
 export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, exchangeRates }) {
   const { isAuthenticated } = useAuth();
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const hasFoodGuide = Boolean(
+    (city.restaurantsDetailed || city[`${city.id}RestaurantsDetailed`] || []).length > 0 ||
+    (city.drinksDetailed || city[`${city.id}DrinksDetailed`] || []).length > 0 ||
+    (city.cafesDetailed || city[`${city.id}CafesDetailed`] || []).length > 0 ||
+    (city.restaurants && city.restaurants.length > 0)
+  );
   return (
     <div className="space-y-10 animate-fade-in">
       {city.history && (
@@ -105,7 +111,7 @@ export function CityOverviewTab({ city, baseUrl, handleSubPageTabClick, mapUrl, 
           </div>
         )}
 
-        {city.restaurants && city.restaurants.length > 0 && (
+        {hasFoodGuide && (
           <div className="glass-panel p-5 sm:p-7 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-wf-navy-mid to-slate-950 shadow-xl flex flex-col justify-between group hover:border-amber-400/50 transition-all md:col-span-2 lg:col-span-1">
             <div className="space-y-2 mb-4">
               <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">

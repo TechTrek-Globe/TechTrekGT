@@ -5,15 +5,17 @@ import { WalkingLoopOptimizer } from '../route/WalkingLoopOptimizer';
 import { optimizeWalkingLoop } from '../../utils/routeOptimizer';
 
 export function CityAttractionsTab({ city }) {
-  if (!city.mustSee || city.mustSee.length === 0) return null;
-
+  const mustSeeList = city?.mustSee || [];
   const [isOptimized, setIsOptimized] = useState(false);
-  const [anchorMode, setAnchorMode] = useState(city.markets?.[0] ? 'market' : 'none');
+  const [anchorMode, setAnchorMode] = useState(city?.markets?.[0] ? 'market' : 'none');
   const [isRoundTrip, setIsRoundTrip] = useState(true);
   const [includeExcursions, setIncludeExcursions] = useState(false);
 
   // Compute 2-opt route optimization
   const optimizationResult = useMemo(() => {
+    if (mustSeeList.length === 0) {
+      return { orderedPlaces: [], totalDistanceKm: 0, estimatedWalkMins: 0, legs: [] };
+    }
     let startAnchor = null;
     if (anchorMode === 'market' && city.markets?.[0]) {
       startAnchor = {
@@ -23,18 +25,18 @@ export function CityAttractionsTab({ city }) {
       };
     }
 
-    return optimizeWalkingLoop(city.mustSee, {
+    return optimizeWalkingLoop(mustSeeList, {
       startAnchor,
       isRoundTrip,
       includeExcursions,
       walkingSpeedKmh: 4.5
     });
-  }, [city.mustSee, city.markets, anchorMode, isRoundTrip, includeExcursions, city.name]);
+  }, [mustSeeList, city.markets, anchorMode, isRoundTrip, includeExcursions, city.name]);
 
-  const displayedPlaces = isOptimized ? optimizationResult.orderedPlaces : city.mustSee;
+  const displayedPlaces = isOptimized ? optimizationResult.orderedPlaces : mustSeeList;
 
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || mustSeeList.length === 0) return;
     const checkAndScroll = () => {
       const hash = window.location.hash?.replace('#', '');
       const params = new URLSearchParams(window.location.search);
@@ -59,7 +61,9 @@ export function CityAttractionsTab({ city }) {
       window.removeEventListener('hashchange', checkAndScroll);
       window.removeEventListener('popstate', checkAndScroll);
     };
-  }, [displayedPlaces]);
+  }, [displayedPlaces, mustSeeList.length]);
+
+  if (mustSeeList.length === 0) return null;
 
   return (
     <div id="attractions-section" className="space-y-4 sm:space-y-5 animate-fade-in scroll-mt-32">
@@ -69,7 +73,7 @@ export function CityAttractionsTab({ city }) {
           <Sparkles className="w-6 h-6 sm:w-7 sm:h-7 text-amber-400" />
           <span>Must-See Attractions in {city.name}</span>
         </h2>
-        <span className="text-xs text-wf-muted font-medium">Curated Golden Component template</span>
+        <span className="text-xs text-wf-muted font-medium">Seasonal Highlights & Route Stops</span>
       </div>
 
       {/* 2-Opt Walking Loop Optimizer Control Panel */}

@@ -1,14 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useWayfinder } from '../context/WayfinderContext';
 import { ShieldCheck, Shield, FileText, CalendarClock, Backpack, Calendar, Receipt, Users } from 'lucide-react';
-import { ItineraryView } from './ItineraryView';
-import { DocumentCenter } from './DocumentCenter';
-import { PackingManager } from './packing/PackingManager';
-import { ExpenseLedger } from './budget/ExpenseLedger';
 import { CalendarSubscribeModal } from './calendar/CalendarSubscribeModal';
 import { ShareAgendaModal } from './ShareAgendaModal';
 import { getApiUrl } from '../utils/api';
+import { polandJourney } from '../data/poland-2026';
+import { formatCompactStopDates } from './Formatters';
+
+const ItineraryView = lazy(() =>
+  import('./ItineraryView').then((m) => ({ default: m.ItineraryView }))
+);
+const DocumentCenter = lazy(() =>
+  import('./DocumentCenter').then((m) => ({ default: m.DocumentCenter }))
+);
+const PackingManager = lazy(() =>
+  import('./packing/PackingManager').then((m) => ({ default: m.PackingManager }))
+);
+const ExpenseLedger = lazy(() =>
+  import('./budget/ExpenseLedger').then((m) => ({ default: m.ExpenseLedger }))
+);
 
 const AGENDA_REF = 'poland-christmas-2026';
 
@@ -99,9 +110,9 @@ export function PrivateHub({ currentPath }) {
 
   return (
     <div className="w-full flex flex-col">
-      {/* Sub-toolbar docked directly under the main header */}
-      <div className="w-full bg-slate-900/95 backdrop-blur-xl border-b border-white/10 shadow-lg relative z-20">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 flex items-center justify-between gap-2.5">
+      {/* Sub-toolbar locked directly under the main header on scroll */}
+      <div className="sticky top-14 sm:top-16 z-30 w-full bg-slate-950/95 border-b border-amber-500/25 shadow-xl">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5">
           {/* Compact Private Hub Identity */}
           <div className="flex items-center gap-2 shrink-0">
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs sm:text-sm font-bold shadow-sm">
@@ -110,7 +121,7 @@ export function PrivateHub({ currentPath }) {
             </div>
             <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 font-medium">
               <span className="text-slate-600">•</span>
-              <span>Poland Christmas 2026</span>
+              <span className="font-mono text-amber-300/90">Poland ({formatCompactStopDates(polandJourney.dates)})</span>
               {agendaRole && agendaRole !== 'owner' && (
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/25 capitalize font-medium">
                   {agendaRole}
@@ -119,8 +130,8 @@ export function PrivateHub({ currentPath }) {
             </div>
           </div>
 
-          {/* Subview Nav Toolbar: fits horizontally with zero scroll */}
-          <div className="flex items-center gap-1 sm:gap-1.5 bg-wf-navy-mid/90 p-1 rounded-xl border border-white/10 shrink-0">
+          {/* Subview Nav Toolbar: horizontally scrollable on narrow viewports with zero page overflow */}
+          <div className="flex items-center gap-1 sm:gap-1.5 bg-wf-navy-mid/90 p-1 rounded-xl border border-white/10 max-w-full overflow-x-auto scrollbar-none">
             <a
               href="/wayfinder/poland-christmas-2026/private"
               onClick={(e) => pushRoute(e, '/wayfinder/poland-christmas-2026/private')}
@@ -195,14 +206,18 @@ export function PrivateHub({ currentPath }) {
           <div className="flex items-center justify-center py-16 text-wf-muted text-sm">Verifying agenda access...</div>
         ) : isLocked ? (
           <NoAccessPanel role={agendaRole} onRetry={refreshAgendaAccess} pushRoute={pushRoute} />
-        ) : forbiddenTab ? null : isPacking ? (
-          <PackingManager />
-        ) : isExpenses ? (
-          <ExpenseLedger />
-        ) : isDocs ? (
-          <DocumentCenter initialDocId={routeDocId} agendaRole={agendaRole} />
-        ) : (
-          <ItineraryView />
+        ) : forbiddenTab ? null : (
+          <Suspense fallback={<div className="flex items-center justify-center py-16 text-wf-muted text-sm">Loading section...</div>}>
+            {isPacking ? (
+              <PackingManager />
+            ) : isExpenses ? (
+              <ExpenseLedger />
+            ) : isDocs ? (
+              <DocumentCenter initialDocId={routeDocId} agendaRole={agendaRole} />
+            ) : (
+              <ItineraryView />
+            )}
+          </Suspense>
         )}
       </div>
 

@@ -47,10 +47,13 @@ export async function ensureShareTables(db) {
 }
 
 export async function isPlatformAdmin(env, user) {
-  if (user?.isAdmin === true || user?.role === 'admin') return true;
+  if (!user || !user.userId || !env?.DB) return false;
   try {
-    const row = await env.DB.prepare('SELECT role, is_admin FROM users WHERE id = ?').bind(user.userId).first();
-    return Boolean(row && (row.role === 'admin' || row.is_admin === 1));
+    const row = await env.DB.prepare('SELECT role, is_admin, status FROM users WHERE id = ?').bind(user.userId).first();
+    if (!row) return false;
+    const status = row.status || 'Active';
+    if (status === 'Suspended' || (status !== 'Active' && status !== 'active')) return false;
+    return Boolean(row.role === 'admin' || row.is_admin === 1);
   } catch (e) {
     return false;
   }
@@ -99,6 +102,73 @@ export async function getCollaboratorIds(env, journey) {
   const ids = new Set((rows.results || []).map(r => r.user_id));
   if (journey.created_by && journey.created_by !== 'system') ids.add(journey.created_by);
   return [...ids];
+}
+
+// Ordered list of active agenda members ([{ id, name, email, role }]).
+export async function getAgendaMembers(env, journey) {
+  if (!journey) return [];
+  const roleByUserId = new Map();
+  if (journey.created_by && journey.created_by !== 'system') {
+    roleByUserId.set(journey.created_by, 'owner');
+  }
+  try {
+    const rows = await env.DB.prepare(
+      'SELECT user_id, role FROM wayfinder_agenda_shares WHERE agenda_id = ?'
+    ).bind(journey.id).all();
+    for (const row of rows.results || []) {
+      if (!row?.user_id) continue;
+      if (row.user_id === journey.created_by) {
+        roleByUserId.set(row.user_id, 'owner');
+      } else if (!roleByUserId.has(row.user_id)) {
+        roleByUserId.set(row.user_id, row.role || 'viewer');
+      }
+    }
+  } catch (err) {
+    if (!String(err?.message || '').includes('no such table')) {
+      console.error('getAgendaMembers shares query error:', err);
+    }
+  }
+
+  const userIds = [...roleByUserId.keys()];
+  if (userIds.length === 0) return [];
+
+  const usersById = new Map();
+  for (let i = 0; i < userIds.length; i += 80) {
+    const chunk = userIds.slice(i, i + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    try {
+      const userRows = await env.DB.prepare(
+        `SELECT id, name, email FROM users WHERE id IN (${placeholders})`
+      ).bind(...chunk).all();
+      for (const u of userRows.results || []) {
+        if (u?.id) usersById.set(u.id, u);
+      }
+    } catch (err) {
+      if (!String(err?.message || '').includes('no such table')) {
+        console.error('getAgendaMembers users query error:', err);
+      }
+    }
+  }
+
+  const roleRank = { owner: 0, admin: 1, editor: 2, viewer: 3 };
+  const members = userIds.map((id) => {
+    const u = usersById.get(id);
+    const role = roleByUserId.get(id) || 'viewer';
+    const fallbackName = role === 'owner' ? 'Agenda Owner' : 'Collaborator';
+    return {
+      id,
+      name: (u?.name || u?.email || fallbackName).trim(),
+      email: u?.email || null,
+      role,
+    };
+  });
+
+  members.sort((a, b) => {
+    const rankDiff = (roleRank[a.role] ?? 9) - (roleRank[b.role] ?? 9);
+    if (rankDiff !== 0) return rankDiff;
+    return a.name.localeCompare(b.name);
+  });
+  return members;
 }
 
 export const canEdit = (role) => role === 'owner' || role === 'admin' || role === 'editor';

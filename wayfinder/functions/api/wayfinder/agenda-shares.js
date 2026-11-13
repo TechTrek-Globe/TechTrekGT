@@ -5,13 +5,14 @@
 //   PUT    /api/wayfinder/agendas/:id/shares/:userId     change collaborator role (owner/admin)
 //   DELETE /api/wayfinder/agendas/:id/shares/:userId     remove collaborator (owner/admin)
 //   GET    /api/wayfinder/agendas/:id/access             caller role on agenda
+//   GET    /api/wayfinder/agendas/:id/members            list agenda members (member)
 //   GET    /api/wayfinder/invites/verify?token=          public token inspection
 //   POST   /api/wayfinder/invites/claim                  accept invite (session required)
 
 import { generateId } from '../../utils/id.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 import { sendInviteEmail } from '../../utils/inviteEmail.js';
-import { ensureShareTables, resolveAgendaAccess, canManage, sha256Hex, agendaPermissions } from '../../utils/agendaAccess.js';
+import { ensureShareTables, resolveAgendaAccess, canManage, isMember, getAgendaMembers, sha256Hex, agendaPermissions } from '../../utils/agendaAccess.js';
 
 const ROLES = ['viewer', 'editor', 'admin'];
 const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@]{1,253}\.[^\s@]{2,}$/;
@@ -65,7 +66,9 @@ export async function handleAgendaShares(context, url, method) {
 
   try {
     if (!env.DB) return json({ error: 'Database not available' }, 503);
-    await ensureShareTables(env.DB);
+    if (method !== 'GET' && method !== 'HEAD') {
+      await ensureShareTables(env.DB);
+    }
 
     // ---- Public: verify token ----
     if (seg[0] === 'invites' && seg[1] === 'verify' && method === 'GET') {
@@ -142,6 +145,17 @@ export async function handleAgendaShares(context, url, method) {
 
       if (seg[2] === 'access' && method === 'GET') {
         return json({ agendaId: journey.id, slug: journey.slug, role, permissions: agendaPermissions(role) });
+      }
+
+      if (seg[2] === 'members' && method === 'GET') {
+        if (!isMember(role)) return json({ error: 'Forbidden' }, 403);
+        const members = (await getAgendaMembers(env, journey)).map((m) => ({
+          id: m.id,
+          name: m.name,
+          email: canManage(role) || m.id === user.userId ? m.email : null,
+          role: m.role,
+        }));
+        return json({ agendaId: journey.id, slug: journey.slug, members });
       }
 
       if (!canManage(role)) return json({ error: 'Forbidden' }, 403);

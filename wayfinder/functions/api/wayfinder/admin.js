@@ -1,5 +1,6 @@
 // TechTrek Wayfinder - System Administration & Account Governance Handler
 // Handles user account listing, statistics, API key entitlement management, and account status updates.
+import { isPlatformAdmin } from '../../utils/agendaAccess.js';
 import { deleteUserAccount } from '../../utils/deleteAccount.js';
 
 function json(data, status = 200, extraHeaders = {}) {
@@ -13,21 +14,7 @@ function json(data, status = 200, extraHeaders = {}) {
  * Validates whether the caller possesses administrator privileges.
  */
 async function verifyAdminCaller(env, user) {
-  if (!user || !user.userId) return false;
-  if (user.isAdmin === true || user.role === 'admin') return true;
-
-  if (env.DB) {
-    try {
-      const dbUser = await env.DB.prepare(
-        'SELECT role, is_admin FROM users WHERE id = ?'
-      ).bind(user.userId).first();
-      return Boolean(dbUser && (dbUser.role === 'admin' || dbUser.is_admin === 1));
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
+  return isPlatformAdmin(env, user);
 }
 
 export async function handleAdmin(context, url, method) {
@@ -441,7 +428,7 @@ export async function handleAdmin(context, url, method) {
 
       const isAdminVal = role === 'admin' ? 1 : 0;
       await env.DB.prepare(
-        'UPDATE users SET role = ?, is_admin = ? WHERE id = ?'
+        'UPDATE users SET role = ?, is_admin = ?, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?'
       ).bind(role, isAdminVal, userId).run();
 
       return json({

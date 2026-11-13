@@ -1,4 +1,4 @@
-import { hashPassword, createToken, hmacHex, generateVerificationCode } from '../../utils/auth.js';
+import { hashPassword, createToken, hmacHex, generateVerificationCode, buildAuthCookieHeader } from '../../utils/auth.js';
 import { checkRateLimit } from '../../utils/rateLimit.js';
 import { sha256Hex } from '../../utils/agendaAccess.js';
 import { sendVerificationCodeEmail } from '../../utils/inviteEmail.js';
@@ -108,7 +108,7 @@ export async function onRequestPost(context) {
     // Insert user into shared users table (households table is deprecated across platform)
     await env.DB.prepare(
       `INSERT INTO users (id, email, password_hash, name, security_question, security_answer_hash, role, token_version, status, email_verified, email_verified_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'user', 0, 'Active', ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, 'user', 1, 'Active', ?, ?)`
     ).bind(userId, cleanEmail, passwordHash, name.trim(), cleanSecurityQuestion, securityAnswerHash, emailVerified, emailVerifiedAt).run();
 
     // If registering without an invite token, require email verification before signing in
@@ -166,21 +166,14 @@ export async function onRequestPost(context) {
 
     const maxAge = body.rememberMe ? 30 * 24 * 3600 : 7200;
 
-    // Create JWT token (only for pre-verified invite token registrations)
+    // Create minimal JWT token containing zero PII (only for pre-verified invite token registrations)
     const token = await createToken(
-      { userId, email: cleanEmail, householdId: null, name: name.trim(), role: 'user', isAdmin: false, apiKeyEnabled: false },
+      { userId, tv: 1 },
       env.JWT_SECRET,
       maxAge
     );
 
-    const cookieOptions = [
-      `auth_token=${token}`,
-      'HttpOnly',
-      'Secure',
-      'SameSite=Strict',
-      'Path=/',
-      `Max-Age=${maxAge}`
-    ].join('; ');
+    const cookieOptions = buildAuthCookieHeader(token, maxAge);
 
     return new Response(JSON.stringify({
       success: true,

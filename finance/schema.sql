@@ -399,6 +399,7 @@ CREATE TABLE IF NOT EXISTS finance_daily_matrix (
   PRIMARY KEY (ledger_id, account_id, month_key, day_num, field_key)
 );
 CREATE INDEX IF NOT EXISTS idx_finance_matrix_lookup ON finance_daily_matrix(ledger_id, account_id, month_key);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_finance_daily_matrix_ledger_field ON finance_daily_matrix(ledger_id, field_key);
 
 CREATE TABLE IF NOT EXISTS finance_account_statement_rows (
   ledger_id     TEXT NOT NULL,

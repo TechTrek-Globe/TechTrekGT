@@ -1,6 +1,6 @@
 import {
   authenticate, readJson, asTrimmedString, json, fail, withCookies, sessionCookies, newCsrfToken,
-  createToken, hashPassword, verifyPassword, validatePassword, issueOneTimeCode, ONE_TIME_CODE_TTL_MS,
+  createToken, issueSession, hashPassword, verifyPassword, validatePassword, issueOneTimeCode, ONE_TIME_CODE_TTL_MS,
   sendVerificationEmail, sendEmailChangeNotification, ERROR_CODES, toPublicUser,
   EMAIL_REGEX, MAX_BODY_AUTH, MAX_NAME_LEN, MAX_EMAIL_LEN, MAX_QUESTION_LEN, MAX_ANSWER_LEN,
   ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT, invalidateCachedUser
@@ -127,19 +127,11 @@ export async function onRequestPost(context) {
     // extending the session (fix H6).
     const now = Math.floor(Date.now() / 1000);
     const sexp = typeof payload.sexp === 'number' && payload.sexp > now ? payload.sexp : now + SESSION_TTL_DEFAULT;
-    const { token } = await createToken(
-      {
-        userId: user.id,
-        email: user.email,
-        name: updatedName,
-        tv: newTokenVersion,
-        sid: payload.sid || crypto.randomUUID()
-      },
-      env.JWT_SECRET,
-      ACCESS_TOKEN_TTL,
-      sexp
+    const { token, csrf, maxAge } = await issueSession(
+      env,
+      { ...user, name: updatedName, token_version: newTokenVersion },
+      { sessionExp: sexp }
     );
-    const csrf = newCsrfToken();
 
     return withCookies(
       json({
@@ -155,7 +147,7 @@ export async function onRequestPost(context) {
         }),
         csrfToken: csrf
       }),
-      sessionCookies(token, csrf, sexp - now)
+      sessionCookies(token, csrf, maxAge)
     );
   } catch (err) {
     if (issuedVerificationId && env?.DB) {

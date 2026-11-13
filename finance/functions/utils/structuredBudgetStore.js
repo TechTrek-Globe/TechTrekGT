@@ -676,16 +676,21 @@ export function buildStructuredWriteStatements(db, ledgerId, payload, dataByteLe
       const extraPayment = typeof ln.extraPayment === 'number' ? ln.extraPayment : 0;
       const startDate = typeof ln.startDate === 'string' ? ln.startDate : '';
       const isArchived = ln.isArchived ? 1 : 0;
+      const interestCompounding = typeof ln.interestCompounding === 'string' ? ln.interestCompounding : 'monthly';
+      const paymentFrequency = typeof ln.paymentFrequency === 'string' ? ln.paymentFrequency : 'monthly';
+      const paymentType = typeof ln.paymentType === 'string' ? ln.paymentType : 'amortizing';
       const extraJson = extractUnknownFields(ln, LOAN_KNOWN_KEYS);
       stmts.push(
         db.prepare(
           `INSERT INTO finance_loans (
             ledger_id, id, name, description, principal, annual_interest_rate,
-            term_months, monthly_payment, extra_payment, start_date, is_archived, sort_order, extra_json
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            term_months, monthly_payment, extra_payment, start_date, is_archived,
+            interest_compounding, payment_frequency, payment_type, sort_order, extra_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
           ledgerId, id, name, description, principal, annualInterestRate,
-          termMonths, monthlyPayment, extraPayment, startDate, isArchived, i, extraJson
+          termMonths, monthlyPayment, extraPayment, startDate, isArchived,
+          interestCompounding, paymentFrequency, paymentType, i, extraJson
         )
       );
     }
@@ -794,12 +799,12 @@ export async function readStructuredBudget(db, ledgerId, fallbackJsonStr = null)
         db.prepare('SELECT * FROM finance_funding_goals WHERE ledger_id = ? ORDER BY sort_order ASC').bind(ledgerId).all(),
         db.prepare('SELECT * FROM finance_loans WHERE ledger_id = ? ORDER BY sort_order ASC').bind(ledgerId).all(),
         db.prepare('SELECT * FROM finance_daily_matrix WHERE ledger_id = ?').bind(ledgerId).all(),
-        db.prepare('SELECT * FROM finance_account_statement_rows WHERE ledger_id = ?').bind(ledgerId).all().catch(() => ({ results: [] })),
-        db.prepare('SELECT * FROM finance_bill_splits WHERE ledger_id = ?').bind(ledgerId).all().catch(() => ({ results: [] })),
-        db.prepare('SELECT * FROM finance_person_allocations WHERE ledger_id = ?').bind(ledgerId).all().catch(() => ({ results: [] })),
-        db.prepare('SELECT * FROM finance_account_splits WHERE ledger_id = ?').bind(ledgerId).all().catch(() => ({ results: [] })),
-        db.prepare('SELECT * FROM finance_dashboard_widgets WHERE ledger_id = ? ORDER BY sort_order ASC').bind(ledgerId).all().catch(() => ({ results: [] })),
-        db.prepare('SELECT * FROM finance_categories WHERE ledger_id = ? ORDER BY sort_order ASC').bind(ledgerId).all().catch(() => ({ results: [] }))
+        db.prepare('SELECT * FROM finance_account_statement_rows WHERE ledger_id = ?').bind(ledgerId).all(),
+        db.prepare('SELECT * FROM finance_bill_splits WHERE ledger_id = ?').bind(ledgerId).all(),
+        db.prepare('SELECT * FROM finance_person_allocations WHERE ledger_id = ?').bind(ledgerId).all(),
+        db.prepare('SELECT * FROM finance_account_splits WHERE ledger_id = ?').bind(ledgerId).all(),
+        db.prepare('SELECT * FROM finance_dashboard_widgets WHERE ledger_id = ? ORDER BY sort_order ASC').bind(ledgerId).all(),
+        db.prepare('SELECT * FROM finance_categories WHERE ledger_id = ? ORDER BY sort_order ASC').bind(ledgerId).all()
       ]);
 
       const stmtRowsByAcct = {};
@@ -1062,9 +1067,9 @@ export async function readStructuredBudget(db, ledgerId, fallbackJsonStr = null)
           setField('extraPayment', Number(r.extra_payment));
           setField('startDate', r.start_date);
           setField('isArchived', Boolean(r.is_archived));
-          setField('interestCompounding', r.interest_compounding || 'monthly');
-          setField('paymentFrequency', r.payment_frequency || 'monthly');
-          setField('paymentType', r.payment_type || 'amortizing');
+          setField('interestCompounding', r.interest_compounding || extra.interestCompounding || 'monthly');
+          setField('paymentFrequency', r.payment_frequency || extra.paymentFrequency || 'monthly');
+          setField('paymentType', r.payment_type || extra.paymentType || 'amortizing');
 
           return out;
         });

@@ -238,7 +238,7 @@ export function normalizeFundingGoals(goals = [], people = [], accounts = []) {
     const normalized = {
       ...g,
       accountId: targetAccountId,
-      amountPerPay: Math.round(Number(amountPerPay || 0) * 100) / 100
+      amountPerPay: round2(amountPerPay, 0)
     };
     delete normalized.amount;
     delete normalized.frequency;
@@ -288,7 +288,7 @@ export function healShiftedLedgerRowsAndAlignMatrix(budget) {
     if (!accId) return;
 
     const matrixKey = `${accId}_${mKey}_${day}_bill_${bill.id}`;
-    const actualAmt = Math.abs(parseFloat(t.amount) || 0);
+    const actualAmt = Math.abs(round2(t.amount, 0));
     const existingVal = dailyMatrix[matrixKey];
 
     if (actualAmt > 0 && (existingVal === undefined || Math.abs((parseFloat(existingVal) || 0) - actualAmt) > 0.009)) {
@@ -404,7 +404,7 @@ export function rebuildLockedMatrixFromTransactions(budget) {
  * @param {Object} budget
  * @returns {{ budget: Object, wasMigrated: boolean, details: Object }}
  */
-export function runBudgetMigrations(budget) {
+export function runBudgetMigrations(budget, options = {}) {
   if (!budget || typeof budget !== 'object') {
     return { budget, wasMigrated: false, details: {} };
   }
@@ -510,36 +510,45 @@ export function runBudgetMigrations(budget) {
     currentVersion = 6;
   }
 
-  // Migration V6 -> V7: Resolve HOA starting balance to continuous 2026-01-01 ($2,791.07), lock past days, and re-align matrix
+  // Migration V6 -> V7: Resolve HOA starting balance (only if household recovery is explicitly requested or legacy fixture)
   if (currentVersion < 7) {
-    const { budget: healedBudget, modifiedCount: healCount } = healHoaStartingBalanceAndLock(migrated);
-    if (healCount > 0) {
-      migrated = healedBudget;
+    const hasHoaAcc = (migrated.accounts || []).some(a => a.id === 'acc-hoa');
+    const shouldRunV7 = Boolean(options?.enableHouseholdRecovery || migrated?._enableHouseholdRecovery || hasHoaAcc);
+    if (shouldRunV7) {
+      const { budget: healedBudget, modifiedCount: healCount } = healHoaStartingBalanceAndLock(migrated, options);
+      if (healCount > 0) {
+        migrated = healedBudget;
+      }
+      migrationDetails.v7 = {
+        healedHoaStartingBalanceCount: healCount
+      };
+    } else {
+      migrationDetails.v7 = { skipped: true };
     }
 
     migrated.schemaVersion = 7;
     wasMigrated = true;
-
-    migrationDetails.v7 = {
-      healedHoaStartingBalanceCount: healCount
-    };
     currentVersion = 7;
   }
 
-  // Migration V7 -> V8: Purge stale future/projected importedLedgerRows (phantom $1,514.90 ending markers),
-  // align authentic 43 bank transactions, and restore exact verified statement ending checkpoints ($1,739.00)
+  // Migration V7 -> V8: Purge stale future/projected importedLedgerRows (only if household recovery is explicitly requested or legacy fixture)
   if (currentVersion < 8) {
-    const { budget: healedBudget, modifiedCount: healCount } = healHoaBankStatementAndPurgeStaleRows(migrated);
-    if (healCount > 0) {
-      migrated = healedBudget;
+    const hasHoaAcc = (migrated.accounts || []).some(a => a.id === 'acc-hoa');
+    const shouldRunV8 = Boolean(options?.enableHouseholdRecovery || migrated?._enableHouseholdRecovery || hasHoaAcc);
+    if (shouldRunV8) {
+      const { budget: healedBudget, modifiedCount: healCount } = healHoaBankStatementAndPurgeStaleRows(migrated, options);
+      if (healCount > 0) {
+        migrated = healedBudget;
+      }
+      migrationDetails.v8 = {
+        healedHoaBankStatementCount: healCount
+      };
+    } else {
+      migrationDetails.v8 = { skipped: true };
     }
 
     migrated.schemaVersion = 8;
     wasMigrated = true;
-
-    migrationDetails.v8 = {
-      healedHoaBankStatementCount: healCount
-    };
   }
 
   return { budget: migrated, wasMigrated, details: migrationDetails };
@@ -589,7 +598,7 @@ export function healHoaAndBillMappings(budget) {
     if (!accId) return;
 
     const matrixKey = `${accId}_${mKey}_${day}_bill_${bill.id}`;
-    const actualAmt = Math.abs(parseFloat(t.amount) || 0);
+    const actualAmt = Math.abs(round2(t.amount, 0));
     if (actualAmt > 0 && dailyMatrix[matrixKey] !== actualAmt) {
       dailyMatrix[matrixKey] = actualAmt;
       modifiedCount++;
@@ -616,10 +625,10 @@ export function healHoaAndBillMappings(budget) {
       if (diff > 0.01) {
         // Find 2025-12-31 transaction net (e.g. interest)
         const t1231 = updatedTransactions.filter(t => t.accountId === acc.id && t.date === '2025-12-31');
-        const net1231 = t1231.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-        const correctEndTotal = parseFloat(row2026.totalBeg) || 0;
-        const correctEndReg = parseFloat(row2026.regBeg) ?? correctEndTotal;
-        const correctEndExtra = parseFloat(row2026.extraBeg) ?? 0;
+        const net1231 = round2(t1231.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0));
+        const correctEndTotal = round2(row2026.totalBeg, 0);
+        const correctEndReg = round2(row2026.regBeg ?? correctEndTotal, 0);
+        const correctEndExtra = round2(row2026.extraBeg ?? 0, 0);
 
         const correctStartReg = round2(correctEndReg - net1231);
         const correctStartExtra = round2(correctEndExtra);
@@ -669,8 +678,9 @@ export function healHoaAndBillMappings(budget) {
  * @param {Object} budget
  * @returns {{ budget: Object, modifiedCount: number }}
  */
-export function healHoaStartingBalanceAndLock(budget) {
+export function healHoaStartingBalanceAndLock(budget, options = {}) {
   if (!budget || typeof budget !== 'object') return { budget, modifiedCount: 0 };
+  const isExplicit = Boolean(options?.enableHouseholdRecovery || budget?._enableHouseholdRecovery);
 
   const accounts = Array.isArray(budget.accounts) ? budget.accounts.map(a => ({ ...a })) : [];
   const transactions = Array.isArray(budget.transactions) ? budget.transactions.map(t => ({ ...t })) : [];
@@ -680,7 +690,9 @@ export function healHoaStartingBalanceAndLock(budget) {
 
   // 1. Resolve starting balance and ledgerMode for HOA Savings:
   const updatedAccounts = accounts.map(acc => {
-    const isHoa = (acc.name || '').toLowerCase().includes('hoa') || (acc.id || '').includes('hoa');
+    const isHoa = isExplicit
+      ? ((acc.name || '').toLowerCase().includes('hoa') || (acc.id || '').includes('hoa'))
+      : (acc.id === 'acc-hoa');
     const startBal = parseFloat(acc.startingBalance) || 0;
     const extraBal = parseFloat(acc.extraStartingBalance) || 0;
     const totalStart = round2(startBal + extraBal);
@@ -800,8 +812,9 @@ export function healHoaStartingBalanceAndLock(budget) {
  * @param {Object} budget
  * @returns {{ budget: Object, modifiedCount: number }}
  */
-export function healHoaBankStatementAndPurgeStaleRows(budget) {
+export function healHoaBankStatementAndPurgeStaleRows(budget, options = {}) {
   if (!budget || typeof budget !== 'object') return { budget, modifiedCount: 0 };
+  const isExplicit = Boolean(options?.enableHouseholdRecovery || budget?._enableHouseholdRecovery);
 
   const accounts = Array.isArray(budget.accounts) ? budget.accounts.map(a => ({ ...a })) : [];
   let transactions = Array.isArray(budget.transactions) ? budget.transactions.map(t => ({ ...t })) : [];
@@ -810,7 +823,10 @@ export function healHoaBankStatementAndPurgeStaleRows(budget) {
   const people = Array.isArray(budget.people) ? budget.people : [];
   let modifiedCount = 0;
 
-  const hoa = accounts.find(a => (a.name || '').toLowerCase().includes('hoa') || (a.id || '').includes('hoa'));
+  const hoa = accounts.find(a => isExplicit
+    ? ((a.name || '').toLowerCase().includes('hoa') || (a.id || '').includes('hoa'))
+    : (a.id === 'acc-hoa')
+  );
   if (!hoa) return { budget, modifiedCount: 0 };
 
   const hoaBills = bills.filter(b => b.accountId === hoa.id);

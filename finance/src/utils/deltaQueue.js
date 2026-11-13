@@ -33,9 +33,9 @@ if (typeof window !== 'undefined') {
 
 function getDedupKey(op) {
   if (op.op === 'upsert_matrix_cell' || op.op === 'delete_matrix_cell') {
-    return `${op.ledgerId || ''}:${op.op}:${op.key}`;
+    return `${op.ledgerId || ''}:${op.key}`;
   }
-  return `${op.ledgerId || ''}:${op.op}:${op.key || op.id || JSON.stringify(op)}`;
+  return `${op.ledgerId || ''}:${op.key || op.id || JSON.stringify(op)}`;
 }
 
 export function enqueueDelta(op) {
@@ -89,10 +89,18 @@ export async function flushDeltaQueue(options = {}) {
     });
 
     if (!res.ok) {
-      // Restore on HTTP error if not superseded by a newer mutation
-      for (const [k, v] of snapshot) {
-        if (!pendingOps.has(k)) {
-          pendingOps.set(k, v);
+      if (res.status === 400 || res.status === 403 || res.status === 404) {
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+          window.dispatchEvent(new CustomEvent('techtrek:delta-sync-rejected', {
+            detail: { status: res.status, count: ledgerBatch.length }
+          }));
+        }
+      } else {
+        // Restore on temporary error if not superseded by a newer mutation
+        for (const [k, v] of snapshot) {
+          if (!pendingOps.has(k)) {
+            pendingOps.set(k, v);
+          }
         }
       }
     }
@@ -118,7 +126,7 @@ export async function flushDeltaQueue(options = {}) {
  * @param {Function} getLedgerId - Callback returning active ledger ID
  */
 export function initDeltaQueueLifecycle(getLedgerId) {
-  if (typeof document === 'undefined') return;
+  if (typeof document === 'undefined') return () => {};
   activeLedgerResolver = getLedgerId;
 
   const onUnloadFlush = () => {
@@ -126,15 +134,19 @@ export function initDeltaQueueLifecycle(getLedgerId) {
     flushDeltaQueue({ keepalive: true, force: true }).catch(() => {});
   };
 
-  document.addEventListener('visibilitychange', () => {
+  const onVisibilityChange = () => {
     if (document.visibilityState === 'hidden') {
       onUnloadFlush();
     }
-  });
+  };
 
-  window.addEventListener('beforeunload', () => {
-    onUnloadFlush();
-  });
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('beforeunload', onUnloadFlush);
+
+  return () => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('beforeunload', onUnloadFlush);
+  };
 }
 
 /**
@@ -145,5 +157,13 @@ export function clearDeltaQueue() {
   flushTimer = null;
   firstEnqueueTime = null;
   pendingOps.clear();
+}
+
+/**
+ * Returns a copy of pending delta operations.
+ * @returns {Array<Object>}
+ */
+export function getPendingDeltaOps() {
+  return [...pendingOps.values()];
 }
 

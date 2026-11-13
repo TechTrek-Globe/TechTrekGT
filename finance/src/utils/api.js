@@ -78,10 +78,14 @@ export async function apiFetch(endpoint, options = {}) {
 
   const res = await fetch(url, opts);
 
-  if (res.status === 401 && typeof window !== 'undefined') {
+  if ((res.status === 401 || res.status === 403) && typeof window !== 'undefined') {
     const clone = res.clone();
     clone.json().then(data => {
-      if (data?.code && (data.code === ERROR_CODES.SESSION_EXPIRED || data.code === ERROR_CODES.UNAUTHORIZED)) {
+      if (data?.code && (
+        data.code === ERROR_CODES.SESSION_EXPIRED ||
+        data.code === ERROR_CODES.UNAUTHORIZED ||
+        data.code === ERROR_CODES.ACCOUNT_SUSPENDED
+      )) {
         window.dispatchEvent(new CustomEvent('techtrek:session-expired', { detail: data }));
       }
     }).catch(() => {});

@@ -272,4 +272,25 @@ For every existing user, their personal ledger ID is identical to their user ID 
   - `users` (primary record)
 - If the calling administrator deletes their own account, session cookies are cleared automatically.
 
+## 12. Security, Persistence & Math Remediation Invariants (Phase 1 & 2 Audit)
+
+### 12.1 Authentication & Session Cache State Invariants
+- **Session Cookie & CSRF Cleanup Order:** In `AuthContext.jsx`, `setCsrfToken(null)`, `setUser(null)`, and local session storage purges execute inside a `finally` block *after* `await apiFetch('/api/auth/logout')`, ensuring CSRF verification passes on the logout call and credentials clear even on network failure.
+- **Inactivity Timer Closure Stability:** The 15-minute inactivity timeout invokes `logoutRef.current()` rather than an inlined stale closure, ensuring clean session termination during uninterrupted usage.
+- **Client Routing Transition:** Session expiry events (`techtrek:session-expired`) dispatch `techtrek:navigate` with `{ path: '/finance' }`, allowing the single-page application router to handle view state transitions without raw `pushState` de-synchronization.
+- **Live KV Edge Session Caching (`USER_CACHE`):** Active user identity and authentication claims are cached in Cloudflare KV (`17a4f483c801496e92837c1b050c66e4`) with a 60-second TTL. Cache records are invalidated immediately upon user status changes, password updates, or session revocations.
+
+### 12.2 Delta Queue & CAS Persistence Invariants
+- **Delta Queue Deduplication Keying:** Delta mutation queue in `src/utils/deltaQueue.js` keys operations strictly by `${ledgerId}:${key}` (excluding operation type), ensuring `upsert -> delete -> upsert` pipelines resolve last-write-wins without duplicate statement generation.
+- **Terminal Rejection Cleanup:** Permanent 4xx HTTP responses (`400`, `403`, `404`) during delta flushes drop the rejected mutations from `pendingOps` and broadcast `techtrek:delta-sync-rejected` rather than re-enqueuing failing operations indefinitely.
+- **CAS Verification Sequencing in `handleSyncBackup`:** The Compare-And-Swap batch update against `user_backups` executes and checks `changes > 0 || force` *before* generating and batching relational statements via `buildStructuredWriteStatements`. Stale client pushes are rejected with HTTP 409 `SYNC_CONFLICT` without modifying relational tables.
+- **Delta Sync Timestamp Bumping:** `handleSyncDelta` updates `user_backups.updated_at_ms = Date.now()` upon processing matrix cell mutations, ensuring subsequent `GET /api/sync/restore` requests receive a fresh ETag and do not return stale HTTP 304 responses.
+- **Relational Loan Schema Integrity:** Loan fields (`interestCompounding`, `paymentFrequency`, `paymentType`) are bound to first-class table columns in `finance_loans` and mapped to/from `extra_json` fallback without loss. Database read errors propagate as HTTP 500 rather than swallowing exceptions.
+
+### 12.3 Financial Math & Running Balance Invariants
+- **Strict Currency Validation:** Multi-dot and multi-minus numeric strings are rejected by `round2()` and `isValidMoney()`, returning safe default zeros.
+- **Canonical Running Balance Engine:** `calculateRunningBalanceAsOf` in `src/utils/ledgerEngine.js` unifies balance projection across `LedgerDataContext.jsx` and `spreadsheet.js`, enforcing a unified `2024-01-01` baseline date, checking `lineItems` overrides, filtering archived bills, and capping iteration loops at `maxDays = 1826`.
+- **Importer Column Alignment & Bi-Weekly Math:** `parseGenericFlat` preserves raw column indices across blank headers, and `matchCreditToEarner` standardizes bi-weekly earner matching on `(amount * 26) / 12`.
+- **Migration Fixture Gating:** V7 and V8 migrations in `budgetMigrations.js` are strictly guarded by `hasHoaAcc` (`acc.id === 'acc-hoa'`) or `options.enableHouseholdRecovery`, ensuring non-fixture user budgets are never mutated by legacy fixture logic.
+
 

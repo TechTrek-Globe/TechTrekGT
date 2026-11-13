@@ -80,6 +80,7 @@ export function InviteClaim() {
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok || !data.valid) {
+          try { sessionStorage.removeItem(PENDING_KEY); } catch {}
           setFailure(REASON_TEXT[data.reason] || 'Unable to verify this invitation.');
         } else {
           setInfo(data);
@@ -115,6 +116,12 @@ export function InviteClaim() {
         throw new Error(data.error || `Could not accept invitation (HTTP ${res.status})`);
       }
       try { sessionStorage.removeItem(PENDING_KEY); } catch {}
+      if (data?.ledgerId) {
+        try { sessionStorage.setItem('finance_active_ledger_id', data.ledgerId); } catch {}
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('techtrek:switch-ledger', { detail: { ledgerId: data.ledgerId } }));
+        }
+      }
       setClaimed(true);
       setTimeout(() => navigate(DASHBOARD_PATH), 900);
     } catch (err) {

@@ -178,14 +178,22 @@ export function parseGenericFlat(arrayBuffer) {
   }
 
   // GAP-1: Strip UTF-8 BOM that Windows/Excel adds to the first CSV byte
-  const headers = rawRows[headerRowIdx].map(h => String(h).replace(/^\uFEFF/, '').trim()).filter(h => h !== '');
+  // Preserve raw column index mapping so blank header cells do not shift subsequent columns
+  const rawHeaderRow = rawRows[headerRowIdx] || [];
+  const headerEntries = rawHeaderRow
+    .map((h, idx) => ({ name: String(h).replace(/^\uFEFF/, '').trim(), index: idx }))
+    .filter(entry => entry.name !== '');
+  const headers = headerEntries.map(e => e.name);
+
   // GAP-3: Tighten filter - exclude rows where every cell is empty or whitespace-only
   const dataRows = rawRows.slice(headerRowIdx + 1)
     .filter(r => r.some(c => String(c).trim() !== ''));
 
   const rows = dataRows.map(r => {
     const obj = {};
-    headers.forEach((h, i) => { obj[h] = r[i] !== undefined ? String(r[i]).trim() : ''; });
+    headerEntries.forEach(entry => {
+      obj[entry.name] = r[entry.index] !== undefined ? String(r[entry.index]).trim() : '';
+    });
     return obj;
   });
 
@@ -814,11 +822,11 @@ export function matchCreditToEarner({
   const getBillCost = (b) => {
     if (!b) return 0;
     const period = b.period || 'Monthly';
-    const bAmt = parseFloat(b.amount) || 0;
-    if (period === 'Quarterly') return bAmt / 3;
-    if (period === 'Semi-Annual') return bAmt / 6;
-    if (period === 'Annual') return bAmt / 12;
-    return bAmt;
+    const bAmt = parseMoney(b.amount, 0);
+    if (period === 'Quarterly') return round2(bAmt / 3);
+    if (period === 'Semi-Annual') return round2(bAmt / 6);
+    if (period === 'Annual') return round2(bAmt / 12);
+    return round2(bAmt);
   };
 
   // Scaled near-match tolerance: 0.5% of amount, minimum $0.02, maximum $2.00
@@ -861,24 +869,26 @@ export function matchCreditToEarner({
           bestCandidate = { person: p, label, delta: deltaAlloc };
         }
 
-        // Monthly equivalent (two paychecks for semi-monthly / bi-weekly).
-        // IMPORTANT: A monthly-doubled value is a derived/computed match, not a direct
+        // Monthly equivalent (two paychecks for semi-monthly, 26/12 for bi-weekly).
+        // IMPORTANT: A monthly-scaled value is a derived/computed match, not a direct
         // per-paycheck allocation. Apply a synthetic confidence penalty of $0.50 so that
         // a direct per-paycheck allocation for any earner (even processed later in the loop)
-        // always beats a monthly-double tie.
-        const isBiOrSemi = p.payFrequency === 'semi-monthly' || p.payFrequency === 'bi-weekly';
-        if (isBiOrSemi) {
-          const monthlyAlloc = round2(allocAmt * 2);
+        // always beats a monthly-scaled tie.
+        const isSemi = p.payFrequency === 'semi-monthly';
+        const isBi = p.payFrequency === 'bi-weekly';
+        if (isSemi || isBi) {
+          const monthlyAlloc = isBi ? round2((allocAmt * 26) / 12) : round2(allocAmt * 2);
           const deltaMonthly = Math.abs(monthlyAlloc - rawAmt);
-          // Penalize the effective delta for a derived monthly-double to preserve ranking
+          // Penalize the effective delta for a derived monthly-scaled value to preserve ranking
           // priority for direct per-paycheck matches from any earner processed later.
           const MONTHLY_DOUBLE_PENALTY = 0.50;
           const effectiveDeltaMonthly = deltaMonthly + MONTHLY_DOUBLE_PENALTY;
           if (deltaMonthly <= tolerance && effectiveDeltaMonthly < minDelta) {
             const accName = accounts.find(a => a.id === accId)?.name || accId;
+            const cadenceName = isBi ? 'Annualized Monthly' : 'Monthly';
             const label = accId === targetAccountId
-              ? `${p.name} Monthly Allocation ($${monthlyAlloc.toFixed(2)})`
-              : `${p.name} Monthly Allocation via ${accName} ($${monthlyAlloc.toFixed(2)})`;
+              ? `${p.name} ${cadenceName} Allocation ($${monthlyAlloc.toFixed(2)})`
+              : `${p.name} ${cadenceName} Allocation via ${accName} ($${monthlyAlloc.toFixed(2)})`;
             minDelta = effectiveDeltaMonthly;
             bestCandidate = { person: p, label, delta: deltaMonthly };
           }
@@ -961,14 +971,16 @@ export function matchCreditToEarner({
         minDelta = deltaNet;
         bestCandidate = { person: p, label: `${p.name} Net Paycheck ($${netPay.toFixed(2)})`, delta: deltaNet };
       }
-      // Monthly net (two paychecks for semi-monthly / bi-weekly)
-      const isBiOrSemi = p.payFrequency === 'semi-monthly' || p.payFrequency === 'bi-weekly';
-      if (isBiOrSemi) {
-        const netMonthly = round2(netPay * 2);
+      // Monthly net (two paychecks for semi-monthly, 26/12 for bi-weekly)
+      const isSemi = p.payFrequency === 'semi-monthly';
+      const isBi = p.payFrequency === 'bi-weekly';
+      if (isSemi || isBi) {
+        const netMonthly = isBi ? round2((netPay * 26) / 12) : round2(netPay * 2);
         const deltaNetMonthly = Math.abs(netMonthly - rawAmt);
         if (deltaNetMonthly <= tolerance && deltaNetMonthly < minDelta) {
           minDelta = deltaNetMonthly;
-          bestCandidate = { person: p, label: `${p.name} Monthly Net ($${netMonthly.toFixed(2)})`, delta: deltaNetMonthly };
+          const cadenceName = isBi ? 'Annualized Monthly' : 'Monthly';
+          bestCandidate = { person: p, label: `${p.name} ${cadenceName} Net ($${netMonthly.toFixed(2)})`, delta: deltaNetMonthly };
         }
       }
     }

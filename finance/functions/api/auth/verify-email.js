@@ -49,22 +49,17 @@ export async function onRequestPost(context) {
       ).bind(cleanEmail).first();
 
       if (!targetUser) {
-        return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'No account found for that email address.', requestId);
+        return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Invalid verification code or email address.', requestId);
+      }
+
+      if (targetUser.status === 'suspended') {
+        return fail(ERROR_CODES.ACCOUNT_SUSPENDED, 403, 'Your account has been suspended.', requestId);
       }
     }
 
     if (Number(targetUser.email_verified) === 1 || Boolean(targetUser.email_verified_at)) {
       if (isUnauthenticated) {
-        const { token, csrf, maxAge } = await issueSession(env, targetUser, { rememberMe: Boolean(body.rememberMe) });
-        return withCookies(
-          json({
-            success: true,
-            message: 'Email is already verified.',
-            user: toPublicUser(targetUser),
-            csrfToken: csrf
-          }),
-          sessionCookies(token, csrf, maxAge)
-        );
+        return fail(ERROR_CODES.VALIDATION_ERROR, 400, 'Email is already verified. Please sign in.', requestId);
       }
       return json({ success: true, message: 'Email is already verified.' });
     }

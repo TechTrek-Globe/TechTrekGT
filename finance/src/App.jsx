@@ -240,7 +240,7 @@ function MainContent({ pathname, navigateTo, onNavigateHome }) {
             {activeView === 'sync'        && <BackupSyncView onNavigateView={handleNavigateView} />}
             {activeView === 'settings'    && <SettingsView onNavigateView={handleNavigateView} />}
             {activeView === 'admin'       && (
-              user?.isAdmin ? (
+              (user?.role === 'admin' || Boolean(user?.isAdmin)) ? (
                 <AdminView />
               ) : (
                 <div className="flex flex-col items-center justify-center p-12 text-center min-h-[50vh]">
@@ -298,16 +298,6 @@ export default function App() {
     logState('APP_INIT', `Finance application initialized on route: ${route}`, { route, pathname });
   }, []);
 
-  useEffect(() => {
-    const handlePopState = () => {
-      const newPath = window.location.pathname;
-      logState('ROUTER_POPSTATE', `Browser popstate event navigated to: ${newPath}`, { pathname: newPath, view: getViewFromPathname(newPath) });
-      setPathname(newPath);
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
-
   const navigateTo = useCallback((path) => {
     if (typeof window !== 'undefined') {
       logState('ROUTER_PUSHSTATE', `SPA pushState navigation: ${window.location.pathname} -> ${path}`, {
@@ -321,6 +311,25 @@ export default function App() {
       setPathname(path);
     }
   }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const newPath = window.location.pathname;
+      logState('ROUTER_POPSTATE', `Browser popstate event navigated to: ${newPath}`, { pathname: newPath, view: getViewFromPathname(newPath) });
+      setPathname(newPath);
+    };
+    const handleCustomNavigate = (e) => {
+      if (e?.detail?.path) {
+        navigateTo(e.detail.path);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('techtrek:navigate', handleCustomNavigate);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('techtrek:navigate', handleCustomNavigate);
+    };
+  }, [navigateTo]);
 
   return (
     <ErrorBoundary>

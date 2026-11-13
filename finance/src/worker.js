@@ -647,11 +647,14 @@ async function handleSyncBackup(context) {
       const dataRow = await env.DB.prepare(
         'SELECT data FROM user_backups WHERE id = ?'
       ).bind(targetLedgerId).first();
-      let serverData;
-      try {
-        serverData = dataRow && dataRow.data ? JSON.parse(dataRow.data) : null;
-      } catch {
-        serverData = dataRow ? dataRow.data : null;
+      const structured = await readStructuredBudget(env.DB, targetLedgerId, dataRow?.data);
+      let serverData = structured.ok ? structured.budget : null;
+      if (!serverData) {
+        try {
+          serverData = dataRow && dataRow.data ? JSON.parse(dataRow.data) : null;
+        } catch {
+          serverData = dataRow ? dataRow.data : null;
+        }
       }
       emitMetric('sync.backup.conflict', context.requestId);
       return json({
@@ -729,12 +732,7 @@ async function handleSyncBackup(context) {
     );
     const userBackupsIdx = queries.length - 1;
 
-    // Atomically write structured relational tables when CAS condition passes (or force = true)
-    const canWriteStructured = force || !row || !hasBaseVersion || storedVersion <= baseVersion;
-    if (canWriteStructured) {
-      queries.push(...buildStructuredWriteStatements(env.DB, targetLedgerId, payload, dataByteLength, now));
-    }
-
+    // Atomically execute CAS backup writes first
     const batchResults = await env.DB.batch(queries);
 
     const backupResult = batchResults && batchResults[userBackupsIdx];
@@ -755,11 +753,14 @@ async function handleSyncBackup(context) {
             : (freshRow.updated_at ? new Date(freshRow.updated_at).getTime() : 0))
         : null;
 
-      let serverData;
-      try {
-        serverData = freshRow && freshRow.data ? JSON.parse(freshRow.data) : null;
-      } catch {
-        serverData = freshRow ? freshRow.data : null;
+      const structured = await readStructuredBudget(env.DB, targetLedgerId, freshRow?.data);
+      let serverData = structured.ok ? structured.budget : null;
+      if (!serverData) {
+        try {
+          serverData = freshRow && freshRow.data ? JSON.parse(freshRow.data) : null;
+        } catch {
+          serverData = freshRow ? freshRow.data : null;
+        }
       }
 
       emitMetric('sync.backup.conflict', context.requestId);
@@ -770,6 +771,15 @@ async function handleSyncBackup(context) {
         serverData: serverData && serverData.budget !== undefined ? serverData.budget : serverData,
         serverVersion: freshVersion
       }, 409);
+    }
+
+    // CAS verified and persisted. Atomically write structured relational tables
+    const structuredStatements = buildStructuredWriteStatements(env.DB, targetLedgerId, payload, dataByteLength, now);
+    if (structuredStatements && structuredStatements.length > 0) {
+      const BATCH_CHUNK_SIZE = 100;
+      for (let i = 0; i < structuredStatements.length; i += BATCH_CHUNK_SIZE) {
+        await env.DB.batch(structuredStatements.slice(i, i + BATCH_CHUNK_SIZE));
+      }
     }
 
     emitMetric('sync.backup.success', context.requestId);
@@ -818,7 +828,8 @@ async function handleSyncDelta(context) {
       if (!mut || typeof mut !== 'object') continue;
       switch (mut.op) {
         case 'upsert_matrix_cell': {
-          if (typeof mut.key !== 'string' || !mut.key) continue;
+          if (typeof mut.key !== 'string' || !mut.key || mut.key.length > 100) continue;
+          if (typeof mut.strValue === 'string' && mut.strValue.length > 500) continue;
           const { accountId, monthKey, dayNum } = parseMatrixCompositeKey(mut.key);
           const numVal = typeof mut.numValue === 'number' && Number.isFinite(mut.numValue) ? mut.numValue : null;
           const strVal = typeof mut.strValue === 'string' ? mut.strValue : (mut.numValue === null ? '__NULL__' : null);
@@ -832,7 +843,7 @@ async function handleSyncDelta(context) {
           break;
         }
         case 'delete_matrix_cell': {
-          if (typeof mut.key !== 'string' || !mut.key) continue;
+          if (typeof mut.key !== 'string' || !mut.key || mut.key.length > 100) continue;
           stmts.push(env.DB.prepare(
             `DELETE FROM finance_daily_matrix WHERE ledger_id = ? AND field_key = ?`
           ).bind(targetLedgerId, mut.key));
@@ -844,9 +855,19 @@ async function handleSyncDelta(context) {
     }
 
     if (stmts.length === 0) return json({ success: true, unchanged: true });
+
+    const now = Date.now();
+    stmts.push(env.DB.prepare(
+      `INSERT INTO user_backups (id, data, data_byte_length, updated_at, updated_at_ms)
+       VALUES (?, '{}', 2, datetime('now'), ?)
+       ON CONFLICT(id) DO UPDATE SET
+         updated_at = datetime('now'),
+         updated_at_ms = excluded.updated_at_ms`
+    ).bind(targetLedgerId, now));
+
     await env.DB.batch(stmts);
     emitMetric('sync.delta.success', context.requestId);
-    return json({ success: true, ops: stmts.length });
+    return json({ success: true, ops: stmts.length - 1, version: now });
   } catch (err) {
     console.error('[sync/delta] error:', context.requestId ? { requestId: context.requestId } : '', err && err.message);
     return fail(ERROR_CODES.INTERNAL_ERROR, 500, 'Delta sync failed.', context.requestId);

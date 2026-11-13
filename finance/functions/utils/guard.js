@@ -34,6 +34,9 @@ export function round2(val, defaultVal = 0) {
   const isParenNeg = /^\s*\(.*\)\s*$/.test(str);
   const cleaned = str.replace(/[^0-9.-]+/g, '');
   if (!cleaned || cleaned === '-' || cleaned === '.') return defaultVal;
+  if ((cleaned.match(/\./g) || []).length > 1) return defaultVal;
+  if ((cleaned.match(/-/g) || []).length > 1) return defaultVal;
+  if (cleaned.indexOf('-') > 0) return defaultVal;
   const num = parseFloat(cleaned);
   if (!Number.isFinite(num)) return defaultVal;
   const signed = (isParenNeg && num > 0) ? -num : (str.startsWith('-') && num > 0 ? -num : num);
@@ -58,6 +61,9 @@ export function isValidMoney(val) {
   if (!str || /[a-zA-Z]{2,}/.test(str)) return false;
   const cleaned = str.replace(/[^0-9.-]+/g, '');
   if (!cleaned || cleaned === '-' || cleaned === '.') return false;
+  if ((cleaned.match(/\./g) || []).length > 1) return false;
+  if ((cleaned.match(/-/g) || []).length > 1) return false;
+  if (cleaned.indexOf('-') > 0) return false;
   return Number.isFinite(parseFloat(cleaned));
 }
 

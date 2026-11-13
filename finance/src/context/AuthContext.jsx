@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { getApiUrl, apiFetch, setCsrfToken, getCsrfToken } from '../utils/api';
 
 import { isNetworkError } from '../utils/networkError';
@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [turnstileConfig, setTurnstileConfig] = useState({ enabled: false, siteKey: null });
+  const logoutRef = useRef(null);
 
   // Fetch Turnstile bot verification configuration
   useEffect(() => {
@@ -55,7 +56,7 @@ export function AuthProvider({ children }) {
       window.dispatchEvent(new CustomEvent('techtrek:user-logout', { detail: { userId: e?.detail?.userId || null, reason: 'session-expired' } }));
       setIsAuthModalOpen(true);
       if (typeof window !== 'undefined') {
-        window.history.pushState({}, '', '/finance');
+        window.dispatchEvent(new CustomEvent('techtrek:navigate', { detail: { path: '/finance' } }));
       }
     };
     window.addEventListener('techtrek:session-expired', handleSessionExpired);
@@ -108,7 +109,11 @@ export function AuthProvider({ children }) {
         lastStorageWrite = now;
       }
       timer = setTimeout(() => {
-        logout();
+        if (logoutRef.current) {
+          logoutRef.current();
+        } else {
+          logout();
+        }
         setIsAuthModalOpen(true);
       }, INACTIVITY_TIMEOUT);
     };
@@ -222,11 +227,14 @@ export function AuthProvider({ children }) {
    * @param {string} securityAnswer
    * @param {boolean} rememberMe
    */
-  const register = async (name, email, password, securityQuestion, securityAnswer, rememberMe = false, turnstileToken = null) => {
+  const register = async (name, email, password, securityQuestion, securityAnswer, rememberMe = false, turnstileToken = null, inviteToken = null) => {
     try {
       const payload = { name, email, password, securityQuestion, securityAnswer, rememberMe };
       if (turnstileToken) {
         payload.turnstileToken = turnstileToken;
+      }
+      if (inviteToken) {
+        payload.inviteToken = inviteToken;
       }
       const res = await apiFetch('/api/auth/register', {
         method: 'POST',
@@ -384,22 +392,26 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     const signedInUserId = currentUserId || getCurrentUserId();
-    window.dispatchEvent(new CustomEvent('techtrek:user-logout', { detail: { userId: signedInUserId, reason: 'logout' } }));
-    sessionStorage.removeItem('personal_budget_last_activity');
-    setIsAuthenticated(false);
-    setUser(null);
-    setCsrfTokenState(null);
-    setCsrfToken(null);
-    setCurrentUserId(null);
-    if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', '/finance');
-    }
     try {
       await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch (e) {
       // ignore
+    } finally {
+      window.dispatchEvent(new CustomEvent('techtrek:user-logout', { detail: { userId: signedInUserId, reason: 'logout' } }));
+      sessionStorage.removeItem('personal_budget_last_activity');
+      try { window.sessionStorage.removeItem('tt_signed_in_user_id'); } catch {}
+      setIsAuthenticated(false);
+      setUser(null);
+      setCsrfTokenState(null);
+      setCsrfToken(null);
+      setCurrentUserId(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('techtrek:navigate', { detail: { path: '/finance' } }));
+      }
     }
   };
+
+  logoutRef.current = logout;
 
   return (
     <AuthContext.Provider value={{

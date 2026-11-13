@@ -62,10 +62,9 @@
     }
   ],
   "kv_namespaces": [
-    // {
-    //   "binding": "RATE_LIMIT_KV",
-    //   "id": "<YOUR_KV_NAMESPACE_ID_HERE>",
-    //   "comment": "Run `npx wrangler kv:namespace create RATE_LIMIT_KV` and paste the ID above"
-    // }
+    {
+      "binding": "USER_CACHE",
+      "id": "17a4f483c801496e92837c1b050c66e4"
+    }
   ]
 }

@@ -1,6 +1,6 @@
 import {
   authenticate, readJson, asTrimmedString, json, fail, withCookies, sessionCookies,
-  newCsrfToken, createToken, constantTimeStringEqual, hmacHex, toPublicUser,
+  newCsrfToken, issueSession, constantTimeStringEqual, hmacHex, toPublicUser,
   MAX_BODY_AUTH, ACCESS_TOKEN_TTL, SESSION_TTL_DEFAULT, ERROR_CODES, invalidateCachedUser
 } from '../../utils/auth.js';
 import { enforceRateLimit } from '../../utils/rateLimit.js';
@@ -83,19 +83,11 @@ export async function onRequestPost(context) {
 
     const now = Math.floor(Date.now() / 1000);
     const sexp = typeof payload.sexp === 'number' && payload.sexp > now ? payload.sexp : now + SESSION_TTL_DEFAULT;
-    const { token } = await createToken(
-      {
-        userId: user.id,
-        email: newEmail,
-        name: user.name,
-        tv: newTokenVersion,
-        sid: payload.sid || crypto.randomUUID()
-      },
-      env.JWT_SECRET,
-      ACCESS_TOKEN_TTL,
-      sexp
+    const { token, csrf, maxAge } = await issueSession(
+      env,
+      { ...user, email: newEmail, token_version: newTokenVersion },
+      { sessionExp: sexp }
     );
-    const csrf = newCsrfToken();
 
     return withCookies(
       json({
@@ -108,7 +100,7 @@ export async function onRequestPost(context) {
         }),
         csrfToken: csrf
       }),
-      sessionCookies(token, csrf, sexp - now)
+      sessionCookies(token, csrf, maxAge)
     );
   } catch (err) {
     console.error('[confirm-email-change] error:', err && err.message);

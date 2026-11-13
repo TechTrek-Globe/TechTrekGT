@@ -9,7 +9,7 @@ import { enqueueDelta, initDeltaQueueLifecycle, clearDeltaQueue } from '../utils
 import { getBudgetData, saveBudgetData, clearAndRestoreBudgetData, clearBudgetData, migrateLegacyBudgetToUser, listBudgetRecordKeys, getCurrentUserId, budgetRecordKey, openDB, LEGACY_BUDGET_KEY } from '../utils/indexedDB';
 import { processSpreadsheetImport } from '../utils/spreadsheet';
 import { isBillDueInMonth, effectiveDueDay } from '../utils/paydayUtils';
-import { allocateEarnerCredit } from '../utils/ledgerEngine';
+import { allocateEarnerCredit, calculateRunningBalanceAsOf } from '../utils/ledgerEngine';
 import { round2, parseMoney } from '../utils/formatters';
 import { pruneInvalidMatrixDayKeys, runBudgetMigrations, CURRENT_BUDGET_SCHEMA_VERSION } from '../migrations/budgetMigrations';
 import { logSync, logTransaction, logMatrix, logLedger, logState } from '../utils/logger';
@@ -222,7 +222,7 @@ export function LedgerDataProvider({ children }) {
 
   // FIX-31: Initialize browser lifecycle hooks to flush pending delta mutations on tab hide / unload
   useEffect(() => {
-    initDeltaQueueLifecycle(() => activeLedgerId || currentUserId || getCurrentUserId());
+    return initDeltaQueueLifecycle(() => activeLedgerId || currentUserId || getCurrentUserId());
   }, [activeLedgerId, currentUserId]);
 
 
@@ -1408,151 +1408,16 @@ export function LedgerDataProvider({ children }) {
 
   // Calculates true running balance from start date to target date using matrix simulation rules
   const getCalculatedBalanceAsOf = useCallback((accountId, targetDateObj) => {
-    if (!accountId || !targetDateObj) return { regEnding: 0, extraEnding: 0, totalEnd: 0, reg: 0, extra: 0, total: 0 };
-    const acc = (metadataStateRef.current.accounts || []).find(a => a.id === accountId);
-    if (!acc) return { regEnding: 0, extraEnding: 0, totalEnd: 0, reg: 0, extra: 0, total: 0 };
-
-    const showExtra = acc.enableExtraSavings !== false;
-    const startDateStr = acc.balanceAsOfDate || acc.startDate || '2026-01-01';
-    const [sy, sm, sd] = startDateStr.split('-');
-    const startDateObj = new Date(parseInt(sy), parseInt(sm) - 1, parseInt(sd));
-    
-    // Normalize targetDate to midnight
-    const target = new Date(targetDateObj.getFullYear(), targetDateObj.getMonth(), targetDateObj.getDate());
-    
-    if (target < startDateObj) {
-        const sReg = parseMoney(acc.startingBalance, 0);
-        const sExtra = showExtra ? parseMoney(acc.extraStartingBalance, 0) : 0;
-        const total = round2(sReg + sExtra);
-        return { 
-          regEnding: sReg, 
-          extraEnding: sExtra, 
-          totalEnd: total,
-          reg: sReg,
-          extra: sExtra,
-          total
-        };
-    }
-
-    const accTxns = (transactionsRef.current || []).filter(t => t.accountId === acc.id && t.date);
-    const maxTxnDate = accTxns.length > 0 ? accTxns.map(t => t.date).sort().pop() : null;
-    const isImportMode = acc.ledgerMode === 'import' || (acc.importedLedgerRows && Object.keys(acc.importedLedgerRows).length > 0) || accTxns.length > 0;
-    const importedRows = isImportMode ? (acc.importedLedgerRows || {}) : {};
-    const importedDatesList = Object.keys(importedRows);
-    const maxImportDateStr = importedDatesList.length > 0 ? importedDatesList.reduce((a, b) => a > b ? a : b) : null;
-    const maxDataDate = [maxImportDateStr, maxTxnDate].filter(Boolean).sort().pop() || null;
-
-    let runningRegBeg = parseMoney(acc.startingBalance, 0);
-    let runningExtraBeg = showExtra ? parseMoney(acc.extraStartingBalance, 0) : 0;
-
-    const allPeople = metadataStateRef.current.people || [];
-    const people = (acc.enabledEarners && Array.isArray(acc.enabledEarners))
-      ? allPeople.filter(p => acc.enabledEarners.includes(p.id))
-      : allPeople;
-    const accountBills = (metadataStateRef.current.bills || []).filter(b => b.accountId === accountId);
-    
-    const today = new Date();
-    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-    const earnerPlanCache = new Map();
-    people.forEach(p => {
-      const planDep = round2(getPersonDepositAmountForAccount(p, accountId, metadataStateRef.current));
-      const planExtra = planDep > 0 ? round2(getPersonExtraSavingsDepositAmountForAccount(p, accountId, metadataStateRef.current)) : 0;
-      earnerPlanCache.set(p.id, { planDeposit: planDep, planExtra });
+    return calculateRunningBalanceAsOf({
+      targetAccountId: accountId,
+      targetDate: targetDateObj,
+      metadataState: metadataStateRef.current,
+      dailyMatrix: dailyMatrixRef.current,
+      transactions: transactionsRef.current,
+      lineItems: lineItemsRef.current,
+      detailed: true
     });
-
-    let cur = new Date(startDateObj);
-    while (cur <= target) {
-      const year = cur.getFullYear();
-      const month = cur.getMonth();
-      const day = cur.getDate();
-      const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
-      const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      
-      // P6: clamp import lock boundary to today so future dates project normally.
-      const todayLockStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      const effectiveLockEnd = maxDataDate && maxDataDate < todayLockStr ? maxDataDate : todayLockStr;
-      const isLockedDay = Boolean(isImportMode && maxDataDate && isoDate <= effectiveLockEnd);
-
-
-      // 1. Credits
-      let dayCredits = 0;
-      let dayExtraAdd = 0;
-      people.forEach(p => {
-        const plan = earnerPlanCache.get(p.id);
-        const alloc = allocateEarnerCredit(p, accountId, year, month, day, metadataStateRef.current, dailyMatrixRef.current, {
-          isLockedDay: isLockedDay,
-          planDeposit: plan?.planDeposit,
-          planExtra: plan?.planExtra
-        });
-        dayCredits = round2(dayCredits + alloc.earnerReg);
-        dayExtraAdd = round2(dayExtraAdd + alloc.earnerExtra);
-      });
-
-      // 2. Bills
-      let dayBills = 0;
-      // Track whether any bill on this day has a manual dailyMatrix override so
-      // the importedRows ending-balance anchor can be bypassed when needed.
-      let hasDayBillOverride = false;
-      accountBills.forEach(b => {
-        const customBill = getDailyMatrixCell(accountId, monthKey, day, `bill_${b.id}`);
-        let amt = 0;
-        const expectedBillAmt = round2(b.amount);
-        if (customBill !== undefined) {
-          hasDayBillOverride = true;
-          amt = parseMoney(customBill, 0);
-        } else if (!isLockedDay) {
-          const actualAmt = getActualAmount(b.id, monthKey);
-          if (actualAmt !== null && effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
-            amt = actualAmt;
-          } else if (actualAmt !== null) {
-            amt = 0;
-          } else if (!b.isArchived && effectiveDueDay(b, year, month) === day && isBillDueInMonth(b, month, true)) {
-            amt = expectedBillAmt;
-          }
-        }
-        dayBills = round2(dayBills + amt);
-      });
-
-      // 3. Other (consolidated credit and debit affects extra savings balance)
-      const customOther = getDailyMatrixCell(accountId, monthKey, day, 'other_amount');
-      const customOtherCredit = getDailyMatrixCell(accountId, monthKey, day, 'other_credit_amount');
-      let otherAmt = 0;
-      if (customOther !== undefined) otherAmt = round2(otherAmt + parseMoney(customOther, 0));
-      if (customOtherCredit !== undefined) otherAmt = round2(otherAmt + parseMoney(customOtherCredit, 0));
-
-      // FIX-08 / FIX-16: ending = round2(beginning + credits - bills + other) every day.
-      // Other $ belongs to regular operating deductions/credits.
-      // Never replace it with reg_ending, extra_ending, or importedLedgerRows values.
-      let regEnding = round2(runningRegBeg + dayCredits - dayBills + otherAmt);
-      let extraEnding = showExtra ? round2(runningExtraBeg + dayExtraAdd) : 0;
-      if (extraEnding < 0 && regEnding > 0) {
-        const transfer = Math.min(regEnding, -extraEnding);
-        extraEnding = round2(extraEnding + transfer);
-        regEnding = round2(regEnding - transfer);
-      } else if (regEnding < 0 && extraEnding > 0) {
-        const transfer = Math.min(extraEnding, -regEnding);
-        regEnding = round2(regEnding + transfer);
-        extraEnding = round2(extraEnding - transfer);
-      }
-
-      runningRegBeg = regEnding;
-      runningExtraBeg = extraEnding;
-
-      cur.setDate(cur.getDate() + 1);
-    }
-
-    const extraEnding = showExtra ? runningExtraBeg : 0;
-    const totalEnd = round2(runningRegBeg + extraEnding);
-    return {
-      regEnding: runningRegBeg,
-      extraEnding,
-      totalEnd,
-      reg: runningRegBeg,
-      extra: extraEnding,
-      total: totalEnd
-    };
-  }, [getDailyMatrixCell, getActualAmount, isPersonDepositDay, getPersonDepositAmountForAccount, getPersonExtraSavingsDepositAmountForAccount]);
+  }, []);
 
   const getTotalCashOnHand = useCallback((accountsOverride, asOfDate) => {
     const accounts = accountsOverride || metadataState.accounts || [];

@@ -160,7 +160,7 @@ export function AppLayout({ children, onNavigateHome, onNavigateView, activeView
   } = useBudget();
 
   const { user, logout, verifyEmail, resendVerification } = useAuth();
-  const isAdmin = Boolean(user?.isAdmin);
+  const isAdmin = user?.role === 'admin' || Boolean(user?.isAdmin);
 
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [verifyCode, setVerifyCode] = useState('');

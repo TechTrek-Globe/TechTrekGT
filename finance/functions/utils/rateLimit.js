@@ -17,7 +17,8 @@ export async function checkRateLimit(env, key, maxRequests, windowSeconds, isPro
       const stub = env.RATE_LIMITER.get(id);
       const res = await stub.fetch('https://rl/check', {
         method: 'POST',
-        body: JSON.stringify({ max: maxRequests, window: windowSeconds })
+        body: JSON.stringify({ max: maxRequests, window: windowSeconds }),
+        signal: AbortSignal.timeout(2000)
       });
       const data = await res.json();
       return data.allowed

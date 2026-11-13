@@ -242,6 +242,10 @@ export function asTrimmedString(value, maxLen) {
   return trimmed;
 }
 
+export function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 /* ------------------------------------------------------------------ */
 /* Password hashing (fix C2)                                          */
 /* ------------------------------------------------------------------ */
@@ -621,7 +625,7 @@ export async function setCachedUser(userId, userData, env, ttlSeconds = USER_CAC
       const res = new Response(JSON.stringify(safeData), {
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': `public, max-age=${ttlSeconds}, s-maxage=${ttlSeconds}`
+          'Cache-Control': `private, max-age=${ttlSeconds}, s-maxage=${ttlSeconds}`
         }
       });
       await caches.default.put(req, res);
@@ -767,16 +771,19 @@ export async function withAuth(fn) {
 export async function issueSession(env, user, options = {}) {
   const rememberMe = Boolean(options && options.rememberMe);
   const now = Math.floor(Date.now() / 1000);
-  const sessionTtl = rememberMe ? SESSION_TTL_REMEMBER : SESSION_TTL_DEFAULT;
-  const sessionExp = now + sessionTtl;
+  const sessionTtl = typeof options?.sessionExp === 'number' && options.sessionExp > now
+    ? options.sessionExp - now
+    : (rememberMe ? SESSION_TTL_REMEMBER : SESSION_TTL_DEFAULT);
+  const sessionExp = typeof options?.sessionExp === 'number' && options.sessionExp > now
+    ? options.sessionExp
+    : now + sessionTtl;
   const { token } = await createToken(
     {
       userId: user.id,
       email: user.email,
       name: user.name,
       role: user.role || 'user',
-      tv: Number(user.token_version || 0),
-      sid: crypto.randomUUID()
+      tv: Number(user.token_version || 0)
     },
     env.JWT_SECRET,
     ACCESS_TOKEN_TTL,
@@ -860,7 +867,8 @@ export async function sendTransactionalEmail(env, {
           subject,
           text,
           html: renderedHtml
-        })
+        }),
+        signal: AbortSignal.timeout(8000)
       });
     };
 
@@ -912,7 +920,7 @@ export async function sendResetEmail(env, toEmail, code, securityQuestion) {
     '<div style="background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px 24px; text-align: center; margin: 24px 0;">',
     `<span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #2563eb; font-family: \'Courier New\', Courier, monospace;">${code}</span>`,
     '</div>',
-    securityQuestion ? `<p style="font-size: 14px; color: #475569;">You will also be asked your security question: <b>${securityQuestion}</b></p>` : '',
+    securityQuestion ? `<p style="font-size: 14px; color: #475569;">You will also be asked your security question: <b>${escapeHtml(securityQuestion)}</b></p>` : '',
     '<p style="font-size: 13px; color: #64748b; line-height: 1.5;">This code will expire in 15 minutes and can only be used once.</p>',
     '<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />',
     '<p style="font-size: 12px; color: #94a3b8;">If you did not request this password reset, no changes have been made to your account. Sent by TechTrek Finance OS.</p>',
@@ -1067,7 +1075,8 @@ export async function verifyTurnstile(token, env, ip = null, requestId = null) {
 
     const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
-      body: formData
+      body: formData,
+      signal: AbortSignal.timeout(5000)
     });
 
     if (!res.ok) {

@@ -113,7 +113,8 @@ export async function dispatchEmail(env, { sender, to, subject, text, html }) {
           subject,
           text,
           html
-        })
+        }),
+        signal: AbortSignal.timeout(8000)
       });
     };
 

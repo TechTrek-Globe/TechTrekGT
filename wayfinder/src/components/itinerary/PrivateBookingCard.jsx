@@ -252,13 +252,13 @@ export function PrivateBookingCard({ item, reorderControls }) {
       >
         {/* Top bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center space-x-2.5">
+          <div className="flex items-center space-x-2.5 min-w-0">
             <div className={`p-2 rounded-xl border ${theme.icon} shrink-0`}>
               {getBookingIcon(docType)}
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                <h3 className="font-bold text-white text-base sm:text-lg leading-tight">
+                <h3 className="font-bold text-white text-base sm:text-lg leading-tight truncate max-w-full">
                   {item.title || item.tour_name || item.hotel_name || item.restaurant_name || `Private ${getBookingLabel(docType)}`}
                 </h3>
                 <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold flex items-center space-x-1 ${theme.badge}`}>
@@ -272,11 +272,11 @@ export function PrivateBookingCard({ item, reorderControls }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="text-xs text-slate-400 hover:text-amber-300 flex items-center space-x-1 mt-0.5 transition-colors group/loc cursor-pointer inline-flex max-w-fit"
+                  className="text-xs text-slate-400 hover:text-amber-300 flex items-center space-x-1 mt-0.5 transition-colors group/loc cursor-pointer inline-flex max-w-full min-w-0"
                   title="Open navigation directions in Google Maps"
                 >
                   <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover/loc:scale-110 transition-transform" />
-                  <span className="underline decoration-slate-600 hover:decoration-amber-400 underline-offset-2">
+                  <span className="underline decoration-slate-600 hover:decoration-amber-400 underline-offset-2 break-words">
                     {displayLocation}
                   </span>
                   <ExternalLink className="w-3 h-3 text-slate-500 group-hover/loc:text-amber-300 opacity-70 ml-0.5 shrink-0" />

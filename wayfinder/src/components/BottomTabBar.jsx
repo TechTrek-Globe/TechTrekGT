@@ -10,7 +10,7 @@ function TabItem({ icon: Icon, label, href, isActive, onClick, colorActive = 'te
     <a
       href={href}
       onClick={onClick}
-      className={`flex flex-col items-center justify-center flex-1 py-2 gap-0.5 rounded-xl transition-all min-h-[56px] ${
+      className={`flex flex-col items-center justify-center flex-1 py-2 gap-0.5 rounded-xl transition-all min-h-[56px] min-w-[44px] ${
         isActive
           ? `${colorActive} ${bgActive}`
           : 'text-slate-500 hover:text-slate-300'
@@ -90,7 +90,7 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
         />
         <button
           onClick={onOpenConverter}
-          className="flex flex-col items-center justify-center flex-1 py-2 gap-0.5 rounded-xl text-slate-500 hover:text-amber-400 transition-all min-h-[56px]"
+          className="flex flex-col items-center justify-center flex-1 py-2 gap-0.5 rounded-xl text-slate-500 hover:text-amber-400 transition-all min-h-[56px] min-w-[44px]"
           aria-label="Open Currency Converter"
         >
           <Coins className="w-5 h-5" strokeWidth={2} />

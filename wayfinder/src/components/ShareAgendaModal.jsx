@@ -88,17 +88,17 @@ export function ShareAgendaModal({ isOpen, onClose, agendaId, agendaTitle }) {
 
   const roleOptions = myRole === 'owner' ? ['viewer', 'editor', 'admin'] : ['viewer', 'editor'];
   const pending = invites.filter((i) => i.status === 'pending' && !i.is_expired);
-  const field = 'w-full px-3 py-2 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-wf-blue';
+  const field = 'w-full px-3 py-2 bg-wf-navy-mid border border-white/10 rounded-xl text-base sm:text-sm text-white focus:outline-none focus:border-wf-blue';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto glass-panel border border-white/10 rounded-2xl p-5 sm:p-6 bg-slate-900" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg max-h-[90dvh] overflow-y-auto glass-panel border border-white/10 rounded-2xl p-5 sm:p-6 bg-slate-900" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2"><Users className="w-5 h-5 text-sky-400" /> Share agenda</h2>
             {agendaTitle && <p className="text-xs text-wf-muted mt-0.5">{agendaTitle}</p>}
           </div>
-          <button onClick={onClose} className="text-wf-muted hover:text-white" aria-label="Close"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="p-2 min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center text-wf-muted hover:text-white hover:bg-white/10 transition-colors" aria-label="Close"><X className="w-5 h-5" /></button>
         </div>
 
         {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
@@ -119,7 +119,7 @@ export function ShareAgendaModal({ isOpen, onClose, agendaId, agendaTitle }) {
               {created.emailSent ? `Invitation sent to ${created.email} from no-reply@techtrekgt.com.` : `Email could not be delivered${created.emailError ? ` (${created.emailError})` : ''}. Share the link manually below:`}
             </p>
             <div className="flex gap-2">
-              <input readOnly value={created.inviteLink} onFocus={(e) => e.target.select()} className={`${field} flex-1 text-xs`} />
+              <input readOnly value={created.inviteLink} onFocus={(e) => e.target.select()} className={`${field} flex-1 text-base sm:text-xs`} />
               <button type="button" onClick={() => copyLink(created.inviteLink)} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs flex items-center gap-1.5">
                 {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />} {copied ? 'Copied' : 'Copy link'}
               </button>
@@ -135,10 +135,10 @@ export function ShareAgendaModal({ isOpen, onClose, agendaId, agendaTitle }) {
             <li key={s.user_id} className="flex items-center justify-between gap-2 text-sm text-slate-200 bg-white/5 rounded-lg px-3 py-2">
               <span className="truncate">{s.name || s.email}<span className="text-xs text-wf-muted ml-1">{s.name ? s.email : ''}</span></span>
               <span className="flex items-center gap-2 shrink-0">
-                <select value={s.role} disabled={s.role === 'admin' && myRole !== 'owner'} onChange={(e) => changeRole(s.user_id, e.target.value)} className="bg-wf-navy-mid border border-white/10 rounded-md text-xs text-white px-1.5 py-1">
+                <select value={s.role} disabled={s.role === 'admin' && myRole !== 'owner'} onChange={(e) => changeRole(s.user_id, e.target.value)} className="bg-wf-navy-mid border border-white/10 rounded-md text-base sm:text-xs text-white px-2 py-1 min-h-[36px]">
                   {['viewer', 'editor', ...(myRole === 'owner' || s.role === 'admin' ? ['admin'] : [])].map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
-                <button onClick={() => removeShare(s.user_id)} disabled={s.role === 'admin' && myRole !== 'owner'} className="text-red-400 hover:text-red-300 disabled:opacity-30" aria-label="Remove collaborator"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => removeShare(s.user_id)} disabled={s.role === 'admin' && myRole !== 'owner'} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-red-400 hover:text-red-300 disabled:opacity-30" aria-label="Remove collaborator"><Trash2 className="w-4 h-4" /></button>
               </span>
             </li>
           ))}

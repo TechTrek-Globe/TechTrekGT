@@ -752,7 +752,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
       {/* Review & Approve Modal */}
       {reviewingJob && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-wf-navy/95 backdrop-blur-md animate-fade-in overflow-y-auto">
-          <div className="w-full max-w-2xl bg-wf-navy-mid border border-white/15 rounded-3xl shadow-2xl overflow-hidden glass-card flex flex-col max-h-[90vh] my-auto">
+          <div className="w-full max-w-2xl bg-wf-navy-mid border border-white/15 rounded-3xl shadow-2xl overflow-hidden glass-card flex flex-col max-h-[90dvh] my-auto">
             <div className="p-5 sm:p-6 border-b border-white/10 flex items-center justify-between bg-wf-navy shrink-0">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-wf-blue/20 rounded-xl text-wf-blue-lt">
@@ -765,8 +765,9 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
               </div>
               <button 
                 onClick={() => { setReviewingJob(null); setModalError(null); }}
-                className="p-1.5 text-wf-muted hover:text-white rounded-lg transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-wf-muted hover:text-white rounded-lg transition-colors cursor-pointer"
                 title="Close"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -796,7 +797,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                       type="text"
                       value={fieldOverrides[field.field_name] ?? field.extracted_value ?? ''}
                       onChange={(e) => setFieldOverrides({ ...fieldOverrides, [field.field_name]: e.target.value })}
-                      className="w-full px-3 py-2 bg-wf-navy-mid border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-wf-blue"
+                      className="w-full px-3 py-2 bg-wf-navy-mid border border-white/10 rounded-lg text-base sm:text-sm text-white focus:outline-none focus:border-wf-blue"
                     />
                   </div>
                 ))
@@ -835,17 +836,17 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
       {/* Document Viewer Modal */}
       {selectedDoc && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 bg-wf-navy/95 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-5xl h-full max-h-[90vh] bg-wf-navy-mid border border-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden glass-card">
-            <div className="p-4 border-b border-white/10 flex items-center justify-between bg-wf-navy">
-              <div className="flex items-center space-x-3">
-                <FileText className="w-5 h-5 text-wf-blue-lt" />
+          <div className="w-full max-w-5xl h-full max-h-[90dvh] bg-wf-navy-mid border border-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden glass-card">
+            <div className="p-4 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-wf-navy">
+              <div className="flex items-center space-x-3 min-w-0">
+                <FileText className="w-5 h-5 text-wf-blue-lt shrink-0" />
                 <h3 className="text-white font-medium truncate">{selectedDoc.safe_display_name || selectedDoc.filename}</h3>
                 {getDocStatusBadge(selectedDoc.processing_status)}
               </div>
-              <div className="flex items-center space-x-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <button 
                   onClick={() => openReviewModal(selectedDoc.id)}
-                  className="px-3 py-1.5 bg-wf-blue/20 hover:bg-wf-blue/30 text-wf-blue-lt border border-wf-blue/40 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
+                  className="px-3 py-1.5 bg-wf-blue/20 hover:bg-wf-blue/30 text-wf-blue-lt border border-wf-blue/40 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer min-h-[36px]"
                 >
                   <Eye className="w-3.5 h-3.5" />
                   <span>Review Extracted Fields</span>
@@ -854,7 +855,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                   <>
                     <button 
                       onClick={() => handleOpenRename(selectedDoc)}
-                      className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
+                      className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer min-h-[36px]"
                       title="Rename document title"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
@@ -862,7 +863,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                     </button>
                     <button 
                       onClick={() => setDocToDelete(selectedDoc)}
-                      className="px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
+                      className="px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer min-h-[36px]"
                       title="Delete this document and purge linked bookings"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -870,8 +871,8 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                     </button>
                   </>
                 )}
-                <div className="w-px h-5 bg-white/10" />
-                <button onClick={closeViewer} className="text-wf-muted hover:text-white font-medium text-sm transition-colors cursor-pointer">
+                <div className="w-px h-5 bg-white/10 hidden sm:block" />
+                <button onClick={closeViewer} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-wf-muted hover:text-white font-medium text-sm transition-colors cursor-pointer">
                   Close
                 </button>
               </div>
@@ -905,7 +906,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in"
           onClick={(e) => { if (e.target === e.currentTarget) closePdfPreview(); }}
         >
-          <div className="w-full max-w-5xl bg-wf-navy-mid border border-white/15 rounded-3xl shadow-2xl flex flex-col overflow-hidden glass-card" style={{ height: 'min(90vh, 900px)' }}>
+          <div className="w-full max-w-5xl bg-wf-navy-mid border border-white/15 rounded-3xl shadow-2xl flex flex-col overflow-hidden glass-card" style={{ height: 'min(90dvh, 900px)' }}>
             {/* Header */}
             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-wf-navy shrink-0">
               <div className="flex items-center space-x-3 min-w-0">
@@ -979,8 +980,9 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                 )}
                 <button
                   onClick={closePdfPreview}
-                  className="p-2 text-wf-muted hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                  className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-wf-muted hover:text-white hover:bg-white/10 rounded-xl transition-colors"
                   title="Close (ESC)"
+                  aria-label="Close"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1061,7 +1063,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
       {/* Synced Booking Detail Modal */}
       {selectedBooking && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="relative w-full max-w-xl bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+          <div className="relative w-full max-w-xl bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-6 max-h-[90dvh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
               <div className="flex items-center space-x-3.5">
@@ -1089,7 +1091,8 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
               <button
                 type="button"
                 onClick={() => setSelectedBooking(null)}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1251,7 +1254,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                 <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                   Imported Email Details & Notes
                 </div>
-                <div className="p-4 rounded-2xl bg-slate-950/90 border border-white/10 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                <div className="p-4 rounded-2xl bg-slate-950/90 border border-white/10 font-mono text-xs text-slate-300 whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed max-h-48 overflow-y-auto">
                   {selectedBooking.notes.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n')}
                 </div>
               </div>
@@ -1350,8 +1353,9 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                       e.stopPropagation();
                       handleOpenRename(doc);
                     }}
-                    className="opacity-0 group-hover/title:opacity-100 p-1 rounded-md text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 transition-all cursor-pointer shrink-0"
+                    className="opacity-100 sm:opacity-0 sm:group-hover/title:opacity-100 p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-md text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 transition-all cursor-pointer shrink-0"
                     title="Rename document title"
+                    aria-label="Rename document title"
                   >
                     <Edit2 className="w-3 h-3" />
                   </button>
@@ -1402,8 +1406,9 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                             e.stopPropagation();
                             handleOpenRename(doc);
                           }}
-                          className="p-1 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer"
                           title="Rename document title"
+                          aria-label="Rename document title"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
@@ -1413,8 +1418,9 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                             e.stopPropagation();
                             setDocToDelete(doc);
                           }}
-                          className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                           title="Delete document and purge linked bookings"
+                          aria-label="Delete document"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1448,7 +1454,8 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                 <button
                   type="button"
                   onClick={() => setDocToRename(null)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  aria-label="Close"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1465,7 +1472,7 @@ export function DocumentCenter({ journeyId = 'poland-christmas-2026', agendaRole
                     onChange={(e) => setRenameInputTitle(e.target.value)}
                     placeholder="e.g. Hotel Experior Boutique (Kraków)"
                     autoFocus
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-white/15 focus:border-amber-400 rounded-xl text-white text-sm font-medium focus:outline-none transition-colors"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-white/15 focus:border-amber-400 rounded-xl text-white text-base sm:text-sm font-medium focus:outline-none transition-colors"
                   />
                   <p className="text-[11px] text-slate-400 mt-1.5">
                     Original filename: <span className="font-mono text-slate-300">{docToRename.original_filename || docToRename.safe_display_name}</span>

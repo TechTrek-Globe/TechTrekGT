@@ -89,7 +89,7 @@ export function CurrencyConverterModal({ isOpen, onClose }) {
       />
 
       {/* Floating Popover Card: Floating near top header, about 20% of screen (~300px wide) */}
-      <div className="fixed top-16 right-3 sm:right-8 md:right-14 z-[100] w-72 sm:w-80 max-w-[92vw] bg-wf-navy/95 border border-white/20 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden text-white animate-in zoom-in-95 duration-150">
+      <div className="fixed top-16 right-3 sm:right-8 md:right-14 z-[100] w-72 sm:w-80 max-w-[92vw] max-h-[90dvh] bg-wf-navy/95 border border-white/20 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-y-auto text-white animate-in zoom-in-95 duration-150">
         
         {/* Compact Header */}
         <div className="px-3 py-2.5 border-b border-white/10 glass-panel flex items-center justify-between">
@@ -104,8 +104,9 @@ export function CurrencyConverterModal({ isOpen, onClose }) {
           {/* X Close Button */}
           <button
             onClick={onClose}
-            className="p-1 rounded-lg bg-white/5 hover:bg-white/20 border border-white/10 text-wf-muted hover:text-white transition-all active:scale-95"
+            className="p-2 min-h-[44px] min-w-[44px] rounded-lg bg-white/5 hover:bg-white/20 border border-white/10 text-wf-muted hover:text-white transition-all active:scale-95 flex items-center justify-center"
             title="Close Converter"
+            aria-label="Close Converter"
           >
             <X className="w-4 h-4" />
           </button>

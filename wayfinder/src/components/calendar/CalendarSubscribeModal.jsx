@@ -103,9 +103,9 @@ export function CalendarSubscribeModal({ isOpen, onClose }) {
   const outlookUrl = urls.outlook_url || '';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
       <div 
-        className="relative w-full max-w-2xl bg-gradient-to-b from-slate-900 to-wf-navy border border-white/15 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in"
+        className="relative w-full max-w-2xl bg-gradient-to-b from-slate-900 to-wf-navy border border-white/15 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] animate-scale-in"
         role="dialog"
         aria-modal="true"
         aria-labelledby="calendar-modal-title"
@@ -134,7 +134,7 @@ export function CalendarSubscribeModal({ isOpen, onClose }) {
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />

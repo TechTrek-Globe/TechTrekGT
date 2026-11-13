@@ -53,7 +53,7 @@ export function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-slate-950 w-full max-w-full overflow-x-clip">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col font-sans bg-slate-950 w-full max-w-full overflow-x-clip">
       {/* Background glow effects - Radial gradients without expensive blend compositing */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-0 right-0 w-[800px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(45,106,159,0.14)_0%,transparent_70%)] transform translate-x-1/3 -translate-y-1/3" />
@@ -61,7 +61,7 @@ export function Layout({ children }) {
       </div>
 
       {/* Sticky Top Navigation Bar: Locked in view on all pages */}
-      <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-xl border-b border-[#b48214]/30 w-full max-w-full shadow-xl">
+      <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-xl border-b border-[#b48214]/30 w-full max-w-full shadow-xl pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between min-w-0">
           {/* Brand Logo Banner: enlarged and spills over the bottom border */}
           <div className="flex items-start shrink-0 min-w-0 self-stretch pt-1 sm:pt-1.5 relative z-30">
@@ -293,10 +293,11 @@ export function Layout({ children }) {
             <OfflineSyncBadge />
             <button
               onClick={() => setIsConverterOpen(!isConverterOpen)}
-              className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs font-bold active:scale-95"
+              className="flex items-center justify-center p-2 min-h-[44px] min-w-[44px] rounded-xl bg-wf-amber/10 border border-wf-amber/30 text-wf-amber text-xs font-bold active:scale-95"
               title="Open Currency Converter"
+              aria-label="Open Currency Converter"
             >
-              <Coins className="w-4 h-4 text-wf-amber" />
+              <Coins className="w-5 h-5 text-wf-amber" />
             </button>
             <button
               onClick={() => setIsSettingsOpen(true)}
@@ -322,7 +323,7 @@ export function Layout({ children }) {
 
       </header>
 
-      <main className="flex-1 relative z-10 w-full max-w-full flex flex-col overflow-x-clip pb-20 md:pb-0">
+      <main className="flex-1 relative z-10 w-full max-w-full flex flex-col overflow-x-clip pb-24 md:pb-0">
         {children}
       </main>
 
@@ -349,7 +350,7 @@ export function Layout({ children }) {
         </Suspense>
       )}
 
-      <footer className="border-t border-white/5 pt-8 pb-6 bg-wf-navy/80 backdrop-blur-md relative z-10 mt-auto safe-pb">
+      <footer className="border-t border-white/5 pt-8 pb-24 md:pb-8 bg-wf-navy/80 backdrop-blur-md relative z-10 mt-auto safe-pb">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">

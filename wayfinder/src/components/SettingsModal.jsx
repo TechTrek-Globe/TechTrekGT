@@ -23,7 +23,7 @@ export function SettingsModal({ isOpen, onClose }) {
         onClick={onClose}
       />
       
-      <div className="relative w-full max-w-md glass-panel rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-md glass-panel rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[90dvh]">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-wf-navy/50">
@@ -35,7 +35,8 @@ export function SettingsModal({ isOpen, onClose }) {
           </div>
           <button 
             onClick={onClose}
-            className="p-2 rounded-xl text-wf-muted hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-xl text-wf-muted hover:text-white hover:bg-white/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Close Preferences"
           >
             <X className="w-5 h-5" />
           </button>
@@ -247,7 +248,7 @@ export function SettingsModal({ isOpen, onClose }) {
                       value={deleteConfirmText}
                       onChange={(e) => setDeleteConfirmText(e.target.value)}
                       placeholder="Type DELETE"
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-900/90 border border-rose-800/80 text-white placeholder-slate-500 focus:outline-none focus:border-rose-400 font-mono"
+                      className="w-full px-3 py-2 text-base sm:text-xs rounded-xl bg-slate-900/90 border border-rose-800/80 text-white placeholder-slate-500 focus:outline-none focus:border-rose-400 font-mono"
                     />
                     <div className="flex gap-2">
                       <button

@@ -177,7 +177,7 @@ export function OfflineSyncBadge({ className = '' }) {
 
       {/* Offline Queue Details Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
           <div className="glass-panel w-full max-w-md p-6 rounded-3xl border border-amber-500/30 bg-slate-900/95 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center space-x-2.5">
@@ -199,7 +199,8 @@ export function OfflineSyncBadge({ className = '' }) {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+                aria-label="Close"
               >
                 <X className="w-4 h-4" />
               </button>

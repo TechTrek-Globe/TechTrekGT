@@ -49,14 +49,14 @@ function StationDossierModal({ stationKey, onClose }) {
   if (!station) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-slate-950/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-slate-950/85 backdrop-blur-md animate-fade-in">
       <div 
         className="fixed inset-0 cursor-pointer" 
         onClick={onClose} 
         aria-hidden="true" 
       />
 
-      <div className="relative w-full max-w-2xl bg-wf-navy-mid border border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl z-10 text-white max-h-[90vh] overflow-y-auto space-y-6">
+      <div className="relative w-full max-w-2xl bg-wf-navy-mid border border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl z-10 text-white max-h-[90dvh] overflow-y-auto space-y-6">
         {/* Modal Header */}
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
           <div>
@@ -82,7 +82,7 @@ function StationDossierModal({ stationKey, onClose }) {
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-colors flex-shrink-0"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-colors flex-shrink-0 cursor-pointer"
             aria-label="Close Station Details"
           >
             <X className="w-5 h-5" />

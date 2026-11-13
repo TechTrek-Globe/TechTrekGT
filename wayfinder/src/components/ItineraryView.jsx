@@ -22,7 +22,8 @@ import {
   isConfirmedIntercityRail,
   isFlightScheduleItem,
   getTravelDomIdForScheduleItem,
-  getTravelDocForScheduleItem
+  getTravelDocForScheduleItem,
+  hasConfirmedHotelForDay
 } from '../utils/itineraryTimeline';
 import { FormatTime } from './Formatters';
 
@@ -483,7 +484,7 @@ export function ItineraryView() {
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search itinerary stops, trains, hotels, foods... (Press /)"
               aria-label="Search itinerary"
-              className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-900/90 border border-white/10 focus:border-amber-400/60 focus:outline-none text-xs text-white placeholder:text-slate-500 transition-colors"
+              className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-900/90 border border-white/10 focus:border-amber-400/60 focus:outline-none text-base sm:text-xs text-white placeholder:text-slate-500 transition-colors"
             />
             {searchQuery && (
               <button
@@ -610,7 +611,7 @@ export function ItineraryView() {
 
       {/* Private Synced Items Overlay (If Authenticated User has Uploaded Bookings) */}
       {isAuthenticated && validPrivateItems.length > 0 && (
-        <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-3 text-emerald-300 text-xs font-bold">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
             <span>{validPrivateItems.length} Private booking items synced from your Document Center</span>
@@ -701,7 +702,10 @@ export function ItineraryView() {
             </button>
           </div>
         ) : (
-          visibleDayEntries.map(({ dayItem, dayTimelineItems, indexedItems }) => (
+          visibleDayEntries.map(({ dayItem, dayTimelineItems, indexedItems }) => {
+            const hasHotelBooked = isAuthenticated && hasConfirmedHotelForDay(dayItem, accommodations, privateItems, polandJourney?.cities || []);
+
+            return (
             <div key={dayItem.day} id={`day-${dayItem.day}`} className="relative scroll-mt-24">
               {/* Day Header */}
               <div className="relative z-10 bg-slate-950/95 py-3 border-b border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-lg mb-6 rounded-t-2xl px-2">
@@ -723,11 +727,33 @@ export function ItineraryView() {
 
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
                   <WeatherWidget city={dayItem.cityId} date={dayItem.date} locationName={dayItem.cityName} />
-                  {dayItem.base && (
-                    <span className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-300 flex items-center space-x-1 min-h-[36px] sm:min-h-[38px]">
-                      <Building className="w-3 h-3 text-emerald-400" />
-                      <span className="truncate max-w-[220px]">{dayItem.base}</span>
-                    </span>
+                  {!hasHotelBooked && dayItem.base && (
+                    <div className="relative group/base inline-flex">
+                      <span 
+                        title={dayItem.base}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-300 flex items-center space-x-1.5 min-h-[36px] sm:min-h-[38px] cursor-help hover:border-emerald-500/40 hover:bg-slate-800/80 transition-colors"
+                      >
+                        <Building className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="truncate max-w-[200px] sm:max-w-xs">{dayItem.base}</span>
+                      </span>
+
+                      {/* Tooltip on hover showing full text */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/base:flex flex-col items-center pointer-events-none z-50 min-w-[220px] max-w-xs animate-fade-in">
+                        <div className="px-3 py-2 rounded-xl bg-slate-900/95 border border-emerald-500/40 text-xs text-white shadow-2xl backdrop-blur-md text-center space-y-0.5">
+                          <p className="font-bold text-emerald-300 flex items-center justify-center space-x-1">
+                            <Building className="w-3 h-3 text-emerald-400 inline" />
+                            <span>Recommended Lodging Base</span>
+                          </p>
+                          <p className="text-slate-200 text-xs leading-snug">
+                            {dayItem.base.replace(/^Recommended Base:\s*/i, '')}
+                          </p>
+                          <p className="text-[10px] text-slate-400 pt-0.5 border-t border-white/10 mt-1">
+                            Optimal neighborhood for walking access to markets and sights
+                          </p>
+                        </div>
+                        <div className="w-2 h-2 -mt-1 bg-slate-900 border-r border-b border-emerald-500/40 rotate-45" />
+                      </div>
+                    </div>
                   )}
                   <a
                     href={`/wayfinder/poland-christmas-2026/cities/${dayItem.cityId}/attractions`}
@@ -786,7 +812,7 @@ export function ItineraryView() {
                           type="button"
                           onClick={() => moveTimelineItem(dayItem.day, idx, -1, dayTimelineItems)}
                           disabled={idx === 0}
-                          className="p-1 rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors cursor-pointer"
+                          className="p-2 min-h-[36px] min-w-[36px] sm:p-1 sm:min-h-0 sm:min-w-0 flex items-center justify-center rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors cursor-pointer"
                           title="Move up"
                           aria-label="Move item up"
                         >
@@ -796,7 +822,7 @@ export function ItineraryView() {
                           type="button"
                           onClick={() => moveTimelineItem(dayItem.day, idx, 1, dayTimelineItems)}
                           disabled={idx === dayTimelineItems.length - 1}
-                          className="p-1 rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors cursor-pointer"
+                          className="p-2 min-h-[36px] min-w-[36px] sm:p-1 sm:min-h-0 sm:min-w-0 flex items-center justify-center rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors cursor-pointer"
                           title="Move down"
                           aria-label="Move item down"
                         >
@@ -806,7 +832,7 @@ export function ItineraryView() {
                           draggable={true}
                           onDragStart={(e) => handleDragStart(e, dayItem.day, idx, timelineItem.key)}
                           onDragEnd={handleDragEnd}
-                          className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-amber-300 cursor-grab active:cursor-grabbing transition-colors select-none"
+                          className="p-2 min-h-[36px] min-w-[36px] sm:p-1 sm:min-h-0 sm:min-w-0 flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-400 hover:text-amber-300 cursor-grab active:cursor-grabbing transition-colors select-none"
                           title="Drag handle to reorder (text in tile remains selectable)"
                           aria-label="Drag handle to reorder"
                         >
@@ -850,7 +876,7 @@ export function ItineraryView() {
                             >
                               {/* Top Bar: Time, Category Icon, Title, Badge, and Reorder Controls */}
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <div className="flex items-center space-x-2.5">
+                                <div className="flex items-center space-x-2.5 min-w-0">
                                   {destination ? (
                                     <a
                                       href={destination.url}
@@ -869,7 +895,7 @@ export function ItineraryView() {
                                       {getIconForType(timelineItem.data.itemType)}
                                     </div>
                                   )}
-                                  <div>
+                                  <div className="min-w-0 flex-1">
                                     {destination ? (
                                       <a
                                         href={destination.url}
@@ -877,13 +903,13 @@ export function ItineraryView() {
                                           e.stopPropagation();
                                           pushRoute(e, destination.url);
                                         }}
-                                        className="font-bold text-white text-base sm:text-lg leading-tight hover:text-amber-300 transition-colors inline-block cursor-pointer"
+                                        className="font-bold text-white text-base sm:text-lg leading-tight hover:text-amber-300 transition-colors inline-block cursor-pointer truncate max-w-full"
                                         title={`${destination.buttonText} - Click to view in guide`}
                                       >
                                         {timelineItem.data.title}
                                       </a>
                                     ) : (
-                                      <h3 className="font-bold text-white text-base sm:text-lg leading-tight group-hover:text-amber-200 transition-colors">
+                                      <h3 className="font-bold text-white text-base sm:text-lg leading-tight group-hover:text-amber-200 transition-colors truncate">
                                         {timelineItem.data.title}
                                       </h3>
                                     )}
@@ -893,11 +919,11 @@ export function ItineraryView() {
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         onClick={(e) => e.stopPropagation()}
-                                        className="text-xs text-slate-400 hover:text-amber-300 flex items-center space-x-1 mt-0.5 transition-colors group/loc cursor-pointer inline-flex max-w-fit"
+                                        className="text-xs text-slate-400 hover:text-amber-300 flex items-center space-x-1 mt-0.5 transition-colors group/loc cursor-pointer inline-flex max-w-full min-w-0"
                                         title="Open navigation directions in Google Maps"
                                       >
                                         <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover/loc:scale-110 transition-transform" />
-                                        <span className="underline decoration-slate-600 hover:decoration-amber-400 underline-offset-2">
+                                        <span className="underline decoration-slate-600 hover:decoration-amber-400 underline-offset-2 break-words">
                                           {timelineItem.data.location}
                                         </span>
                                         <ExternalLink className="w-3 h-3 text-slate-500 group-hover/loc:text-amber-300 opacity-70 ml-0.5 shrink-0" />
@@ -1008,7 +1034,8 @@ export function ItineraryView() {
                   })}
               </div>
             </div>
-          ))
+            );
+          })
         );
         })()}
       </div>

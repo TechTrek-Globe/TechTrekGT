@@ -747,7 +747,7 @@ export function PackingManager() {
                   placeholder="e.g. Polish Phrasebook or Extra Wool Scarf"
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-sky-400"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-sky-400"
                   required
                   autoFocus
                 />
@@ -761,7 +761,7 @@ export function PackingManager() {
                 <select
                   value={newItemCategory}
                   onChange={(e) => setNewItemCategory(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-sky-400"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-sky-400"
                 >
                   {CATEGORIES.map(c => (
                     <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
@@ -777,7 +777,7 @@ export function PackingManager() {
                 <select
                   value={newItemBag}
                   onChange={(e) => setNewItemBag(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-sky-400"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-sky-400"
                 >
                   {BAG_TYPES.map(b => (
                     <option key={b.id} value={b.id}>{b.icon} {b.label}</option>
@@ -796,7 +796,7 @@ export function PackingManager() {
                   max="99"
                   value={newItemQuantity}
                   onChange={(e) => setNewItemQuantity(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-sky-400"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-sky-400"
                 />
               </div>
 
@@ -811,7 +811,7 @@ export function PackingManager() {
                   step={isLbs ? "0.1" : "10"}
                   value={newItemWeight}
                   onChange={(e) => setNewItemWeight(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-sky-400"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-sky-400"
                 />
               </div>
 
@@ -825,7 +825,7 @@ export function PackingManager() {
                   placeholder="e.g. Keep in coat pocket for Christmas market walks"
                   value={newItemNotes}
                   onChange={(e) => setNewItemNotes(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-sky-400"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-sky-400"
                 />
               </div>
             </div>
@@ -912,7 +912,7 @@ export function PackingManager() {
               placeholder="Search gear or notes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950/90 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950/90 border border-white/10 text-base sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
             />
           </div>
         </div>
@@ -1025,7 +1025,7 @@ export function PackingManager() {
                           <div className="flex items-start sm:items-center space-x-3 min-w-0 flex-1">
                             <button
                               onClick={() => handleTogglePacked(item)}
-                              className={`p-1 rounded-lg transition-transform active:scale-90 ${isPk ? 'text-emerald-400' : 'text-slate-400 hover:text-white'}`}
+                              className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-transform active:scale-90 ${isPk ? 'text-emerald-400' : 'text-slate-400 hover:text-white'}`}
                               title={isPk ? 'Mark unpacked' : 'Mark packed'}
                             >
                               {isPk ? (
@@ -1069,7 +1069,7 @@ export function PackingManager() {
                               <button
                                 onClick={() => handleUpdateQuantity(item, -1)}
                                 disabled={qty <= 1}
-                                className="px-1.5 text-slate-400 hover:text-white disabled:opacity-30 font-bold"
+                                className="px-2.5 py-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-white disabled:opacity-30 font-bold"
                                 title="Decrease quantity"
                               >
                                 -
@@ -1079,7 +1079,7 @@ export function PackingManager() {
                               </span>
                               <button
                                 onClick={() => handleUpdateQuantity(item, 1)}
-                                className="px-1.5 text-slate-400 hover:text-white font-bold"
+                                className="px-2.5 py-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-white font-bold"
                                 title="Increase quantity"
                               >
                                 +
@@ -1089,7 +1089,7 @@ export function PackingManager() {
                             {/* Delete Button */}
                             <button
                               onClick={() => handleDeleteItem(item.id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                               title="Delete item"
                             >
                               <Trash2 className="w-3.5 h-3.5" />

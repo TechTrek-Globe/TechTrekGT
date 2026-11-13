@@ -143,11 +143,11 @@ export function BookingImportChannels() {
                       type="text"
                       readOnly
                       value={inbox.email_address}
-                      className="w-full bg-transparent text-white font-mono text-xs sm:text-sm px-2 focus:outline-none select-all"
+                      className="w-full bg-transparent text-white font-mono text-base sm:text-sm px-2 focus:outline-none select-all"
                     />
                     <button
                       onClick={handleCopy}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all shrink-0 cursor-pointer ${
+                      className={`px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all shrink-0 cursor-pointer ${
                         copied
                           ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                           : 'bg-white/10 hover:bg-white/20 text-white border border-white/10'

@@ -899,6 +899,41 @@ Delivers comprehensive security, privacy, API resilience, geospatial audit tooli
   - Locked section navigation bars at `sticky top-14 sm:top-16 z-30` directly beneath the main navbar in `PolandLanding.jsx`, `CityPage.jsx`, `RouteVisualization.jsx`, and `PrivateHub.jsx` (plus `md:sticky md:top-[116px] z-20` City/Day quick-jump bar in `ItineraryView.jsx`), adjusting `PolandLanding.jsx` Schedule View day headers to `sticky top-[166px] md:top-[124px] z-20` to prevent overlap.
   - Added `formatCompactStopDates` (`Formatters.jsx`) so unauthenticated visitors see the clean basic stop/city bar (`All Stops (5)`, `01 Kraków`, ...) while signed-in travelers see actual stop dates (`All Stops (Dec 3-13)`, `01 Kraków Dec 4-7`, ...) across `PolandLanding.jsx`, `CityPage.jsx` quick city-switcher, `RouteVisualization.jsx`, `PrivateHub.jsx`, and `ItineraryView.jsx`.
 
+## 44. Mobile Viewport, Safe Area & iPhone 18 Pro Usability Architecture
+
+Wayfinder delivers an end-to-end mobile-first responsive architecture specifically optimized for iOS Safari / WebKit and the iPhone 18 Pro viewport (402x874 CSS logical pixels, 3x DPR, top Dynamic Island inset, and bottom home indicator):
+
+- Viewport & Safe Area Inset Support (`index.html`, `index.css`, `Layout.jsx`, `BottomTabBar.jsx`):
+  - Viewport metadata configured with `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">`.
+  - Utility classes `.pt-safe`, `.pb-safe`, and dynamic `.safe-pb` (`max(0.75rem, env(safe-area-inset-bottom))`) ensure sticky headers (`pt-[env(safe-area-inset-top,0px)]`) clear the Dynamic Island / status bar, and fixed navigation controls (`BottomTabBar.jsx`) clear the iOS home indicator bar.
+  - Page content container (`Layout.jsx`) enforces `pb-24` clearance across `<main>` and `<footer>` so scrolling content is never obstructed by the fixed bottom navigation bar.
+- Dynamic Viewport Heights & Address Bar Clipping Prevention (`index.css`, `Layout.jsx`, Modals):
+  - Global `#root` and `<Layout>` configured with `min-h-[100dvh]` to prevent viewport layout jumps when Safari URL and toolbar expand or collapse.
+  - All modal dialogs and bottom sheets (`CurrencyConverterModal`, `SettingsModal`, `AuthModal`, `ShareAgendaModal`, `CalendarSubscribeModal`, `DocumentViewerModal`, `DocumentCenter` review/detail/booking modals, `ExpenseLedger` add/settle modals, `RouteVisualization` station dossier) use `max-h-[85dvh]` or `max-h-[90dvh]` paired with internal `overflow-y-auto` scroll containment, preventing content clipping off-screen.
+- Zero Horizontal Overflow on 402px Viewport Width:
+  - Flex and grid containers across all views (`ItineraryView`, `PolandLanding`, `PrivateBookingCard`, `ExpenseLedger`, `PersonBreakdownPanel`, `AdminView`, `CityPage`) enforce `min-w-0` on flex/grid children.
+  - Polish venue addresses, long email addresses, and filenames apply `break-words`, `break-all sm:break-normal`, and `truncate max-w-full`, eliminating unintended horizontal page scrolling.
+  - 3D route map on the landing page preserves its exact 3:2 topological aspect ratio with touch hit targets expanded via `before:absolute before:-inset-2` without altering visual coordinate positions.
+- Accessible Touch Target Sizing (>= 44x44px):
+  - All primary interactive touch targets (bottom navigation tab items, mobile currency trigger, modal close buttons, expense edit/delete/settle buttons, packing item toggles, document actions, and city card footer action buttons) enforce `min-h-[44px] min-w-[44px]` (or `min-h-[36px] min-w-[36px]` for timeline reorder and quantity stepper controls).
+- iOS Safari Auto-Zoom Prevention:
+  - Form controls across all views (`<input>`, `<select>`, `<textarea>`) apply `text-base sm:text-xs` or `text-base sm:text-sm` so text renders at 16px on mobile viewports (< 640px) and prevents iOS WebKit from triggering intrusive focus auto-zooming.
+  - Global CSS fallback guard in `index.css` (`@media screen and (max-width: 640px) { input, select, textarea { font-size: 16px; } }`) guarantees zero auto-zoom even on dynamically injected fields.
+- Modal Stacking Context & Layer Isolation:
+  - All modal backdrops and panels are standardized to `z-[100]`, cleanly floating above the `z-50` sticky header and fixed bottom navigation bar without layering glitches.
+
+## 45. Context-Aware Lodging Base Display & Hover Tooltips
+
+Wayfinder dynamically adapts lodging base guidance depending on whether travelers have already booked accommodations:
+
+- Confirmed Hotel Suppression for Recommended Base (`hasConfirmedHotelForDay` in `itineraryTimeline.js`):
+  - When an authenticated traveler has a confirmed hotel booking covering an itinerary day (evaluated across `check_in_date` to `check_out_date` date ranges, single-day check-in, or city stay windows), the generic "Recommended Base: [Zone]" pill is automatically suppressed from the day header in both `ItineraryView.jsx` and `PolandLanding.jsx`.
+  - This eliminates redundant guidance and frees up valuable header space, leaving the confirmed hotel check-in card prominent on the timeline.
+- Rich Hover Tooltips for Unbooked Days:
+  - For days without a confirmed hotel booking (and for unauthenticated visitors browsing recommendations), the "Recommended Base" pill is displayed with `title={dayItem.base}` and an interactive floating hover tooltip (`group-hover/base:flex`) that shows the full neighborhood recommendation text (`dayItem.base.replace(/^Recommended Base:\s*/i, '')`) without truncation or clipping.
+
+
+
 
 
 

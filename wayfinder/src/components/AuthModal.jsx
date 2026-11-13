@@ -179,7 +179,7 @@ export function AuthModal() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-wf-navy/90 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div className="relative w-full max-w-md bg-wf-navy border border-wf-navy-lt rounded-2xl shadow-2xl overflow-hidden text-wf-text max-h-[85vh] flex flex-col my-auto glass-card">
+      <div className="relative w-full max-w-md bg-wf-navy border border-wf-navy-lt rounded-2xl shadow-2xl overflow-hidden text-wf-text max-h-[85dvh] flex flex-col my-auto glass-card">
         
         {/* Header decoration */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-wf-blue/20 rounded-full blur-3xl pointer-events-none" />
@@ -211,8 +211,9 @@ export function AuthModal() {
           <button
             type="button"
             onClick={() => setIsAuthModalOpen(false)}
-            className="p-1.5 text-wf-muted hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-wf-muted hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
             title="Close modal"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
@@ -244,7 +245,7 @@ export function AuthModal() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Alex Morgan"
-                  className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue focus:ring-1 focus:ring-wf-blue transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-base sm:text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue focus:ring-1 focus:ring-wf-blue transition-all"
                 />
               </div>
             </div>
@@ -262,7 +263,7 @@ export function AuthModal() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue focus:ring-1 focus:ring-wf-blue transition-all disabled:opacity-60"
+                  className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-base sm:text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue focus:ring-1 focus:ring-wf-blue transition-all disabled:opacity-60"
                 />
               </div>
             </div>
@@ -319,7 +320,7 @@ export function AuthModal() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue focus:ring-1 focus:ring-wf-blue transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-base sm:text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue focus:ring-1 focus:ring-wf-blue transition-all"
                 />
               </div>
             </div>
@@ -335,7 +336,7 @@ export function AuthModal() {
                   <select
                     value={securityQuestion}
                     onChange={(e) => setSecurityQuestion(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-wf-blue transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-base sm:text-xs text-white focus:outline-none focus:border-wf-blue transition-all"
                   >
                     {PRESET_SECURITY_QUESTIONS.map((q, idx) => (
                       <option key={idx} value={q}>{q}</option>
@@ -353,7 +354,7 @@ export function AuthModal() {
                     value={securityAnswer}
                     onChange={(e) => setSecurityAnswer(e.target.value)}
                     placeholder="Your secret answer"
-                    className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-base sm:text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue transition-all"
                   />
                 </div>
               </div>
@@ -376,7 +377,7 @@ export function AuthModal() {
                   value={securityAnswer}
                   onChange={(e) => setSecurityAnswer(e.target.value)}
                   placeholder="Enter your security answer"
-                  className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-base sm:text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue transition-all"
                 />
               </div>
             </div>
@@ -394,7 +395,7 @@ export function AuthModal() {
                     value={resetToken}
                     onChange={(e) => setResetToken(e.target.value)}
                     placeholder="Paste your reset code here"
-                    className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white font-mono tracking-wider placeholder-wf-subtle focus:outline-none focus:border-wf-blue transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-base sm:text-sm text-white font-mono tracking-wider placeholder-wf-subtle focus:outline-none focus:border-wf-blue transition-all"
                   />
                 </div>
               </div>
@@ -409,7 +410,7 @@ export function AuthModal() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Min 8 chars, 1 upper, 1 number"
-                    className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-base sm:text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue transition-all"
                   />
                 </div>
               </div>

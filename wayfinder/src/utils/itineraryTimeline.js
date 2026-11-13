@@ -83,6 +83,83 @@ export function isConflictingScheduleItem(event, excursion) {
   return evTimeMin >= startMin + 30 && evTimeMin < endMin - 15;
 }
 
+/**
+ * Detects whether a confirmed hotel booking or accommodation covers a specific itinerary day.
+ * Matches by explicit date range (check_in_date to check_out_date), single-day check-in,
+ * or city-level confirmed stay window.
+ */
+export function hasConfirmedHotelForDay(dayItem, accommodations = [], privateItems = [], cities = []) {
+  if (!dayItem) return false;
+  const dayDate = dayItem.date;
+  const cityId = (dayItem.cityId || '').toLowerCase();
+
+  const norm = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  // 1. Direct date check in accommodations list
+  for (const acc of accommodations) {
+    if (!acc) continue;
+    const checkIn = acc.check_in_date || acc.start_date || acc.local_date || '';
+    const checkOut = acc.check_out_date || acc.end_date || '';
+    if (checkIn && checkOut) {
+      if (dayDate >= checkIn && dayDate < checkOut) return true;
+    } else if (checkIn && checkIn === dayDate) {
+      return true;
+    }
+    const accLoc = norm(acc.location || acc.hotel_address || acc.title || acc.hotel_name || '');
+    if (cityId && accLoc.includes(cityId)) {
+      if (checkIn && checkOut && dayDate >= checkIn && dayDate < checkOut) return true;
+      if (checkIn && checkIn === dayDate) return true;
+    }
+  }
+
+  // 2. Direct check in private itinerary items (hotel bookings)
+  for (const item of privateItems) {
+    if (!item) continue;
+    const type = (item.item_type || item.docType || item.detected_doc_type || '').toLowerCase();
+    if (type === 'hotel' || type === 'accommodation' || type === 'lodging') {
+      const checkIn = item.check_in_date || item.start_date || item.local_date || '';
+      const checkOut = item.check_out_date || item.end_date || '';
+      if (checkIn && checkOut) {
+        if (dayDate >= checkIn && dayDate < checkOut) return true;
+      } else if (checkIn && checkIn === dayDate) {
+        return true;
+      }
+      const itemLoc = norm(item.location || item.title || item.hotel_name || '');
+      if (cityId && itemLoc.includes(cityId)) {
+        if (checkIn && checkOut && dayDate >= checkIn && dayDate < checkOut) return true;
+        if (checkIn && checkIn === dayDate) return true;
+      }
+    }
+  }
+
+  // 3. Fallback city-level matching if cities array is provided
+  if (cities && cities.length > 0) {
+    const city = cities.find((c) => c && c.id === dayItem.cityId);
+    if (city && city.startDate && city.endDate && dayDate >= city.startDate && dayDate < city.endDate) {
+      const hasCityHotel = [...accommodations, ...privateItems].some((candidate) => {
+        if (!candidate) return false;
+        const type = (candidate.item_type || candidate.docType || candidate.detected_doc_type || '').toLowerCase();
+        const isHotelType = type === 'hotel' || type === 'accommodation' || type === 'lodging' || Boolean(candidate.check_in_date);
+        if (!isHotelType) return false;
+        const text = norm(`${candidate.title || ''} ${candidate.hotel_name || ''} ${candidate.location || ''} ${candidate.hotel_address || ''}`);
+        const cTarget = norm(city.id);
+        const cName = norm(city.name);
+        return (
+          text.includes(cTarget) ||
+          text.includes(cName) ||
+          (cTarget.includes('krakow') && (text.includes('experior') || text.includes('destigo') || text.includes('szewska'))) ||
+          (cTarget.includes('wroclaw') && text.includes('altus')) ||
+          (cTarget.includes('poznan') && text.includes('brovaria')) ||
+          (cTarget.includes('gdansk') && (text.includes('radisson') || text.includes('chmielna')))
+        );
+      });
+      if (hasCityHotel) return true;
+    }
+  }
+
+  return false;
+}
+
 export function buildUnifiedDayTimeline(dayItem, dayPrivate = [], dayAccommodations = [], isAuthenticated = false, customOrderKeys = null) {
   if (!dayItem) return [];
 

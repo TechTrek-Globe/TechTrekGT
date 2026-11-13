@@ -207,7 +207,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
     >
       <div 
         className="w-full max-w-5xl bg-wf-navy-mid border border-white/15 rounded-3xl shadow-2xl flex flex-col overflow-hidden glass-card"
-        style={{ height: 'min(92vh, 920px)' }}
+        style={{ height: 'min(90dvh, 920px)' }}
       >
         {/* Header Bar */}
         <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-wf-navy shrink-0 gap-3">
@@ -233,16 +233,16 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
               <h3 className="text-white font-bold truncate text-sm sm:text-base">
                 {activeDoc.safe_display_name || activeDoc.filename || 'Travel Document Preview'}
               </h3>
-              <p className="text-[11px] text-slate-400 flex items-center space-x-1.5">
-                <span>{isRail ? 'PKP Rail Travel Document' : isFlight ? 'Flight Document' : isHotel ? 'Hotel Booking' : 'Verified Trip Attachment'}</span>
+              <p className="text-[11px] text-slate-400 flex items-center space-x-1.5 min-w-0">
+                <span className="shrink-0">{isRail ? 'PKP Rail Travel Document' : isFlight ? 'Flight Document' : isHotel ? 'Hotel Booking' : 'Verified Trip Attachment'}</span>
                 <span>:</span>
-                <span className="font-mono text-sky-300">{filename}</span>
+                <span className="font-mono text-sky-300 truncate max-w-[140px] sm:max-w-xs">{filename}</span>
               </p>
             </div>
           </div>
 
           {/* Action Tools */}
-          <div className="flex items-center space-x-2 shrink-0">
+          <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
             <input
               type="file"
               ref={reattachInputRef}
@@ -252,7 +252,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
             />
             <button
               onClick={() => reattachInputRef.current?.click()}
-              className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
+              className="px-2.5 sm:px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
               title="Attach or replace local copy in browser"
             >
               <Upload className="w-3.5 h-3.5 text-sky-400" />
@@ -265,7 +265,7 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
                   href={fileUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 transition-colors"
+                  className="px-2.5 sm:px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors"
                   title="Open document in new browser tab"
                 >
                   <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
@@ -274,19 +274,20 @@ export function DocumentViewerModal({ isOpen, onClose, doc }) {
                 <a
                   href={fileUrl}
                   download={filename}
-                  className="px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center space-x-1.5 transition-colors"
+                  className="px-2.5 sm:px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors"
                   title="Download copy"
                 >
                   <Download className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Download</span>
+                  <span className="hidden sm:inline">Download</span>
                 </a>
               </>
             )}
 
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
               title="Close (ESC)"
+              aria-label="Close"
             >
               <X className="w-5 h-5" />
             </button>

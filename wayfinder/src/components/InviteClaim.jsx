@@ -152,8 +152,8 @@ export function InviteClaim() {
     navigate(`/wayfinder/invite?token=${encodeURIComponent(token)}`);
   };
 
-  const inputClass = 'w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue focus:ring-1 focus:ring-wf-blue transition-all';
-  const btnClass = 'w-full px-6 py-2.5 rounded-xl bg-gradient-to-r from-wf-blue to-wf-blue-lt hover:opacity-90 text-white font-medium shadow-lg disabled:opacity-50 flex items-center justify-center gap-2';
+  const inputClass = 'w-full pl-10 pr-4 py-2.5 bg-wf-navy-mid border border-white/10 rounded-xl text-base sm:text-sm text-white placeholder-wf-subtle focus:outline-none focus:border-wf-blue focus:ring-1 focus:ring-wf-blue transition-all';
+  const btnClass = 'w-full min-h-[44px] px-6 py-2.5 rounded-xl bg-gradient-to-r from-wf-blue to-wf-blue-lt hover:opacity-90 text-white font-medium shadow-lg disabled:opacity-50 flex items-center justify-center gap-2';
 
   let body;
   if (loadingInfo || isLoading) {

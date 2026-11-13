@@ -407,7 +407,7 @@ export function PersonBreakdownPanel({
                   {/* Financial Metrics Stack */}
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/5">
                     {/* Out of pocket */}
-                    <div className="space-y-0.5">
+                    <div className="space-y-0.5 min-w-0">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400">
                         Paid Out-of-Pocket
                       </span>
@@ -420,7 +420,7 @@ export function PersonBreakdownPanel({
                     </div>
 
                     {/* Fair share */}
-                    <div className="space-y-0.5">
+                    <div className="space-y-0.5 min-w-0">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
                         Fair Share (Liability)
                       </span>

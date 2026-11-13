@@ -697,6 +697,35 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
   - Desktop `Private Hub` in `Layout.jsx` functions as an interactive dropdown menu with click-outside dismiss handling, providing direct shortcuts to `Daily Itinerary` (`/private`), `Documents & Tickets` (`/private/documents`), `Packing List` (`/private/packing`), and `Expense Ledger` (`/private/expenses`).
   - When `isAuthenticated` is true, desktop `Itinerary`, mobile `Schedule`, `PolandLanding.jsx` `Schedule View`, `CityRouteCard` `View Stop Schedule`, and interactive map train pins (`navigateToTravel`) route directly to `/wayfinder/poland-christmas-2026/private` (passing `?city=` or `?day=` when launched from a stop card or train segment), and `PolandLanding.jsx` keeps `viewMode` locked to `'cards'` when authenticated. `ItineraryView.jsx` parses both `?city=` and `?day=` query parameters on mount and `popstate`.
 
+### 16.24 Mobile Viewport, Touch Target & iOS Safe Area Invariants
+
+- Safe Area Inset Invariant:
+  - Sticky primary header in `Layout.jsx` MUST incorporate `pt-[env(safe-area-inset-top,0px)]` to clear the Dynamic Island and camera housing on modern iOS devices.
+  - Fixed bottom navigation bar in `BottomTabBar.jsx` MUST use `pb-[env(safe-area-inset-bottom,0px)]` and `.safe-pb` (`max(0.75rem, env(safe-area-inset-bottom))`) to clear the home indicator bar.
+  - `<main>` and `<footer>` containers in `Layout.jsx` MUST maintain `pb-24` clearance to ensure no interactive elements or text content are obscured behind the fixed bottom bar.
+- Dynamic Viewport Height & Scroll Containment Invariant:
+  - Global `#root` and full-page layout shells MUST use `min-h-[100dvh]` rather than `100vh` to avoid layout shifts when mobile browser address bars expand or contract.
+  - All modal dialogs, drawers, and bottom sheets MUST constrain container height with `max-h-[85dvh]` or `max-h-[90dvh]` and provide internal scrolling via `overflow-y-auto`.
+- Touch Target & Hit Area Invariant:
+  - All primary interactive touch targets (bottom navigation items, modal close buttons, filter buttons, item toggles, and action links) MUST meet accessible touch target dimensions (`min-h-[44px] min-w-[44px]`).
+  - Where visible dimensions must remain compact due to visual layout constraints (e.g. 3D route map station pills or timeline reorder buttons), hit targets MUST be expanded using pseudo-elements (`before:absolute before:-inset-2 before:content-['']`) or explicit minimum dimensions (`min-h-[36px] min-w-[36px]`).
+- iOS Safari Auto-Zoom Guard Invariant:
+  - All text inputs, numeric inputs, textareas, and select elements MUST render at a minimum font size of `16px` on viewports `< 640px` (`text-base sm:text-xs` or `text-base sm:text-sm`).
+  - The global stylesheet (`index.css`) MUST enforce this as an invariant safeguard: `@media screen and (max-width: 640px) { input, select, textarea { font-size: 16px; } }`.
+- Stacking Hierarchy & Modal Isolation Invariant:
+  - Modal backdrops and dialog overlays MUST use `z-[100]` to guarantee they render cleanly above the `z-50` sticky navigation header and fixed bottom navigation bar.
+
+### 16.25 Context-Aware Lodging Base Display & Tooltip Invariants
+
+- Confirmed Hotel Day Evaluation Invariant (`hasConfirmedHotelForDay`):
+  - `hasConfirmedHotelForDay(dayItem, accommodations, privateItems, cities)` evaluates confirmed hotels across both `accommodations` and `privateItems` records matching `dayItem.date` within `[check_in_date, check_out_date)` or matched city window (`city.startDate` to `city.endDate`).
+- Header Declutter & Redundancy Guard Invariant:
+  - The Recommended Base pill MUST NOT be rendered on days where `hasConfirmedHotelForDay` is true, keeping the day header uncluttered and prioritizing the confirmed private hotel card on the timeline.
+- Tooltip Truncation Guard Invariant:
+  - Whenever the Recommended Base pill is rendered on unbooked days, it MUST provide both native `title={dayItem.base}` and a rich CSS floating tooltip with non-clipped full text so recommendations are never lost to ellipsis truncation.
+
+
+
 
 
 

@@ -47,7 +47,13 @@
     padding-top: max(0.75rem, env(safe-area-inset-top));
   }
   .safe-pb {
-    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
   }
   .no-overscroll-x {
     overscroll-behavior-x: contain;
@@ -91,13 +97,23 @@ body {
   padding: 0;
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* Hide scrollbar for clean UI elements but allow scroll */
-.no-scrollbar::-webkit-scrollbar {
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
   display: none;
 }
-.no-scrollbar {
+.no-scrollbar,
+.scrollbar-none {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
+}
+
+/* Prevent iOS Safari auto-zoom on input focus */
+@media screen and (max-width: 640px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
 }

@@ -24,7 +24,8 @@ import {
   isConfirmedIntercityRail,
   isFlightScheduleItem,
   getTravelDomIdForScheduleItem,
-  getTravelDocForScheduleItem
+  getTravelDocForScheduleItem,
+  hasConfirmedHotelForDay
 } from '../utils/itineraryTimeline';
 import { FormatTime, FormatText } from './Formatters';
 
@@ -341,6 +342,7 @@ function JourneyStopSchedule({
                 return d && d.toString().startsWith(dayItem.date);
               }) : [];
               const dayAccommodations = isAuthenticated ? (accommodations || []).filter(a => a.check_in_date === dayItem.date) : [];
+              const hasHotelBooked = isAuthenticated && hasConfirmedHotelForDay(dayItem, accommodations, privateItems, polandJourney?.cities || []);
 
               return (
                 <div key={dayItem.day} className="relative space-y-4">
@@ -361,10 +363,32 @@ function JourneyStopSchedule({
 
                     <div className="flex items-center space-x-2 self-start sm:self-center">
                       <WeatherWidget city={city.id} date={dayItem.date} locationName={dayItem.displayDate} />
-                      {dayItem.base && (
-                        <div className="text-xs text-slate-400 flex items-center space-x-1">
-                          <Building className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span className="truncate max-w-[260px]">{dayItem.base}</span>
+                      {!hasHotelBooked && dayItem.base && (
+                        <div className="relative group/base inline-flex">
+                          <div 
+                            title={dayItem.base}
+                            className="text-xs text-slate-400 flex items-center space-x-1 cursor-help hover:text-slate-200 transition-colors"
+                          >
+                            <Building className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="truncate max-w-[200px] sm:max-w-[260px]">{dayItem.base}</span>
+                          </div>
+
+                          {/* Tooltip on hover showing full text */}
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/base:flex flex-col items-center pointer-events-none z-50 min-w-[220px] max-w-xs animate-fade-in">
+                            <div className="px-3 py-2 rounded-xl bg-slate-900/95 border border-emerald-500/40 text-xs text-white shadow-2xl backdrop-blur-md text-center space-y-0.5">
+                              <p className="font-bold text-emerald-300 flex items-center justify-center space-x-1">
+                                <Building className="w-3 h-3 text-emerald-400 inline" />
+                                <span>Recommended Lodging Base</span>
+                              </p>
+                              <p className="text-slate-200 text-xs leading-snug">
+                                {dayItem.base.replace(/^Recommended Base:\s*/i, '')}
+                              </p>
+                              <p className="text-[10px] text-slate-400 pt-0.5 border-t border-white/10 mt-1">
+                                Optimal neighborhood for walking access to markets and sights
+                              </p>
+                            </div>
+                            <div className="w-2 h-2 -mt-1 bg-slate-900 border-r border-b border-emerald-500/40 rotate-45" />
+                          </div>
                         </div>
                       )}
                       {customOrder[dayItem.day] && customOrder[dayItem.day].length > 0 && (
@@ -406,31 +430,31 @@ function JourneyStopSchedule({
                               type="button"
                               onClick={() => moveTimelineItem(dayItem.day, idx, -1, dayTimelineItems)}
                               disabled={idx === 0}
-                              className="p-0.5 rounded hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors cursor-pointer"
+                              className="p-2 min-h-[36px] min-w-[36px] sm:p-1 sm:min-h-0 sm:min-w-0 flex items-center justify-center rounded hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors cursor-pointer"
                               title="Move up"
                               aria-label="Move item up"
                             >
-                              <ChevronUp className="w-3 h-3" />
+                              <ChevronUp className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
                               onClick={() => moveTimelineItem(dayItem.day, idx, 1, dayTimelineItems)}
                               disabled={idx === dayTimelineItems.length - 1}
-                              className="p-0.5 rounded hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors cursor-pointer"
+                              className="p-2 min-h-[36px] min-w-[36px] sm:p-1 sm:min-h-0 sm:min-w-0 flex items-center justify-center rounded hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-slate-400 transition-colors cursor-pointer"
                               title="Move down"
                               aria-label="Move item down"
                             >
-                              <ChevronDown className="w-3 h-3" />
+                              <ChevronDown className="w-3.5 h-3.5" />
                             </button>
                             <div 
                               draggable={true}
                               onDragStart={(e) => handleDragStart(e, dayItem.day, idx, timelineItem.key)}
                               onDragEnd={handleDragEnd}
-                              className="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-amber-300 cursor-grab active:cursor-grabbing transition-colors select-none"
+                              className="p-2 min-h-[36px] min-w-[36px] sm:p-1 sm:min-h-0 sm:min-w-0 flex items-center justify-center rounded hover:bg-white/10 text-slate-400 hover:text-amber-300 cursor-grab active:cursor-grabbing transition-colors select-none"
                               title="Drag handle to reorder (text in tile remains selectable)"
                               aria-label="Drag handle to reorder"
                             >
-                              <GripVertical className="w-3 h-3" />
+                              <GripVertical className="w-3.5 h-3.5" />
                             </div>
                           </div>
                         );
@@ -478,7 +502,7 @@ function JourneyStopSchedule({
                                   title={isAuthenticated && isTravelCard && onOpenTravelDoc ? "Click to view ticket and travel details" : undefined}
                                 >
                                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                    <div className="flex items-center space-x-2.5">
+                                    <div className="flex items-center space-x-2.5 min-w-0">
                                       {destination ? (
                                         <a
                                           href={destination.url}
@@ -497,7 +521,7 @@ function JourneyStopSchedule({
                                           {getIconForType(timelineItem.data.itemType)}
                                         </div>
                                       )}
-                                      <div>
+                                      <div className="min-w-0 flex-1">
                                         {destination ? (
                                           <a
                                             href={destination.url}
@@ -505,13 +529,13 @@ function JourneyStopSchedule({
                                               e.stopPropagation();
                                               pushRoute(e, destination.url);
                                             }}
-                                            className="font-bold text-white text-sm sm:text-base leading-tight hover:text-amber-300 transition-colors inline-block cursor-pointer"
+                                            className="font-bold text-white text-sm sm:text-base leading-tight hover:text-amber-300 transition-colors inline-block cursor-pointer truncate max-w-full"
                                             title={`${destination.buttonText} - Click to view in guide`}
                                           >
                                             {timelineItem.data.title}
                                           </a>
                                         ) : (
-                                          <h4 className="font-bold text-white text-sm sm:text-base leading-tight group-hover:text-amber-200 transition-colors">
+                                          <h4 className="font-bold text-white text-sm sm:text-base leading-tight group-hover:text-amber-200 transition-colors truncate">
                                             {timelineItem.data.title}
                                           </h4>
                                         )}
@@ -521,11 +545,11 @@ function JourneyStopSchedule({
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             onClick={(e) => e.stopPropagation()}
-                                            className="text-xs text-slate-400 hover:text-amber-300 flex items-center space-x-1 mt-0.5 transition-colors group/loc cursor-pointer inline-flex max-w-fit"
+                                            className="text-xs text-slate-400 hover:text-amber-300 flex items-center space-x-1 mt-0.5 transition-colors group/loc cursor-pointer inline-flex max-w-full min-w-0"
                                             title="Open navigation directions in Google Maps"
                                           >
                                             <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover/loc:scale-110 transition-transform" />
-                                            <span className="underline decoration-slate-600 hover:decoration-amber-400 underline-offset-2">
+                                            <span className="underline decoration-slate-600 hover:decoration-amber-400 underline-offset-2 break-words">
                                               {timelineItem.data.location}
                                             </span>
                                             <ExternalLink className="w-3 h-3 text-slate-500 group-hover/loc:text-amber-300 opacity-70 ml-0.5 shrink-0" />
@@ -973,7 +997,7 @@ export function PolandLanding() {
                 <button
                   type="button"
                   onClick={() => navigateToTravel('travel-flight-krk', 'krakow', 1)}
-                  className="absolute top-[88%] left-[75%] z-20 hover:z-40 focus:z-40 -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 group/flightin focus:outline-none"
+                  className="absolute top-[88%] left-[75%] z-20 hover:z-40 focus:z-40 -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 group/flightin focus:outline-none relative before:absolute before:-inset-2 before:content-['']"
                   title="Flight Arrival into Kraków (Day 1) - Click to jump to schedule"
                 >
                   <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-950/95 border border-sky-400 text-sky-300 text-[8px] sm:text-[10px] font-black tracking-wider uppercase flex items-center space-x-1 sm:space-x-1.5 whitespace-nowrap shadow-lg shadow-sky-950/80 backdrop-blur-md group-hover/flightin:bg-sky-500 group-hover/flightin:text-slate-950 group-hover/flightin:border-sky-300 transition-colors animate-pulse">
@@ -986,7 +1010,7 @@ export function PolandLanding() {
                 <button
                   type="button"
                   onClick={() => navigateToTravel('travel-flight-gdn', 'gdansk', 10)}
-                  className="absolute top-[10%] left-[25%] z-20 hover:z-40 focus:z-40 -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 group/flightout focus:outline-none"
+                  className="absolute top-[10%] left-[25%] z-20 hover:z-40 focus:z-40 -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 group/flightout focus:outline-none relative before:absolute before:-inset-2 before:content-['']"
                   title="Return Flight Departure from Gdańsk (Day 10) - Click to jump to schedule"
                 >
                   <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-950/95 border border-sky-400 text-sky-300 text-[8px] sm:text-[10px] font-black tracking-wider uppercase flex items-center space-x-1 sm:space-x-1.5 whitespace-nowrap shadow-lg shadow-sky-950/80 backdrop-blur-md group-hover/flightout:bg-sky-500 group-hover/flightout:text-slate-950 group-hover/flightout:border-sky-300 transition-colors animate-pulse">
@@ -1002,7 +1026,7 @@ export function PolandLanding() {
                     type="button"
                     onClick={() => navigateToTravel(train.id, train.cityId, train.dayNumber)}
                     style={{ top: train.top, left: train.left }}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 z-20 hover:z-40 focus:z-40 group/train cursor-pointer transition-transform hover:scale-110 focus:outline-none"
+                    className="absolute -translate-x-1/2 -translate-y-1/2 z-20 hover:z-40 focus:z-40 group/train cursor-pointer transition-transform hover:scale-110 focus:outline-none relative before:absolute before:-inset-2 before:content-['']"
                     title={isAuthenticated ? `${train.label} - Click to jump to schedule and view ticket` : `${train.label} - Click to jump to schedule`}
                     aria-label={train.label}
                   >
@@ -1093,7 +1117,7 @@ export function PolandLanding() {
               </div>
               <p className="text-xs sm:text-sm text-slate-300 mt-1">
                 {isAuthenticated ? (
-                  <span className="text-emerald-400 font-medium flex items-center space-x-1.5">
+                  <span className="text-emerald-400 font-medium flex flex-wrap items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span>Signed In as {user?.name || user?.email || 'Traveler'} : Verified expedition schedule active with private confirmations</span>
                   </span>

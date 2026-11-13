@@ -821,7 +821,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search expenses... (/)"
             aria-label="Search expenses"
-            className="w-full pl-8 pr-8 py-1.5 rounded-xl bg-slate-950/90 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400/60"
+            className="w-full pl-8 pr-8 py-1.5 rounded-xl bg-slate-950/90 border border-white/10 text-base sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400/60"
           />
           {searchQuery && (
             <button
@@ -1013,7 +1013,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                       <button
                         type="button"
                         onClick={() => handleOpenEditModal(exp)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
                         title="Edit expense details and who paid"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -1022,7 +1022,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                       <button
                         type="button"
                         onClick={() => handleDeleteExpense(exp.id)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                         title="Delete expense"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1047,9 +1047,9 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
             {settlements.map((s) => (
               <div 
                 key={s.id}
-                className="p-3 rounded-xl bg-slate-950/60 border border-white/5 flex items-center justify-between text-xs text-slate-300"
+                className="p-3 rounded-xl bg-slate-950/60 border border-white/5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-xs text-slate-300"
               >
-                <div className="flex items-center space-x-2 min-w-0">
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
                   <span className="font-bold text-amber-300 shrink-0">{s.from_user_name}</span>
                   <span className="shrink-0">{s.method === 'both_paid_separately' ? 'settled with' : 'paid'}</span>
                   <span className="font-bold text-emerald-400 shrink-0">{s.to_user_name}</span>
@@ -1064,7 +1064,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                     <button
                       type="button"
                       onClick={() => handleUndoSettlement(s.id)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors flex items-center space-x-1 cursor-pointer"
+                      className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                       title="Undo this settlement payment"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -1080,9 +1080,9 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
 
       {/* Add Expense Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="glass-panel w-full max-w-lg max-h-[90vh] flex flex-col rounded-3xl border border-amber-500/30 bg-slate-900 shadow-2xl overflow-hidden my-auto">
-            <form onSubmit={handleSaveExpense} className="flex flex-col max-h-[90vh] h-full text-xs sm:text-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="glass-panel w-full max-w-lg max-h-[90dvh] flex flex-col rounded-3xl border border-amber-500/30 bg-slate-900 shadow-2xl overflow-hidden my-auto">
+            <form onSubmit={handleSaveExpense} className="flex flex-col max-h-[90dvh] h-full text-xs sm:text-sm">
               <div className="flex items-center justify-between border-b border-white/10 px-5 sm:px-6 py-4 flex-shrink-0 bg-slate-900">
                 <h3 className="text-lg font-black text-white flex items-center space-x-2">
                   {editingExpense ? (
@@ -1100,7 +1100,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                 <button 
                   type="button" 
                   onClick={() => { setIsAddModalOpen(false); setEditingExpense(null); }}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                  className="w-10 h-10 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
                 >
                   ✕
                 </button>
@@ -1115,7 +1115,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                   value={formDesc}
                   onChange={(e) => setFormDesc(e.target.value)}
                   placeholder="e.g. PKP Intercity Wrocław to Poznań"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-base sm:text-sm"
                 />
               </div>
 
@@ -1129,7 +1129,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                     value={formAmount}
                     onChange={(e) => setFormAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-base sm:text-sm"
                   />
                 </div>
 
@@ -1138,7 +1138,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                   <select
                     value={formCurrency}
                     onChange={(e) => setFormCurrency(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white focus:outline-none focus:border-amber-400"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white focus:outline-none focus:border-amber-400 text-base sm:text-sm"
                   >
                     {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -1160,7 +1160,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                 <select
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white focus:outline-none focus:border-amber-400 capitalize"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white focus:outline-none focus:border-amber-400 capitalize text-base sm:text-sm"
                 >
                   {CATEGORIES.filter(c => c.id !== 'all').map(c => (
                     <option key={c.id} value={c.id}>{c.label}</option>
@@ -1174,7 +1174,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                   <select
                     value={formPayer || currentUserId}
                     onChange={(e) => setFormPayer(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white focus:outline-none focus:border-amber-400"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white focus:outline-none focus:border-amber-400 text-base sm:text-sm"
                   >
                     {participants.map(p => (
                       <option key={p.id} value={p.id}>
@@ -1192,7 +1192,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                   <select
                     value={formSplitType}
                     onChange={(e) => setFormSplitType(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white focus:outline-none focus:border-amber-400"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white focus:outline-none focus:border-amber-400 text-base sm:text-sm"
                   >
                     <option value="equal">
                       {participants.length > 1 ? `Split Equally (${participants.length}-way)` : 'Full Amount (Solo)'}
@@ -1216,7 +1216,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                     value={formSite}
                     onChange={(e) => setFormSite(e.target.value)}
                     placeholder="e.g. Booking.com, Hotels.com, PKP Intercity"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs sm:text-sm"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-base sm:text-sm"
                   />
                   <datalist id="trip-booking-sites-list">
                     {availableBookingSites.map((site) => (
@@ -1265,7 +1265,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                     value={formPaymentMethod}
                     onChange={(e) => setFormPaymentMethod(e.target.value)}
                     placeholder="e.g. US Bank VISA, Apple Pay, Mastercard"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs sm:text-sm"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-base sm:text-sm"
                   />
                   <datalist id="trip-payment-methods-list">
                     {availablePaymentMethods.map((m) => (
@@ -1335,8 +1335,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
 
       {/* Record Total Settle-Up Modal */}
       {isSettleModalOpen && activeTransferToSettle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="glass-panel w-full max-w-sm max-h-[90vh] overflow-y-auto p-6 rounded-3xl border border-emerald-500/30 bg-slate-900 shadow-2xl space-y-4 my-auto">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="glass-panel w-full max-w-sm max-h-[90dvh] overflow-y-auto p-6 rounded-3xl border border-emerald-500/30 bg-slate-900 shadow-2xl space-y-4 my-auto">
             <div>
               <h3 className="text-base sm:text-lg font-black text-white flex items-center space-x-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -1364,7 +1364,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
               <select
                 value={settleMethod}
                 onChange={(e) => setSettleMethod(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white text-xs focus:outline-none focus:border-emerald-400"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white text-base sm:text-xs focus:outline-none focus:border-emerald-400"
               >
                 <option value="cash">Cash</option>
                 <option value="bank_transfer">Bank Transfer</option>
@@ -1387,7 +1387,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                   setIsSettleModalOpen(false);
                   setActiveTransferToSettle(null);
                 }}
-                className="px-3 py-2 rounded-xl text-slate-400 hover:text-white text-xs"
+                className="px-3 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white text-xs cursor-pointer"
               >
                 Cancel
               </button>
@@ -1395,7 +1395,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                 type="button"
                 onClick={handleSettleUp}
                 disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 min-h-[44px] flex items-center justify-center rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? 'Recording...' : 'Confirm Total Settle'}
               </button>
@@ -1406,8 +1406,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
 
       {/* Record Item-by-Item Settle Modal */}
       {activeItemToSettle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="glass-panel w-full max-w-sm max-h-[90vh] overflow-y-auto p-6 rounded-3xl border border-amber-500/40 bg-slate-900 shadow-2xl space-y-4 my-auto">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="glass-panel w-full max-w-sm max-h-[90dvh] overflow-y-auto p-6 rounded-3xl border border-amber-500/40 bg-slate-900 shadow-2xl space-y-4 my-auto">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-base sm:text-lg font-black text-white flex items-center space-x-2">
                 <Receipt className="w-5 h-5 text-amber-400" />
@@ -1416,7 +1416,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
               <button 
                 type="button" 
                 onClick={() => setActiveItemToSettle(null)}
-                className="text-slate-400 hover:text-white text-sm"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white text-sm"
               >
                 ✕
               </button>
@@ -1447,7 +1447,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
               <select
                 value={settleMethod}
                 onChange={(e) => setSettleMethod(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white text-xs focus:outline-none focus:border-amber-400"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white text-base sm:text-xs focus:outline-none focus:border-amber-400"
               >
                 <option value="cash">Cash</option>
                 <option value="bank_transfer">Bank Transfer</option>
@@ -1467,7 +1467,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
               <button
                 type="button"
                 onClick={() => setActiveItemToSettle(null)}
-                className="px-3 py-2 rounded-xl text-slate-400 hover:text-white text-xs"
+                className="px-3 py-2 min-h-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white text-xs cursor-pointer"
               >
                 Cancel
               </button>
@@ -1475,7 +1475,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                 type="button"
                 onClick={handleConfirmItemSettle}
                 disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 min-h-[44px] flex items-center justify-center rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? 'Recording...' : `Confirm Settle (${formatCurrency(activeItemToSettle.split.amount_owed, activeItemToSettle.expense.currency_original)})`}
               </button>

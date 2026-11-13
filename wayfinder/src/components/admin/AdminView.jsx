@@ -535,20 +535,20 @@ export function AdminView() {
                 <div key={trip.id} className="rounded-2xl border border-white/10 bg-slate-900/90 shadow-2xl overflow-hidden backdrop-blur-xl">
                   {/* Trip Card Header */}
                   <div className="px-5 py-4 border-b border-white/10 bg-slate-950/60 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
                         <Compass className="w-5 h-5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-white">{trip.name}</h3>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                          <h3 className="text-sm font-bold text-white truncate">{trip.name}</h3>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 shrink-0">
                             {trip.id}
                           </span>
                         </div>
                         <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                          <Crown className="w-3 h-3 text-amber-400" />
-                          <span>Owner: <strong className="text-slate-200">{trip.owner?.name || 'Unknown'}</strong> ({trip.owner?.email})</span>
+                          <Crown className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span className="truncate">Owner: <strong className="text-slate-200">{trip.owner?.name || 'Unknown'}</strong> (<span className="break-all sm:break-normal">{trip.owner?.email}</span>)</span>
                         </p>
                       </div>
                     </div>
@@ -621,7 +621,7 @@ export function AdminView() {
                                         handleUpdateTripMembership(trip.id, c.userId, e.target.value);
                                       }
                                     }}
-                                    className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-amber-400/60 disabled:opacity-50"
+                                    className="bg-slate-800 border border-slate-700 text-slate-200 text-base sm:text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-amber-400/60 disabled:opacity-50"
                                   >
                                     <option value="viewer">Viewer</option>
                                     <option value="editor">Editor</option>
@@ -655,9 +655,9 @@ export function AdminView() {
                           </h5>
                           <div className="space-y-1.5">
                             {trip.pendingInvites.map((inv) => (
-                              <div key={inv.id} className="flex items-center justify-between text-xs p-2 rounded-lg bg-amber-950/20 border border-amber-900/30">
-                                <span className="font-mono text-amber-200/90">{inv.email}</span>
-                                <span className="text-[10px] uppercase font-bold text-amber-400/80 bg-amber-900/40 px-2 py-0.5 rounded">
+                              <div key={inv.id} className="flex items-center justify-between text-xs p-2 rounded-lg bg-amber-950/20 border border-amber-900/30 gap-2 min-w-0">
+                                <span className="font-mono text-amber-200/90 truncate min-w-0">{inv.email}</span>
+                                <span className="text-[10px] uppercase font-bold text-amber-400/80 bg-amber-900/40 px-2 py-0.5 rounded shrink-0">
                                   Invited as {inv.role}
                                 </span>
                               </div>
@@ -698,15 +698,15 @@ export function AdminView() {
                                   </span>
                                 </div>
 
-                                <div className="flex items-center gap-2 pt-1">
-                                  <select
-                                    value={selectedRole}
-                                    disabled={isUpdating}
-                                    onChange={(e) => {
-                                      setAddMemberRoles(prev => ({ ...prev, [selectedRoleKey]: e.target.value }));
-                                    }}
-                                    className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 flex-1 focus:outline-none focus:border-amber-400/60 disabled:opacity-50"
-                                  >
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <select
+                                      value={selectedRole}
+                                      disabled={isUpdating}
+                                      onChange={(e) => {
+                                        setAddMemberRoles(prev => ({ ...prev, [selectedRoleKey]: e.target.value }));
+                                      }}
+                                      className="bg-slate-800 border border-slate-700 text-slate-200 text-base sm:text-xs rounded-lg px-2 py-1 flex-1 focus:outline-none focus:border-amber-400/60 disabled:opacity-50"
+                                    >
                                     <option value="viewer">Tie as Viewer</option>
                                     <option value="editor">Tie as Editor</option>
                                     <option value="admin">Tie as Admin</option>
@@ -759,7 +759,7 @@ export function AdminView() {
               placeholder="Search name, email, ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-slate-800/80 border border-slate-700 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-400/60 transition-colors"
+              className="w-full pl-9 pr-3 py-1.5 text-base sm:text-xs rounded-xl bg-slate-800/80 border border-slate-700 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-400/60 transition-colors"
             />
           </div>
         </div>
@@ -840,7 +840,7 @@ export function AdminView() {
                                 handleUpdateTripMembership('poland-christmas-2026', u.id, e.target.value);
                               }
                             }}
-                            className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-0.5 focus:outline-none focus:border-amber-400/60 disabled:opacity-50"
+                            className="bg-slate-800 border border-slate-700 text-slate-200 text-base sm:text-xs rounded-lg px-2 py-0.5 focus:outline-none focus:border-amber-400/60 disabled:opacity-50"
                           >
                             <option value="viewer">Viewer</option>
                             <option value="editor">Editor</option>

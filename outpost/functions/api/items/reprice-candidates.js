@@ -4,7 +4,7 @@ import { computeAgingDecaySuggestion } from '../../utils/auction.js';
 /**
  * GET /api/items/reprice-candidates
  *
- * Scans active inventory (Listed and Available items) for the authenticated user,
+ * Scans actively listed inventory (status = 'Listed') for the authenticated user,
  * categorizes them into aging decay tiers (0-30d, 31-60d, 61-90d, 90d+),
  * and computes floor-clamped markdown suggestions that guarantee 0% net loss protection.
  */
@@ -18,7 +18,7 @@ export async function onRequestGet(context) {
     const filterTier = url.searchParams.get('tier') || '';
     const onlyEligible = url.searchParams.get('eligible') === 'true';
 
-    // 1. Fetch user's active inventory items
+    // 1. Fetch user's actively listed inventory items (status = 'Listed' exclusively)
     const rows = await env.DB.prepare(`
       SELECT
         i.id, i.sku, i.item_name, i.category, i.status, i.platform,
@@ -32,8 +32,8 @@ export async function onRequestGet(context) {
         inv.invoice_ref
       FROM auction_items i
       LEFT JOIN auction_invoices inv ON i.invoice_id = inv.id
-      WHERE i.user_id = ? AND i.status IN ('Listed', 'Available')
-      ORDER BY i.date_listed ASC, i.created_at ASC
+      WHERE i.user_id = ? AND i.status = 'Listed'
+      ORDER BY COALESCE(i.date_listed, i.created_at) ASC
     `).bind(payload.userId).all();
 
     const items = rows.results || [];

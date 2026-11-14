@@ -62,6 +62,11 @@ export async function onRequestPost(context) {
         continue;
       }
 
+      if (item.status !== 'Listed') {
+        results.push({ id: itemId, success: false, error: 'Item is not actively listed' });
+        continue;
+      }
+
       if (item.reprice_locked) {
         results.push({ id: itemId, success: false, error: 'Item is locked against repricing' });
         continue;

@@ -815,10 +815,10 @@ The Automated Repricing & Aging-Inventory Decay Engine introduces algorithmic pr
    - Added `original_list_price` (REAL), `last_repriced_at` (TEXT), `reprice_locked` (INTEGER DEFAULT 0), and `reprice_tier` (TEXT) to `auction_items`.
    - Created composite index `idx_auction_items_reprice ON auction_items(user_id, status, reprice_locked, date_listed)`.
 4. **Serverless REST Endpoints**:
-   - `GET /api/items/reprice-candidates`: Scans active inventory for the authenticated user, applies aging calculations, and returns categorized candidates with summary statistics (`total_candidates`, `potential_price_drop`, `tier_counts`, `locked_count`, `at_floor_count`).
-   - `POST /api/items/reprice-apply`: Accepts batch revisions, re-evaluates the break-even floor on the server to prevent client-side bypass, executes atomic batch updates via `chunkedBatch()`, and optionally pushes price revisions directly to active eBay listings via the eBay Trading API (`updateEbayListingPrice`).
+   - `GET /api/items/reprice-candidates`: Scans actively listed inventory (`status = 'Listed'` exclusively) for the authenticated user, applies aging calculations from `date_listed` (or creation dates), excludes unlisted inventory (`Available`, `Draft`, `Sold`), and returns categorized candidates with summary statistics (`total_candidates`, `potential_price_drop`, `tier_counts`, `locked_count`, `at_floor_count`).
+   - `POST /api/items/reprice-apply`: Accepts batch revisions, re-evaluates the break-even floor on the server to prevent client-side bypass, rejects unlisted items (`status !== 'Listed'`), executes atomic batch updates via `chunkedBatch()`, and optionally pushes price revisions directly to active eBay listings via the eBay Trading API (`updateEbayListingPrice`).
 5. **UI Surfacing & Ergonomics**:
-   - `InventoryGridRow.jsx`: Displays color-coded age badges (`30d`, `60d`, `90d+`) in the status column and provides an inline lock toggle (`Lock` / `Unlock`).
+   - `InventoryGridRow.jsx`: Displays color-coded age badges (`30d`, `60d`, `90d+`) in the status column and provides an inline lock toggle (`Lock` / `Unlock`) strictly on actively `Listed` items.
    - `InventoryCommandBar.jsx`: Adds a dedicated "Reprice Engine" action button to launch the review workflow.
    - `AgingMarkdownModal.jsx`: Interactive batch modal displaying eligible items by tier, current price vs. suggested price, floor cushion, lock toggle, and one-click execution.
 

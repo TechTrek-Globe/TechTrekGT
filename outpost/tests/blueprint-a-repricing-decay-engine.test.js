@@ -107,6 +107,30 @@ test('Blueprint A: Aging Decay suggestion tiers and floor clamp', async (t) => {
     assert.equal(res.eligible, false);
     assert.equal(res.suggested_price, 150.00);
   });
+
+  await t.test('Unlisted items (status = Available, Draft, Sold) are strictly excluded from decay', () => {
+    const unlistedAvailable = {
+      ...baseItem,
+      status: 'Available',
+      date_acquired: '2026-06-01T12:00:00.000Z' // 166 days ago
+    };
+    const resAvailable = computeAgingDecaySuggestion(unlistedAvailable, {}, { referenceDate: refDate });
+    assert.equal(resAvailable.eligible, false);
+    assert.equal(resAvailable.tier, 'unlisted');
+    assert.equal(resAvailable.days_listed, 0);
+    assert.equal(resAvailable.action, 'unlisted');
+    assert.equal(resAvailable.suggested_price, 150.00);
+
+    const unlistedSold = {
+      ...baseItem,
+      status: 'Sold',
+      date_listed: '2026-06-01T12:00:00.000Z'
+    };
+    const resSold = computeAgingDecaySuggestion(unlistedSold, {}, { referenceDate: refDate });
+    assert.equal(resSold.eligible, false);
+    assert.equal(resSold.tier, 'unlisted');
+    assert.equal(resSold.days_listed, 0);
+  });
 });
 
 test('Blueprint A: Worker Route Registration & Dispatch', () => {

@@ -506,7 +506,34 @@ export function computeAgingDecaySuggestion(item = {}, platformSchedule = {}, op
   const referenceDate = options.referenceDate ? new Date(options.referenceDate) : new Date();
   const refIso = referenceDate.toISOString();
 
-  // Determine intake/listed date
+  // Only actively listed items (status === 'Listed') are eligible for aging repricing decay
+  const isListed = !item.status || item.status === 'Listed';
+
+  if (!isListed) {
+    const currentPrice = Number(item.current_list_price ?? item.suggested_list_price ?? item.unit_price ?? 0) || 0;
+    return {
+      item_id: item.id || null,
+      sku: item.sku || null,
+      item_name: item.item_name || '',
+      days_listed: 0,
+      tier: 'unlisted',
+      tier_label: 'Not Listed',
+      action: 'unlisted',
+      discount_pct: 0,
+      current_price: currentPrice,
+      original_list_price: Number(item.original_list_price ?? currentPrice) || currentPrice,
+      suggested_price: currentPrice,
+      raw_suggested_price: currentPrice,
+      break_even_floor: 0,
+      dollar_drop: 0,
+      pct_drop: 0,
+      at_floor_blocked: false,
+      reprice_locked: Boolean(item.reprice_locked),
+      eligible: false
+    };
+  }
+
+  // Determine intake/listed date - prioritize date_listed
   const listedDate = item.date_listed || item.date_acquired || item.purchase_date || item.created_at;
   const daysListed = listedDate ? (daysBetween(listedDate, refIso) ?? 0) : 0;
 

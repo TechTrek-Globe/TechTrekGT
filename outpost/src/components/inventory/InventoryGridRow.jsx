@@ -83,8 +83,9 @@ export function InventoryGridRow({
     (item.attributes && (typeof item.attributes === 'string' ? item.attributes.includes('amazon_vinescout') : item.attributes?.source === 'amazon_vinescout'))
   );
 
-  // Compute aging in inventory
-  const listedDate = item.date_listed || item.date_acquired || item.purchase_date || item.created_at;
+  // Compute aging in inventory - only for actively listed items
+  const isListed = item.status === 'Listed';
+  const listedDate = isListed ? (item.date_listed || item.date_acquired || item.purchase_date || item.created_at) : null;
   const daysListed = listedDate ? (daysBetween(listedDate, new Date().toISOString()) ?? 0) : 0;
 
   return (
@@ -262,7 +263,7 @@ export function InventoryGridRow({
             onUpdated={onUpdateItem}
             onMarkSold={onMarkSold}
           />
-          {item.status !== 'Sold' && daysListed > 0 && (
+          {isListed && daysListed > 0 && (
             <div className="flex items-center gap-1 mt-1">
               <span
                 className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold border tracking-wide ${
@@ -274,7 +275,7 @@ export function InventoryGridRow({
                     ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
                     : 'bg-slate-800 text-slate-400 border-slate-700'
                 }`}
-                title={`Listed/Acquired: ${listedDate ? listedDate.slice(0, 10) : ''} (${daysListed} days in inventory)`}
+                title={`Listed: ${item.date_listed ? item.date_listed.slice(0, 10) : (listedDate ? listedDate.slice(0, 10) : '')} (${daysListed} days on market)`}
               >
                 {daysListed}d
               </span>

@@ -319,6 +319,14 @@ export const getTaxReport = (year = '') =>
 // PHASE 3 - eBay Real-Time Sync Engine API Utilities
 // ============================================================
 
+// --- 1-Click Create / Publish Listing to eBay ---
+export const createEbayListingApi = (payload) =>
+  apiFetch('/api/ebay/create-listing', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(payload)
+  });
+
 // --- eBay OAuth Status ---
 export const getEbayOAuthStatus = () =>
   apiFetch('/api/ebay/oauth-status');

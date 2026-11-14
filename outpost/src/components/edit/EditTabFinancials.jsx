@@ -11,6 +11,7 @@ import { fmtCurrency, formatPercent } from '../../utils/formulaPreview';
 import { computeTargetPriceFromMargin, compareChannelEconomics } from '../../utils/feeEngine';
 import { DEFAULT_PLATFORM_FEE_PCT, DEFAULT_PLATFORM_FLAT_FEE } from '../../../functions/utils/constants.js';
 import { MarginHealthBadge } from '../inventory/MarginHealthBadge';
+import { createEbayListingApi } from '../../utils/auctionApi';
 
 export function EditTabFinancials({
   form,
@@ -41,6 +42,46 @@ export function EditTabFinancials({
   const [manualError, setManualError] = useState('');
   const [isPairingManual, setIsPairingManual] = useState(false);
   const [showChangePicker, setShowChangePicker] = useState(false);
+
+  // 1-Click Create Listing state
+  const [creatingListing, setCreatingListing] = useState(false);
+  const [createListingMsg, setCreateListingMsg] = useState(null);
+
+  const handle1ClickCreateListing = async () => {
+    if (!item?.id) return;
+    setCreatingListing(true);
+    setCreateListingMsg(null);
+    try {
+      const res = await createEbayListingApi({
+        item_id: item.id,
+        price: form.current_list_price || form.suggested_list_price || form.min_sell_price,
+        use_ai: true,
+        shipping_cost: form.buyer_shipping_cost || 0,
+        free_shipping: form.buyer_shipping_cost === 0
+      });
+      if (res?.success) {
+        updateField('ebay_listing_id', res.listing_id);
+        updateField('status', 'Listed');
+        updateField('platform', 'eBay');
+        setCreateListingMsg({
+          type: 'success',
+          text: `Listing #${res.listing_id} created live on eBay!`
+        });
+      } else {
+        setCreateListingMsg({
+          type: 'error',
+          text: res?.error || 'Failed to create listing'
+        });
+      }
+    } catch (e) {
+      setCreateListingMsg({
+        type: 'error',
+        text: e.message || 'Error creating eBay listing'
+      });
+    } finally {
+      setCreatingListing(false);
+    }
+  };
 
   const isSold = form.status === 'Sold' || item?.status === 'Sold';
   const isEbaySynced = Boolean(form.ebay_listing_id);
@@ -752,10 +793,22 @@ export function EditTabFinancials({
           /* PAIRING WORKFLOW HUB (UNPAIRED OR CHANGE MODE) */
           <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-slate-300 font-semibold">
                   {isEbaySynced ? 'Change Paired eBay Listing' : 'Pair with Active eBay Listing'}
                 </span>
+                {!isEbaySynced && (
+                  <button
+                    type="button"
+                    onClick={handle1ClickCreateListing}
+                    disabled={creatingListing}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                    title="Generate AI copy & publish fixed-price listing directly to eBay"
+                  >
+                    {creatingListing ? <Loader2 className="w-3 h-3 animate-spin text-slate-950" /> : <Sparkles className="w-3 h-3 text-slate-950" />}
+                    <span>{creatingListing ? 'Creating on eBay...' : '1-Click Create on eBay'}</span>
+                  </button>
+                )}
                 {isEbaySynced && (
                   <button
                     type="button"
@@ -793,6 +846,23 @@ export function EditTabFinancials({
                 </button>
               </div>
             </div>
+
+            {createListingMsg && (
+              <div className={`p-2.5 rounded-lg text-xs flex items-center justify-between border ${
+                createListingMsg.type === 'success'
+                  ? 'bg-emerald-950/60 text-emerald-200 border-emerald-500/40'
+                  : 'bg-rose-950/60 text-rose-200 border-rose-500/40'
+              }`}>
+                <span>{createListingMsg.text}</span>
+                <button
+                  type="button"
+                  onClick={() => setCreateListingMsg(null)}
+                  className="text-slate-400 hover:text-slate-200 ml-2 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* MODE A: BROWSE ACTIVE STORE LISTINGS */}
             {pairingMode === 'browse' && (

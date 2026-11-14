@@ -11,8 +11,8 @@ import {
 } from '../src/worker.js';
 
 describe('T-05: Route Table & Route Shadowing Elimination', () => {
-  it('defines exactly 80 routes in the route table with explicit auth descriptors', () => {
-    assert.equal(ROUTES.length, 80, `Expected exactly 80 routes, found ${ROUTES.length}`);
+  it('defines exactly 81 routes in the route table with explicit auth descriptors', () => {
+    assert.equal(ROUTES.length, 81, `Expected exactly 81 routes, found ${ROUTES.length}`);
     for (const r of ROUTES) {
       assert.ok(r.method, `Route ${r.pattern} must specify HTTP method`);
       assert.ok(r.pattern, `Route must specify pattern`);
@@ -24,8 +24,8 @@ describe('T-05: Route Table & Route Shadowing Elimination', () => {
     }
   });
 
-  it('exports ROUTE_MANIFEST with 80 entries', () => {
-    assert.equal(ROUTE_MANIFEST.length, 80);
+  it('exports ROUTE_MANIFEST with 81 entries', () => {
+    assert.equal(ROUTE_MANIFEST.length, 81);
     for (const item of ROUTE_MANIFEST) {
       assert.ok(item.method);
       assert.ok(item.pattern);
@@ -109,7 +109,7 @@ describe('T-05: Route Table & Route Shadowing Elimination', () => {
     );
   });
 
-  describe('Table-driven test: All 80 routes resolve to their bound handlers', () => {
+  describe('Table-driven test: All 81 routes resolve to their bound handlers', () => {
     for (let idx = 0; idx < ROUTES.length; idx++) {
       const entry = ROUTES[idx];
       it(`Route [${idx + 1}/80] ${entry.method} ${entry.pattern} resolves to bound handler`, () => {

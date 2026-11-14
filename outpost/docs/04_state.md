@@ -301,14 +301,9 @@ Outpost uses React Context and standard React hooks (`useState`, `useReducer`, `
   - **Operational Dashboard Command State [ACTION ID: DASH-001 / AUDIT-011]**:
     - Aggregation & Radar State: `functions/api/dashboard.js` batches 12 queries atomically via `env.DB.batch()`, calculating idle available capital vs. active listed capital, unrealized profit margin, and an aging summary matrix across 4 decay buckets (`fresh_count`, `decay_10_count`, `decay_20_count`, `liquidation_count`, `locked_count`) using `julianday('now')` date deltas on SQLite. Surfaces the top 5 oldest active listings and top 5 unlisted high-capital items.
     - Dashboard Operations UI State: `src/components/DashboardView.jsx` mounts `<AgingMarkdownModal>` for one-click in-place batch repricing, integrates with `InventoryContext` to pass `Available` status filters and SKU search parameters directly into the Inventory Hub, and provides live one-click eBay sync triggering with real-time UI refresh.
-
-
-
-
-
-
-
-
-
-
+  - **1-Click eBay Listing Creation & Gemini AI Publishing State [ACTION ID: LIST-002 / AUDIT-012]**:
+    - Trading API SOAP XML Engine State: `functions/api/ebay/tokenHelper.js` exports `createEbayListing(env, accessToken, listingData)` and `xmlEscape(s)`. Builds validated `AddFixedPriceItem` XML with CDATA description wrappers, ConditionID mapping (`1000` New, `2750` Like New, `3000` Used, `1500` Open Box), CategoryID resolution (`213` cards, `267` books, `9355` electronics, `212` default), EPS photo placeholder fallbacks, and item specifics. Extracts 12-digit ItemID and formats canonical listing URLs (`https://www.ebay.com/itm/${itemId}`).
+    - Serverless Creation Endpoint State: `functions/api/ebay/create-listing.js` handles `POST /api/ebay/create-listing`. Validates authenticated session, fetches item, retrieves eBay user token, invokes `generateAiListingDetails()` and `generateEbayListingHtml()` when AI description is requested, publishes to eBay Trading API, and executes atomic 3-table D1 mutations via `env.DB.batch()`: updating `auction_items` (`ebay_listing_id`, `status = 'Listed'`, `platform = 'eBay'`, `current_list_price`, `date_listed`), upserting `ebay_active_listings`, and upserting `auction_item_platform_listings`.
+    - Route Table & Client API State: Registered route `POST /api/ebay/create-listing` with session auth in `src/worker.js`, expanding route table from 80 to 81 verified routes. Client helper `createEbayListingApi(payload)` exported from `src/utils/auctionApi.js`.
+    - 1-Click UI Publishing State: `src/components/ListingCopyModal.jsx` mounts the 1-Click eBay Listing Creator action card on the eBay tab with in-flight spinner, success badge, and direct external link to the live eBay listing. `src/components/edit/EditTabFinancials.jsx` mounts the 1-Click Create on eBay button in the pairing hub header for immediate unlisted item publishing. `src/components/InventoryHubView.jsx` attaches the `onListingCreated` refresh callback.
 

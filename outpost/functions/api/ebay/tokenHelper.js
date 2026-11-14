@@ -961,6 +961,15 @@ export async function fetchSingleEbayListing(env, accessToken, listingId, campai
   return null;
 }
 
+export function xmlEscape(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 /**
  * Updates the Custom Label (SKU) on an existing eBay listing using Trading API ReviseFixedPriceItem / ReviseItem.
  *
@@ -980,13 +989,6 @@ export async function updateEbayListingSku(env, accessToken, listingId, sku) {
   const tradingEndpoint = isSandbox
     ? 'https://api.sandbox.ebay.com/ws/api.dll'
     : 'https://api.ebay.com/ws/api.dll';
-
-  const xmlEscape = (s) => String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 
   const makeXml = (callName) => `<?xml version="1.0" encoding="utf-8"?>
 <${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">
@@ -1066,13 +1068,6 @@ export async function updateEbayListingPrice(env, accessToken, listingId, newPri
     ? 'https://api.sandbox.ebay.com/ws/api.dll'
     : 'https://api.ebay.com/ws/api.dll';
 
-  const xmlEscape = (s) => String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-
   const makePriceXml = (callName) => `<?xml version="1.0" encoding="utf-8"?>
 <${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
@@ -1127,6 +1122,237 @@ export async function updateEbayListingPrice(env, accessToken, listingId, newPri
   } else {
     throw new Error(errMsg || `eBay returned Ack=${ack} when revising price`);
   }
+}
+
+/**
+ * Creates a new fixed-price Buy-It-Now listing on eBay via Trading API (AddFixedPriceItem).
+ *
+ * @param {object} env - Cloudflare Worker env
+ * @param {string} accessToken - eBay user OAuth access token
+ * @param {object} listingData - Listing parameters:
+ *   - title: string (max 80 chars)
+ *   - descriptionHtml: string (HTML body)
+ *   - price: number|string
+ *   - sku?: string
+ *   - categoryId?: string
+ *   - conditionId?: string|number
+ *   - condition?: string
+ *   - imageUrl?: string (or pictureUrls?: string[])
+ *   - isFreeShipping?: boolean
+ *   - buyerShippingCost?: number
+ *   - postalCode?: string
+ *   - quantity?: number
+ *   - brand?: string
+ *   - specifics?: Array<{ name: string, value: string }> | object
+ * @returns {Promise<{ success: boolean, listing_id: string, ebay_url: string, price: string, title: string, ack: string }>}
+ */
+export async function createEbayListing(env, accessToken, listingData = {}) {
+  if (!accessToken) throw new Error('eBay access token is required');
+
+  const rawTitle = String(listingData.title || '').trim();
+  if (!rawTitle) throw new Error('Listing title is required');
+
+  // eBay titles must be <= 80 chars without mid-word cuts if possible
+  let title = rawTitle;
+  if (title.length > 80) {
+    const truncated = title.substring(0, 80);
+    const lastSpace = truncated.lastIndexOf(' ');
+    title = (lastSpace > 40 ? truncated.substring(0, lastSpace) : truncated).trim();
+  }
+
+  const numPrice = Number(listingData.price);
+  if (isNaN(numPrice) || numPrice <= 0) {
+    throw new Error('Listing price must be a positive number');
+  }
+  const formattedPrice = numPrice.toFixed(2);
+
+  const cleanSku = String(listingData.sku || '').trim().slice(0, 50);
+
+  // Condition ID resolution (1000 = New, 2750 = Like New, 3000 = Used/Very Good)
+  let conditionId = listingData.conditionId ? String(listingData.conditionId) : null;
+  if (!conditionId) {
+    const c = String(listingData.condition || '').toLowerCase();
+    if (c.includes('brand new') || c === 'new' || c.includes('unopened') || c.includes('in box')) {
+      conditionId = '1000';
+    } else if (c.includes('like new') || c.includes('near mint') || c.includes('mint')) {
+      conditionId = '2750';
+    } else if (c.includes('open box')) {
+      conditionId = '1500';
+    } else if (c.includes('very good')) {
+      conditionId = '4000';
+    } else if (c.includes('good')) {
+      conditionId = '5000';
+    } else if (c.includes('acceptable')) {
+      conditionId = '6000';
+    } else if (c.includes('part') || c.includes('repair')) {
+      conditionId = '7000';
+    } else {
+      conditionId = c.includes('used') ? '3000' : '1000';
+    }
+  }
+
+  // Category ID resolution
+  let categoryId = String(listingData.categoryId || listingData.category_id || '').trim();
+  if (!categoryId) {
+    const cat = String(listingData.category || '').toLowerCase();
+    const ttl = title.toLowerCase();
+    if (cat.includes('card') || ttl.includes('card') || ttl.includes('psa') || ttl.includes('bgs') || ttl.includes('beckett')) {
+      categoryId = '213';
+    } else if (cat.includes('media') || cat.includes('book') || cat.includes('dvd')) {
+      categoryId = '267';
+    } else if (cat.includes('electronic') || cat.includes('computer')) {
+      categoryId = '9355';
+    } else {
+      categoryId = '212';
+    }
+  }
+
+  // Picture handling - eBay requires at least one PictureURL
+  let pictureUrls = [];
+  if (Array.isArray(listingData.pictureUrls) && listingData.pictureUrls.length > 0) {
+    pictureUrls = listingData.pictureUrls.map(u => String(u).trim()).filter(Boolean);
+  } else if (listingData.imageUrl || listingData.image_url) {
+    pictureUrls = [String(listingData.imageUrl || listingData.image_url).trim()];
+  }
+  if (pictureUrls.length === 0) {
+    pictureUrls = ['https://i.ebayimg.com/images/g/fe4AAeSwSO1q8G1~/s-l1600.webp'];
+  }
+
+  // Description handling - CDATA with safe closing tag escaping
+  let rawHtml = listingData.descriptionHtml || listingData.htmlBody || listingData.description || `<p>${xmlEscape(title)}</p>`;
+  const cleanCdataHtml = String(rawHtml).replace(/\]\]>/g, ']]&gt;');
+
+  // Shipping & Policies
+  const isFreeShipping = Boolean(listingData.isFreeShipping || Number(listingData.buyerShippingCost) === 0);
+  const shippingCost = isFreeShipping ? '0.00' : (Number(listingData.buyerShippingCost) || 4.95).toFixed(2);
+  const postalCode = listingData.postalCode || '95125';
+  const quantity = Math.max(1, parseInt(listingData.quantity, 10) || 1);
+
+  // Item Specifics
+  const specificsList = [];
+  const brandVal = listingData.brand || 'Unbranded';
+  specificsList.push({ name: 'Brand', value: brandVal });
+  if (cleanSku) specificsList.push({ name: 'MPN', value: cleanSku });
+  if (listingData.productType) specificsList.push({ name: 'Type', value: listingData.productType });
+  if (listingData.sport) specificsList.push({ name: 'Sport', value: listingData.sport });
+  if (listingData.athlete) specificsList.push({ name: 'Player/Athlete', value: listingData.athlete });
+  if (listingData.authenticator) specificsList.push({ name: 'Professional Grader', value: listingData.authenticator });
+  if (listingData.certNumber) specificsList.push({ name: 'Certification Number', value: String(listingData.certNumber) });
+
+  if (Array.isArray(listingData.specifics)) {
+    for (const spec of listingData.specifics) {
+      if (spec?.name && spec?.value) {
+        if (!specificsList.some(s => s.name.toLowerCase() === spec.name.toLowerCase())) {
+          specificsList.push({ name: spec.name, value: spec.value });
+        }
+      } else if (spec?.label && spec?.value) {
+        if (!specificsList.some(s => s.name.toLowerCase() === spec.label.toLowerCase())) {
+          specificsList.push({ name: spec.label, value: spec.value });
+        }
+      }
+    }
+  } else if (listingData.specifics && typeof listingData.specifics === 'object') {
+    for (const [k, v] of Object.entries(listingData.specifics)) {
+      if (k && v && !specificsList.some(s => s.name.toLowerCase() === k.toLowerCase())) {
+        specificsList.push({ name: k, value: String(v) });
+      }
+    }
+  }
+
+  const isSandbox = isEbaySandbox(env);
+  const tradingEndpoint = isSandbox
+    ? 'https://api.sandbox.ebay.com/ws/api.dll'
+    : 'https://api.ebay.com/ws/api.dll';
+
+  const picturesXml = pictureUrls
+    .map(url => `<PictureURL>${xmlEscape(url)}</PictureURL>`)
+    .join('\n      ');
+
+  const specificsXml = specificsList.length > 0 ? `
+    <ItemSpecifics>
+      ${specificsList.map(s => `<NameValueList><Name>${xmlEscape(s.name)}</Name><Value>${xmlEscape(s.value)}</Value></NameValueList>`).join('\n      ')}
+    </ItemSpecifics>` : '';
+
+  const skuXml = cleanSku ? `<SKU>${xmlEscape(cleanSku)}</SKU>` : '';
+
+  const addXml = `<?xml version="1.0" encoding="utf-8"?>
+<AddFixedPriceItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>${xmlEscape(accessToken)}</eBayAuthToken>
+  </RequesterCredentials>
+  <ErrorLanguage>en_US</ErrorLanguage>
+  <WarningLevel>High</WarningLevel>
+  <Item>
+    <Title>${xmlEscape(title)}</Title>
+    <Description><![CDATA[${cleanCdataHtml}]]></Description>
+    <PrimaryCategory>
+      <CategoryID>${xmlEscape(categoryId)}</CategoryID>
+    </PrimaryCategory>
+    <CategoryMappingAllowed>true</CategoryMappingAllowed>
+    <StartPrice currencyID="USD">${formattedPrice}</StartPrice>
+    <ConditionID>${conditionId}</ConditionID>
+    <Country>US</Country>
+    <Currency>USD</Currency>
+    <DispatchTimeMax>1</DispatchTimeMax>
+    <ListingDuration>GTC</ListingDuration>
+    <ListingType>FixedPriceItem</ListingType>
+    <PaymentMethods>PayPal</PaymentMethods>
+    <Quantity>${quantity}</Quantity>
+    ${skuXml}
+    <PictureDetails>
+      ${picturesXml}
+    </PictureDetails>
+    <PostalCode>${xmlEscape(postalCode)}</PostalCode>
+    <ReturnPolicy>
+      <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
+      <RefundOption>MoneyBack</RefundOption>
+      <ReturnsWithinOption>Days_30</ReturnsWithinOption>
+      <ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>
+    </ReturnPolicy>
+    <ShippingDetails>
+      <ShippingType>Flat</ShippingType>
+      <ShippingServiceOptions>
+        <ShippingServicePriority>1</ShippingServicePriority>
+        <ShippingService>USPSGroundAdvantage</ShippingService>
+        <ShippingServiceCost currencyID="USD">${shippingCost}</ShippingServiceCost>
+        <FreeShipping>${isFreeShipping ? 'true' : 'false'}</FreeShipping>
+      </ShippingServiceOptions>
+    </ShippingDetails>${specificsXml}
+  </Item>
+</AddFixedPriceItemRequest>`;
+
+  const res = await fetchWithTimeout(tradingEndpoint, {
+    method: 'POST',
+    headers: {
+      'X-EBAY-API-SITEID': '0',
+      'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+      'X-EBAY-API-CALL-NAME': 'AddFixedPriceItem',
+      'X-EBAY-API-IAF-TOKEN': accessToken,
+      'Content-Type': 'text/xml'
+    },
+    body: addXml
+  }, 20000);
+
+  const text = await res.text();
+  const ack = extractXmlTag(text, 'Ack') || 'Failure';
+  const itemId = extractXmlTag(text, 'ItemID');
+
+  if ((ack === 'Success' || ack === 'Warning') && itemId) {
+    return {
+      success: true,
+      listing_id: itemId,
+      ebay_url: `https://www.ebay.com/itm/${itemId}`,
+      price: formattedPrice,
+      title: title,
+      ack: ack
+    };
+  }
+
+  const errMsg = extractXmlTag(text, 'LongMessage') ||
+                 extractXmlTag(text, 'ShortMessage') ||
+                 'eBay returned an unknown error creating listing';
+  const errCode = extractXmlTag(text, 'ErrorCode');
+  throw new Error(`[eBay ${errCode || 'Error'}] ${errMsg}`);
 }
 
 /**

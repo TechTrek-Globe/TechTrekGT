@@ -439,6 +439,7 @@ export function InventoryHubView({ onNavigate }) {
         isOpen={Boolean(copyModalItem)}
         item={copyModalItem}
         onClose={() => setCopyModalItem(null)}
+        onListingCreated={() => fetchItems()}
       />
       <EditItemModal
         isOpen={Boolean(editModalItem)}

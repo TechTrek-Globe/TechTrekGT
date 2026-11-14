@@ -861,13 +861,31 @@ The Dashboard interface has been upgraded from a passive reporting screen into a
 4. **Backend D1 Batch Ingestion (`functions/api/dashboard.js`)**:
    - Single atomic `env.DB.batch()` round-trip bundles 12 queries, adding `available_capital`, `listed_capital`, `unrealized_profit`, `aging_summary` (fresh, decay_10, decay_20, liquidation, and locked counts), `stagnant_listings`, and `unlisted_queue`.
 
+## 1-Click eBay Listing Creation & Gemini AI Publishing Engine [ACTION ID: LIST-002 / AUDIT-012]
 
+The 1-Click eBay Listing Creation Engine enables sellers to publish full fixed-price listings directly to eBay from Outpost with a single click, combining Google Gemini AI for context-aware description generation with the eBay Trading API (`AddFixedPriceItem`).
 
+### 1-Click Listing Creation Capabilities
 
-
-
-
-
-
-
+1. **Automated End-to-End Publishing Pipeline**:
+   - Single-click action creates the live fixed-price listing on eBay, populating Title (SEO-optimized, max 80 chars), dark-theme HTML description with AI Condition and Key Details cards, Category ID (with eBay catalog category mapping allowed), Condition ID, Item Specifics (Brand, MPN/SKU, Type, Player/Athlete, Grader, Cert Number), and default shipping and return policies.
+   - Pictures: Automatically sends existing primary image URL from `auction_items.image_url` or attributes; if no photo is yet uploaded in Outpost, attaches an eBay EPS-hosted placeholder so the listing is successfully created on eBay, allowing the seller to drag-and-drop live photos directly on eBay.
+2. **Gemini AI Description & Card Generation (`functions/api/ai/generate-ebay-details.js`)**:
+   - Exports `generateAiListingDetails(env, itemData)`: Invokes Google Gemini API (`gemini-3.5-flash-lite` with low-latency generation and automatic fallback to `gemini-3.5-flash`).
+   - Automatically sanitizes XSS vectors, strips internal tracking notes and warehouse lot codes via `stripInternalTrackingNotes`, and injects cards directly into Outpost's dark-theme HTML template.
+3. **eBay Trading API Integration (`createEbayListing` in `functions/api/ebay/tokenHelper.js`)**:
+   - Constructs SOAP XML for `AddFixedPriceItem` with XML escaping, CDATA-wrapped HTML description, ConditionID mapping (`1000` New, `2750` Like New, `3000` Used, `1500` Open Box), and leaf category resolution.
+   - Extracts resulting 12-digit eBay `ItemID` and listing URL (`https://www.ebay.com/itm/${itemId}`).
+4. **Serverless REST Endpoint (`POST /api/ebay/create-listing`)**:
+   - Requires authenticated user session via `requireAuth`.
+   - Resolves user's OAuth access token from `ebay_oauth_tokens`.
+   - Generates AI description cards on the fly if not pre-supplied.
+   - Atomically updates Cloudflare D1 across 3 tables via `env.DB.batch()`:
+     - `auction_items`: Updates `ebay_listing_id`, sets `status = 'Listed'`, `platform = 'eBay'`, `current_list_price`, and `date_listed = date('now')`.
+     - `ebay_active_listings`: Inserts or updates live cache record.
+     - `auction_item_platform_listings`: Inserts or updates platform listing record.
+5. **UI Ergonomics & 1-Click Triggers**:
+   - `ListingCopyModal.jsx`: Prominently features a "1-Click eBay Listing Creator" card on the eBay tab with real-time status, "Create Listing on eBay" button with spinner, and direct success banner with external link to the live eBay listing.
+   - `EditTabFinancials.jsx`: Mounts a "1-Click Create on eBay" trigger directly in the pairing hub header for unlisted items, allowing immediate publishing without leaving the edit modal.
+   - `InventoryHubView.jsx`: Integrated with `ListingCopyModal` callback to refresh inventory automatically when a new listing is created.
 

@@ -38,6 +38,7 @@ import { onRequestGet as adminStatsGetHandler } from '../functions/api/admin/sta
 import { onRequestGet as ebayOAuthStatusHandler } from '../functions/api/ebay/oauth-status.js';
 import { onRequestGet as ebayFindListingsHandler } from '../functions/api/ebay/find-listings.js';
 import { onRequestGet as ebayActiveListingsHandler } from '../functions/api/ebay/active-listings.js';
+import { onRequestPost as ebayCreateListingHandler } from '../functions/api/ebay/create-listing.js';
 import { onRequestPost as ebayReconcileHandler } from '../functions/api/ebay/reconcile.js';
 import { onRequestPost as ebaySyncItemHandler } from '../functions/api/ebay/sync-item.js';
 import { onRequestPost as ebaySyncAllHandler } from '../functions/api/ebay/sync-all.js';
@@ -248,10 +249,11 @@ export const ROUTES = [
   { method: 'POST',   pattern: '/api/market-alerts/refresh-all', handler: marketAlertsPostHandler, auth: 'session' },
   { method: 'PUT',    pattern: '/api/market-alerts/:id',      handler: marketAlertsPutHandler,    auth: 'session' },
 
-  // eBay Operations & Analytics (11 routes)
+  // eBay Operations & Analytics (14 routes)
   { method: 'GET',    pattern: '/api/ebay/oauth-status',      handler: ebayOAuthStatusHandler,    auth: 'session' },
   { method: 'GET',    pattern: '/api/ebay/find-listings',     handler: ebayFindListingsHandler,   auth: 'session' },
   { method: 'GET',    pattern: '/api/ebay/active-listings',   handler: ebayActiveListingsHandler, auth: 'session' },
+  { method: 'POST',   pattern: '/api/ebay/create-listing',    handler: ebayCreateListingHandler,  auth: 'session' },
   { method: 'POST',   pattern: '/api/ebay/sync-item',         handler: ebaySyncItemHandler,       auth: 'session' },
   { method: 'POST',   pattern: '/api/ebay/sync-all',          handler: ebaySyncAllHandler,        auth: 'session' },
   { method: 'GET',    pattern: '/api/ebay/match-sold-vinescout', handler: matchSoldVinescoutGetHandler, auth: 'session' },

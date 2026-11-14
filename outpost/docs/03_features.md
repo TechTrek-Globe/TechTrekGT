@@ -846,6 +846,21 @@ The Channel-Routing Intelligence system evaluates the real economics of selling 
    - `EditTabFinancials.jsx`: Renders a side-by-side Channel Routing & Profit Comparison card comparing eBay Shipped vs. Facebook Local Pickup with profit margin percentages, fee breakdowns, and advantage callouts.
    - `ListingCopyModal.jsx`: Adds a dedicated "Facebook / Local" tab to the multi-channel listing creator with one-click copy buttons for title, cash price, and full description.
 
+## Resale Operations Command Center & Action Dashboard [ACTION ID: DASH-001 / AUDIT-011]
+
+The Dashboard interface has been upgraded from a passive reporting screen into an operational resale command center focused on high-priority daily workflows:
+
+1. **Top Command & Quick Actions Hub**:
+   - Direct action triggers mounted in the dashboard header: "Reprice Engine" (with real-time amber badge of aging listings needing markdowns), "Unlisted Stock" (with count of items in intake awaiting listing), "Sync eBay" (with interactive spinning state), "Sales Log", and "Refresh".
+   - Mounted `<AgingMarkdownModal>` allows sellers to review and execute batch price markdowns directly from the dashboard without navigating away.
+2. **Executive Financial & Velocity KPIs**:
+   - 6 high-density cards displaying Active Capital Deployed (split into listed capital vs. idle available intake), Expected Potential Gross Realization, Realized Net Gain, Blended ROI & Average Turnaround (days to sell), Active Listing Coverage %, and Stagnant Listings Radar.
+3. **Operational Action Center**:
+   - **Aging Inventory & Repricing Radar**: Shows visual 4-tier distribution bar (0-30d Fresh, 31-60d -10%, 61-90d -20%, 90d+ Liquidation) alongside an interactive list of the 5 oldest stagnant listings with direct "Reprice" buttons.
+   - **Unlisted Intake Queue**: Summarizes idle capital tied up in unlisted stock, displaying the top 5 highest-cost items with status "Available" and one-click "List" buttons that navigate directly to Inventory filtered to that item.
+4. **Backend D1 Batch Ingestion (`functions/api/dashboard.js`)**:
+   - Single atomic `env.DB.batch()` round-trip bundles 12 queries, adding `available_capital`, `listed_capital`, `unrealized_profit`, `aging_summary` (fresh, decay_10, decay_20, liquidation, and locked counts), `stagnant_listings`, and `unlisted_queue`.
+
 
 
 

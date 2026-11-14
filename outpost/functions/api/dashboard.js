@@ -13,7 +13,7 @@ export async function onRequestGet(context) {
     const { userId } = await requireAuth(request, env);
     const db = env.DB;
 
-    // 1-9. Batch all 9 Dashboard queries into a single D1 round-trip
+    // 1-12. Batch all 12 Dashboard queries into a single D1 round-trip
     const [
       invRes,
       salesRes,
@@ -23,7 +23,10 @@ export async function onRequestGet(context) {
       platformSalesRes,
       monthlyTrendRes,
       recentSalesRes,
-      recentAcquisitionsRes
+      recentAcquisitionsRes,
+      agingSummaryRes,
+      stagnantListingsRes,
+      unlistedQueueRes
     ] = await db.batch([
       // 1. Inventory Aggregations
       db.prepare(`
@@ -34,6 +37,8 @@ export async function onRequestGet(context) {
           SUM(CASE WHEN status = 'Sold' THEN 1 ELSE 0 END) as sold_items,
           SUM(CASE WHEN status = 'Returned' THEN 1 ELSE 0 END) as returned_items,
           SUM(CASE WHEN status IN ('Available', 'Listed') THEN true_total_cost ELSE 0 END) as capital_tied_up,
+          SUM(CASE WHEN status = 'Available' THEN true_total_cost ELSE 0 END) as available_capital,
+          SUM(CASE WHEN status = 'Listed' THEN true_total_cost ELSE 0 END) as listed_capital,
           SUM(CASE WHEN status = 'Listed' THEN COALESCE(current_list_price, 0) ELSE 0 END) as listed_potential_revenue,
           SUM(CASE WHEN status != 'Returned' THEN true_total_cost ELSE 0 END) as total_capital_invested
         FROM auction_items
@@ -156,17 +161,83 @@ export async function onRequestGet(context) {
         WHERE i.user_id = ?
         ORDER BY i.created_at DESC
         LIMIT 5
+      `).bind(userId),
+
+      // 10. Aging Decay Summary for Actively Listed Items
+      db.prepare(`
+        SELECT
+          SUM(CASE WHEN status = 'Listed' AND (julianday('now') - julianday(COALESCE(date_listed, created_at))) <= 30 THEN 1 ELSE 0 END) as fresh_count,
+          SUM(CASE WHEN status = 'Listed' AND (julianday('now') - julianday(COALESCE(date_listed, created_at))) > 30 AND (julianday('now') - julianday(COALESCE(date_listed, created_at))) <= 60 THEN 1 ELSE 0 END) as decay_10_count,
+          SUM(CASE WHEN status = 'Listed' AND (julianday('now') - julianday(COALESCE(date_listed, created_at))) > 60 AND (julianday('now') - julianday(COALESCE(date_listed, created_at))) <= 90 THEN 1 ELSE 0 END) as decay_20_count,
+          SUM(CASE WHEN status = 'Listed' AND (julianday('now') - julianday(COALESCE(date_listed, created_at))) > 90 THEN 1 ELSE 0 END) as liquidation_count,
+          SUM(CASE WHEN status = 'Listed' AND reprice_locked = 1 THEN 1 ELSE 0 END) as locked_count
+        FROM auction_items
+        WHERE user_id = ?
+      `).bind(userId),
+
+      // 11. Stagnant Listed Items (top 5 oldest active listings needing attention)
+      db.prepare(`
+        SELECT
+          i.id,
+          i.sku,
+          i.item_name,
+          i.category,
+          i.platform,
+          i.current_list_price,
+          i.min_sell_price,
+          i.true_total_cost,
+          i.date_listed,
+          i.created_at,
+          i.reprice_locked,
+          i.image_url,
+          CAST(ROUND(julianday('now') - julianday(COALESCE(i.date_listed, i.created_at))) AS INTEGER) as days_listed
+        FROM auction_items i
+        WHERE i.user_id = ? AND i.status = 'Listed'
+        ORDER BY COALESCE(i.date_listed, i.created_at) ASC
+        LIMIT 5
+      `).bind(userId),
+
+      // 12. Unlisted Intake Queue (top 5 highest-cost items in Available waiting to be listed)
+      db.prepare(`
+        SELECT
+          i.id,
+          i.sku,
+          i.item_name,
+          i.category,
+          i.unit_price,
+          i.true_total_cost,
+          i.min_sell_price,
+          i.suggested_list_price,
+          i.created_at,
+          i.image_url,
+          inv.invoice_ref
+        FROM auction_items i
+        LEFT JOIN auction_invoices inv ON i.invoice_id = inv.id
+        WHERE i.user_id = ? AND i.status = 'Available'
+        ORDER BY i.true_total_cost DESC, i.created_at DESC
+        LIMIT 5
       `).bind(userId)
     ]);
 
     const invStats = invRes?.results?.[0];
     const salesStats = salesRes?.results?.[0];
     const soldCostRow = soldCostRes?.results?.[0];
+    const agingRow = agingSummaryRes?.results?.[0];
 
     const totalSoldCost = soldCostRow?.total_sold_cost || 0;
     const avgCogs        = soldCostRow?.avg_cogs       || 0;
     const totalNetProfit = salesStats?.total_net_profit || 0;
     const blendedRoi = totalSoldCost > 0 ? (totalNetProfit / totalSoldCost) : 0;
+
+    const decay10 = Number(agingRow?.decay_10_count) || 0;
+    const decay20 = Number(agingRow?.decay_20_count) || 0;
+    const liquidation = Number(agingRow?.liquidation_count) || 0;
+    const agingCandidatesCount = decay10 + decay20 + liquidation;
+
+    const availableCapital = Number(invStats?.available_capital) || 0;
+    const listedCapital = Number(invStats?.listed_capital) || 0;
+    const listedPotentialRevenue = Number(invStats?.listed_potential_revenue) || 0;
+    const unrealizedProfit = round2(Math.max(0, listedPotentialRevenue - listedCapital));
 
     return ok({
       inventory: {
@@ -176,9 +247,22 @@ export async function onRequestGet(context) {
         sold_items: invStats?.sold_items || 0,
         returned_items: invStats?.returned_items || 0,
         capital_tied_up: invStats?.capital_tied_up || 0,
-        listed_potential_revenue: invStats?.listed_potential_revenue || 0,
+        available_capital: round2(availableCapital),
+        listed_capital: round2(listedCapital),
+        listed_potential_revenue: round2(listedPotentialRevenue),
+        unrealized_profit: unrealizedProfit,
         total_capital_invested: invStats?.total_capital_invested || 0
       },
+      aging_summary: {
+        fresh_count: Number(agingRow?.fresh_count) || 0,
+        decay_10_count: decay10,
+        decay_20_count: decay20,
+        liquidation_count: liquidation,
+        locked_count: Number(agingRow?.locked_count) || 0,
+        aging_candidates_count: agingCandidatesCount
+      },
+      stagnant_listings: stagnantListingsRes?.results || [],
+      unlisted_queue: unlistedQueueRes?.results || [],
       sales: {
         total_sales: salesStats?.total_sales || 0,
         total_gross_sales: salesStats?.total_gross_sales || 0,

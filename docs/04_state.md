@@ -221,6 +221,7 @@ The shared `users` table serves all TechTrekGT applications. Strict app-level is
 - **Outpost Tracker Dedicated Database (`outpost-db`, ID: `c41ad6c7-26f1-4ca8-9af8-82990ccb4566`)**:
   - Bound via `env.DB` in `outpost/wrangler.jsonc`.
   - Schema: 24 tables defined in `outpost/auction-schema.sql` and `outpost/migrations/0011_deep_normalization.sql`.
+  - Extended via `outpost/migrations/0012_repricing_channel_routing.sql` with automated repricing and channel routing columns (`original_list_price`, `last_repriced_at`, `reprice_locked`, `reprice_tier`) and index `idx_auction_items_reprice`.
   - Decomposes item galleries (`auction_item_images`), specifications and features (`auction_item_specs`), platform listing links (`auction_item_platform_listings`), fee reconciliation lines (`ebay_reconciliation_fee_lines`), and active eBay listings (`ebay_active_listings`).
   - Coordinated via `functions/utils/normalizedItemStore.js` with strictly parameterized `?` bindings.
 - **Wayfinder Guide Dedicated Database (`wayfinder-db`, ID: `f95ad16e-8b63-419e-b828-d749b6fdd8f1`)**:

@@ -41,6 +41,7 @@ if (typeof window !== 'undefined') {
 }
 
 import { getApiUrl } from './utils/api';
+import { apiFetch } from './utils/auctionApi';
 
 const DashboardView = lazyWithRetry(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
 const InventoryHubView = lazyWithRetry(() => import('./components/InventoryHubView').then(m => ({ default: m.InventoryHubView })));
@@ -130,23 +131,16 @@ function MainContent({ pathname, navigateTo }) {
       window.history.replaceState({}, '', cleanUrl);
     } else if ((normalized.includes('/verify-email') || params.get('action') === 'verify') && token) {
       // POST client-side verification to avoid leaking token in history / referrers
-      fetch(getApiUrl('/api/auth/verify-email'), {
+      apiFetch('/api/auth/verify-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token })
       })
-        .then(async (res) => {
-          const data = await res.json().catch(() => ({}));
-          if (res.ok) {
-            setVerifyNotification({ type: 'success', message: data.message || 'Email verified successfully.' });
-            window.history.replaceState({}, '', '/outpost?verified=true');
-          } else {
-            setVerifyNotification({ type: 'error', message: data.error || 'Verification link is invalid or expired.' });
-            window.history.replaceState({}, '', '/outpost');
-          }
+        .then((data) => {
+          setVerifyNotification({ type: 'success', message: data?.message || 'Email verified successfully.' });
+          window.history.replaceState({}, '', '/outpost?verified=true');
         })
-        .catch(() => {
-          setVerifyNotification({ type: 'error', message: 'Network error verifying email.' });
+        .catch((err) => {
+          setVerifyNotification({ type: 'error', message: err?.message || 'Verification link is invalid or expired.' });
           window.history.replaceState({}, '', '/outpost');
         });
     }
@@ -178,7 +172,8 @@ function MainContent({ pathname, navigateTo }) {
     
     if (v === 'admin') {
       const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'jgk1865@gmail.com';
-      if (user?.email?.toLowerCase() !== adminEmail.toLowerCase()) {
+      const isAdmin = user?.role === 'admin' || Boolean(user?.is_admin) || (adminEmail && user?.email?.toLowerCase() === adminEmail.toLowerCase());
+      if (!isAdmin) {
         setActiveView('dashboard');
         window.history.replaceState({}, '', '/outpost/dashboard');
         return;

@@ -8,6 +8,7 @@
 // cycle is safe because both sides export hoisted function declarations that
 // are only invoked at call time, never during module evaluation.
 import { normalizeSaleInput, upsertSale } from './sales.js';
+import { DEFAULT_PLATFORM_FEE_PCT, DEFAULT_PLATFORM_FLAT_FEE } from './constants.js';
 
 // LOW-5: Shared currency rounding helper. Centralizes floating-point rounding. Candidate for future integer-cents migration.
 //
@@ -481,3 +482,214 @@ export async function markItemSold(env, userId, item, saleFields = {}) {
   const record = normalizeSaleInput({ ...saleFields, item_id: item.id || item.item_id }, item);
   return upsertSale(env, userId, record);
 }
+
+/**
+ * Computes aging decay tier and floor-clamped markdown suggestion.
+ *
+ * Blueprint A: Automated Repricing & Aging-Inventory Decay Engine
+ * Tiers:
+ *   - 0-30d:   tier = '0-30d',   action = 'hold',         discount = 0%
+ *   - 31-60d:  tier = '31-60d',  action = 'markdown_10',  discount = 10%
+ *   - 61-90d:  tier = '61-90d',  action = 'markdown_20',  discount = 20%
+ *   - 90d+:    tier = '90d+',    action = 'liquidation',  discount = 30% (or down to break-even floor)
+ *
+ * FLOOR INVARIANT: Suggested list price is strictly clamped at break-even floor
+ * (min_sell_price with target_margin_pct = 0). It will NEVER breach the item's
+ * 0% profit break-even cost floor after platform fees, shipping, and ad boost.
+ *
+ * @param {object} item - auction_items row or item form object
+ * @param {object} [platformSchedule={}] - optional platform overrides { fee_pct, flat_fee }
+ * @param {object} [options={}] - options such as { referenceDate, liquidationToFloor }
+ * @returns {object} Aging decay analysis & suggestion
+ */
+export function computeAgingDecaySuggestion(item = {}, platformSchedule = {}, options = {}) {
+  const referenceDate = options.referenceDate ? new Date(options.referenceDate) : new Date();
+  const refIso = referenceDate.toISOString();
+
+  // Determine intake/listed date
+  const listedDate = item.date_listed || item.date_acquired || item.purchase_date || item.created_at;
+  const daysListed = listedDate ? (daysBetween(listedDate, refIso) ?? 0) : 0;
+
+  // Current active price
+  const currentPrice = Number(item.current_list_price ?? item.suggested_list_price ?? item.unit_price ?? 0) || 0;
+  const originalListPrice = Number(item.original_list_price ?? currentPrice) || currentPrice;
+  const repriceLocked = Boolean(item.reprice_locked);
+
+  // Determine aging bucket and decay policy
+  let tier = '0-30d';
+  let tierLabel = '0-30 Days (Hold)';
+  let action = 'hold';
+  let discountPct = 0;
+
+  if (daysListed > 90) {
+    tier = '90d+';
+    tierLabel = '90+ Days (Liquidation)';
+    action = 'liquidation';
+    discountPct = 0.30;
+  } else if (daysListed > 60) {
+    tier = '61-90d';
+    tierLabel = '61-90 Days (-20%)';
+    action = 'markdown_20';
+    discountPct = 0.20;
+  } else if (daysListed > 30) {
+    tier = '31-60d';
+    tierLabel = '31-60 Days (-10%)';
+    action = 'markdown_10';
+    discountPct = 0.10;
+  }
+
+  // Canonical break-even floor (0% margin)
+  const feePct = item.platform_fee_pct != null
+    ? item.platform_fee_pct
+    : (platformSchedule.fee_pct != null ? platformSchedule.fee_pct : DEFAULT_PLATFORM_FEE_PCT);
+  const flatFee = item.platform_flat_fee != null
+    ? item.platform_flat_fee
+    : (platformSchedule.flat_fee != null ? platformSchedule.flat_fee : DEFAULT_PLATFORM_FLAT_FEE);
+  const boostPct = item.boost_pct ?? item.ebay_promoted_rate ?? 0;
+
+  const floorCalc = computePricingFloors({
+    true_total_cost: Number(item.true_total_cost ?? item.unit_price ?? 0) || 0,
+    est_shipping_cost: Number(item.est_shipping_cost ?? 0) || 0,
+    platform_flat_fee: Number(flatFee) || 0,
+    platform_fee_pct: Number(feePct) || 0,
+    boost_pct: Number(boostPct) || 0,
+    target_margin_pct: 0
+  });
+
+  const breakEvenFloor = floorCalc.min_sell_price ?? 0;
+
+  // Calculate raw target markdown
+  let rawSuggested = currentPrice;
+  if (action === 'liquidation' && options.liquidationToFloor) {
+    rawSuggested = breakEvenFloor;
+  } else if (discountPct > 0 && currentPrice > 0) {
+    rawSuggested = round2(currentPrice * (1 - discountPct));
+  }
+
+  // Strictly clamp at 0% break-even floor
+  const suggestedPrice = Math.max(rawSuggested, breakEvenFloor);
+  const atFloorBlocked = currentPrice <= breakEvenFloor || suggestedPrice >= currentPrice;
+  const dollarDrop = round2(Math.max(0, currentPrice - suggestedPrice));
+  const pctDrop = currentPrice > 0 ? round2((dollarDrop / currentPrice) * 100) : 0;
+  const eligible = !repriceLocked && !atFloorBlocked && action !== 'hold' && dollarDrop > 0;
+
+  return {
+    item_id: item.id || null,
+    sku: item.sku || null,
+    item_name: item.item_name || '',
+    days_listed: daysListed,
+    tier,
+    tier_label: tierLabel,
+    action,
+    discount_pct: discountPct,
+    current_price: currentPrice,
+    original_list_price: originalListPrice,
+    suggested_price: eligible ? suggestedPrice : currentPrice,
+    raw_suggested_price: rawSuggested,
+    break_even_floor: breakEvenFloor,
+    dollar_drop: eligible ? dollarDrop : 0,
+    pct_drop: eligible ? pctDrop : 0,
+    at_floor_blocked: atFloorBlocked,
+    reprice_locked: repriceLocked,
+    eligible
+  };
+}
+
+/**
+ * Compares financial economics between Shipped eBay and Zero-Fee Local Channels.
+ *
+ * Blueprint B: Sold-Comp Velocity & Channel-Routing Intelligence
+ *
+ * Channel 1: eBay (Shipped)
+ *   - Marketplace FVF + Flat Fee + Promoted Ad Fee
+ *   - Incurs outbound shipping deficit (Math.max(0, est_shipping - buyer_shipping))
+ * Channel 2: Facebook Marketplace / Local Pickup
+ *   - 0% Marketplace Commission & $0 Shipping
+ *   - Optional local buyer cash discount
+ *
+ * @param {object} item - auction_items row or pricing inputs
+ * @param {object} [options={}] - { sellPrice, shippingCharged, shippingCost, localDiscountPct }
+ * @returns {object} Side-by-side comparison & channel recommendation
+ */
+export function compareChannelEconomics(item = {}, options = {}) {
+  const sellPrice = Math.max(0, Number(options.sellPrice ?? item.current_list_price ?? item.suggested_list_price ?? item.unit_price ?? 0) || 0);
+  const cogs = Math.max(0, Number(item.true_total_cost ?? item.unit_price ?? 0) || 0);
+  const shippingCharged = Math.max(0, Number(options.shippingCharged ?? item.buyer_shipping_cost ?? 0) || 0);
+  const shippingCost = Math.max(0, Number(options.shippingCost ?? item.est_shipping_cost ?? 0) || 0);
+
+  const feePct = item.platform_fee_pct != null ? item.platform_fee_pct : DEFAULT_PLATFORM_FEE_PCT;
+  const flatFee = item.platform_flat_fee != null ? item.platform_flat_fee : DEFAULT_PLATFORM_FLAT_FEE;
+  const promotedRate = item.ebay_promoted_rate ?? item.boost_pct ?? 0;
+
+  // 1. eBay Shipped Breakdown
+  const ebayGross = round2(sellPrice + shippingCharged);
+  const ebayFvf = round2(ebayGross * (Number(feePct) || 0));
+  const ebayPromotedFee = round2(sellPrice * (Number(promotedRate) > 1 ? Number(promotedRate) / 100 : Number(promotedRate) || 0));
+  const ebayTotalFees = round2(ebayFvf + ebayPromotedFee + (Number(flatFee) || 0));
+  const ebayNetProceeds = round2(ebayGross - ebayTotalFees - shippingCost);
+  const ebayNetProfit = round2(ebayNetProceeds - cogs);
+  const ebayMarginPct = ebayGross > 0 ? Math.round(((ebayNetProfit / ebayGross) + 1e-9) * 10000) / 10000 : 0;
+
+  const floorCalc = computePricingFloors({
+    true_total_cost: cogs,
+    est_shipping_cost: shippingCost,
+    platform_flat_fee: flatFee,
+    platform_fee_pct: feePct,
+    boost_pct: promotedRate,
+    target_margin_pct: 0
+  });
+  const ebayBreakEvenFloor = floorCalc.min_sell_price ?? 0;
+
+  // 2. Facebook Marketplace / Local Pickup Breakdown
+  const localDiscountPct = Number(options.localDiscountPct ?? 0) || 0;
+  const localPrice = round2(sellPrice * (1 - (localDiscountPct > 1 ? localDiscountPct / 100 : localDiscountPct)));
+  const localNetProceeds = localPrice;
+  const localNetProfit = round2(localPrice - cogs);
+  const localMarginPct = localPrice > 0 ? Math.round(((localNetProfit / localPrice) + 1e-9) * 10000) / 10000 : 0;
+  const localBreakEvenFloor = cogs;
+
+  // 3. Comparison & Advantage
+  const netAdvantage = round2(localNetProfit - ebayNetProfit);
+  let recommendedChannel = 'eBay (Shipped)';
+  let reason = '';
+
+  if (netAdvantage > 0) {
+    recommendedChannel = 'Facebook Marketplace / Local Pickup';
+    reason = `Local pickup yields +$${netAdvantage.toFixed(2)} higher net profit by eliminating shipping costs and marketplace fees.`;
+  } else if (netAdvantage < 0) {
+    recommendedChannel = 'eBay (Shipped)';
+    reason = `eBay yields +$${Math.abs(netAdvantage).toFixed(2)} higher net profit through national buyer scale and full asking price realization.`;
+  } else {
+    recommendedChannel = 'Facebook Marketplace / Local Pickup';
+    reason = 'Both channels yield identical net profit; local pickup eliminates shipping and return risks.';
+  }
+
+  return {
+    sell_price: sellPrice,
+    cogs,
+    ebay: {
+      channel_name: 'eBay (Shipped)',
+      gross_revenue: ebayGross,
+      platform_fees: ebayTotalFees,
+      shipping_cost: shippingCost,
+      net_proceeds: ebayNetProceeds,
+      net_profit: ebayNetProfit,
+      margin_pct: ebayMarginPct,
+      break_even_floor: ebayBreakEvenFloor
+    },
+    local: {
+      channel_name: 'Facebook Marketplace / Local Pickup',
+      gross_revenue: localPrice,
+      platform_fees: 0,
+      shipping_cost: 0,
+      net_proceeds: localNetProceeds,
+      net_profit: localNetProfit,
+      margin_pct: localMarginPct,
+      break_even_floor: localBreakEvenFloor
+    },
+    net_advantage: netAdvantage,
+    recommended_channel: recommendedChannel,
+    reason
+  };
+}
+

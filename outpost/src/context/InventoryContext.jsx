@@ -35,6 +35,7 @@ export function InventoryProvider({ children }) {
   const [error, setError] = useState('');
   const [pendingSaleItem, setPendingSaleItem] = useState(null);
   const [serverStatusCounts, setServerStatusCounts] = useState({});
+  const [portfolioKpis, setPortfolioKpis] = useState(null);
 
   // --- User Settings (column visibility, widths, category order) ---
   const [userSettings, setUserSettings] = useState(getStoredUserSettings);
@@ -193,7 +194,7 @@ export function InventoryProvider({ children }) {
       if (listingStatusFilter && listingStatusFilter !== 'All') params.listing_status = listingStatusFilter;
 
       // Server sort mapping
-      if (sortConfig.key && sortConfig.key !== 'margin' && sortConfig.key !== 'net_profit') {
+      if (sortConfig.key) {
         params.sort_by = sortConfig.key;
         params.sort_dir = sortConfig.direction;
       }
@@ -204,6 +205,9 @@ export function InventoryProvider({ children }) {
         setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
         if (data.status_counts) {
           setServerStatusCounts(data.status_counts);
+        }
+        if (data.kpis) {
+          setPortfolioKpis(data.kpis);
         }
       }
     } catch (e) {
@@ -219,11 +223,8 @@ export function InventoryProvider({ children }) {
 
   const fetchPlatforms = useCallback(async () => {
     try {
-      const res = await fetch(getApiUrl('/api/platforms'), { credentials: 'include' });
-      if (res.ok) {
-        const d = await res.json();
-        setPlatforms(d.platforms || []);
-      }
+      const d = await getPlatforms();
+      setPlatforms(d.platforms || []);
     } catch (e) {
       console.warn('[InventoryContext] fetchPlatforms failed:', e);
     }
@@ -423,6 +424,7 @@ export function InventoryProvider({ children }) {
     // UI
     loading, error,
     pendingSaleItem, setPendingSaleItem,
+    portfolioKpis,
     // Settings
     userSettings, setUserSettings,
     // Sync Engine
@@ -440,7 +442,7 @@ export function InventoryProvider({ children }) {
     pagination, statusCounts,
     search, statusFilter, categoryFilter, listingFormatFilter, listingStatusFilter,
     sortConfig, sortPreset, applySortPreset,
-    loading, error, pendingSaleItem,
+    loading, error, pendingSaleItem, portfolioKpis,
     userSettings,
     syncSettings, ebaySyncing, vscoutSyncing, handleSyncEbay, handleSyncVScout,
     fetchItems, fetchPlatforms, refreshAll, updateItemLocal, handleFieldSave, handleSort,

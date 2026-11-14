@@ -24,20 +24,30 @@ import {
   getActiveFeeSchedule
 } from '../../utils/ebayFeeSchedule.js';
 
-// --- Token Crypto (AES-GCM, matches outpost/functions/utils/tokenCrypto.js) ---
-//
-// v1 (legacy): "<iv_b64>.<ciphertext_b64>"    - PBKDF2 100k iters, OLD_SALT or NEW_SALT
-// v2 (current): "v2.<iv_b64>.<ciphertext_b64>" - PBKDF2 310k iters, NEW_SALT
-//
-// FOLLOW-UP: Remove v1/OLD_SALT decryption path after all tokens re-encrypted. 2026-12-31.
+// --- Token Crypto (AES-GCM, re-exported from canonical outpost/functions/utils/tokenCrypto.js) ---
+import {
+  OLD_SALT,
+  NEW_SALT,
+  PBKDF2_ITERATIONS_V1,
+  PBKDF2_ITERATIONS_V2,
+  PBKDF2_ITERATIONS,
+  PBKDF2_WORKERD_CEILING,
+  deriveKey,
+  decryptToken,
+  encryptToken
+} from '../../utils/tokenCrypto.js';
 
-export const OLD_SALT = new TextEncoder().encode('techtrekgt-ebay-token-v1');
-export const NEW_SALT = new TextEncoder().encode('techtrekgt-token-encryption-v2');
-export const PBKDF2_ITERATIONS_V1 = 100_000;
-export const PBKDF2_ITERATIONS_V2 = 310_000;
-export const PBKDF2_ITERATIONS = PBKDF2_ITERATIONS_V2;
-
-const _V2_PREFIX = 'v2';
+export {
+  OLD_SALT,
+  NEW_SALT,
+  PBKDF2_ITERATIONS_V1,
+  PBKDF2_ITERATIONS_V2,
+  PBKDF2_ITERATIONS,
+  PBKDF2_WORKERD_CEILING,
+  deriveKey,
+  decryptToken,
+  encryptToken
+};
 
 export const DEFAULT_EXTERNAL_TIMEOUT_MS = 15000;
 
@@ -82,131 +92,6 @@ export async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_EX
     if (timerId) clearTimeout(timerId);
   }
 }
-
-const _keyCache = new Map();
-export const PBKDF2_WORKERD_CEILING = 100_000;
-
-export async function deriveKey(secret, salt = NEW_SALT, iterations = PBKDF2_ITERATIONS_V2) {
-  const isWorkerd = (typeof navigator !== 'undefined' && String(navigator.userAgent).includes('Cloudflare-Workers')) ||
-                    (typeof WebSocketPair !== 'undefined');
-  const targetIterations = (isWorkerd && iterations > PBKDF2_WORKERD_CEILING) ? PBKDF2_WORKERD_CEILING : iterations;
-
-  const cacheKey = `${secret}:${salt.length}:${targetIterations}`;
-  if (_keyCache.has(cacheKey)) {
-    return _keyCache.get(cacheKey);
-  }
-  const promise = (async () => {
-    try {
-      const raw = await crypto.subtle.importKey(
-        'raw',
-        new TextEncoder().encode(secret),
-        { name: 'PBKDF2' },
-        false,
-        ['deriveKey']
-      );
-      try {
-        return await crypto.subtle.deriveKey(
-          { name: 'PBKDF2', salt, iterations: targetIterations, hash: 'SHA-256' },
-          raw,
-          { name: 'AES-GCM', length: 256 },
-          false,
-          ['encrypt', 'decrypt']
-        );
-      } catch (deriveErr) {
-        if (targetIterations > PBKDF2_WORKERD_CEILING && deriveErr && String(deriveErr).includes('100000')) {
-          return await crypto.subtle.deriveKey(
-            { name: 'PBKDF2', salt, iterations: PBKDF2_WORKERD_CEILING, hash: 'SHA-256' },
-            raw,
-            { name: 'AES-GCM', length: 256 },
-            false,
-            ['encrypt', 'decrypt']
-          );
-        }
-        throw deriveErr;
-      }
-    } catch (err) {
-      _keyCache.delete(cacheKey);
-      throw err;
-    }
-  })();
-  _keyCache.set(cacheKey, promise);
-  return promise;
-}
-
-function bufToBase64(buf) {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
-}
-
-function base64ToBuf(b64) {
-  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-}
-
-/**
- * Decrypts a stored eBay token.
- * Returns { plaintext, wasLegacy } - wasLegacy=true signals caller to re-encrypt under v2.
- * Throws a clear error on corrupted ciphertext - never returns null silently.
- * TOKEN_ENCRYPTION_KEY required. No JWT_SECRET substitution.
- */
-export async function decryptToken(encrypted, tokenEncryptionKey) {
-  if (!encrypted) return { plaintext: null, wasLegacy: false };
-  if (!tokenEncryptionKey) throw new Error('TOKEN_ENCRYPTION_KEY binding is required for decryption');
-
-  // --- v2 path ---
-  if (encrypted.startsWith(`${_V2_PREFIX}.`)) {
-    const rest = encrypted.slice(_V2_PREFIX.length + 1);
-    const dotIdx = rest.indexOf('.');
-    if (dotIdx === -1) throw new Error('Invalid v2 encrypted token format');
-    const iv = base64ToBuf(rest.slice(0, dotIdx));
-    const cipherBuf = base64ToBuf(rest.slice(dotIdx + 1));
-    const key = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V2);
-    let plainBuf;
-    try {
-      plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
-    } catch (_) {
-      try {
-        const fallbackKey = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_WORKERD_CEILING);
-        plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, fallbackKey, cipherBuf);
-      } catch (__) {
-        throw new Error('Failed to decrypt v2 token: invalid key or ciphertext corrupted');
-      }
-    }
-    return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: false };
-  }
-
-  // --- v1 (legacy) path ---
-  const dotIdx = encrypted.indexOf('.');
-  if (dotIdx === -1) throw new Error('Invalid encrypted token format');
-  const iv = base64ToBuf(encrypted.slice(0, dotIdx));
-  const cipherBuf = base64ToBuf(encrypted.slice(dotIdx + 1));
-
-  try {
-    const key = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V1);
-    const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
-    return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: true };
-  } catch (_) { /* fall through */ }
-
-  try {
-    const key = await deriveKey(tokenEncryptionKey, OLD_SALT, PBKDF2_ITERATIONS_V1);
-    const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
-    return { plaintext: new TextDecoder().decode(plainBuf), wasLegacy: true };
-  } catch (_) { /* both paths exhausted */ }
-
-  throw new Error('Failed to decrypt token: invalid key or ciphertext corrupted');
-}
-
-/**
- * Encrypts a plain-text token. Returns v2 versioned envelope.
- * TOKEN_ENCRYPTION_KEY required. Throws if absent.
- */
-export async function encryptToken(plaintext, tokenEncryptionKey) {
-  if (!tokenEncryptionKey) throw new Error('TOKEN_ENCRYPTION_KEY binding is required');
-  const key = await deriveKey(tokenEncryptionKey, NEW_SALT, PBKDF2_ITERATIONS_V2);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(plaintext);
-  const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
-  return `${_V2_PREFIX}.${bufToBase64(iv)}.${bufToBase64(cipherBuf)}`;
-}
-
 
 // --- URL Normalization ---
 
@@ -1096,16 +981,23 @@ export async function updateEbayListingSku(env, accessToken, listingId, sku) {
     ? 'https://api.sandbox.ebay.com/ws/api.dll'
     : 'https://api.ebay.com/ws/api.dll';
 
+  const xmlEscape = (s) => String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
   const makeXml = (callName) => `<?xml version="1.0" encoding="utf-8"?>
 <${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
-    <eBayAuthToken>${accessToken}</eBayAuthToken>
+    <eBayAuthToken>${xmlEscape(accessToken)}</eBayAuthToken>
   </RequesterCredentials>
   <ErrorLanguage>en_US</ErrorLanguage>
   <WarningLevel>High</WarningLevel>
   <Item>
-    <ItemID>${cleanId}</ItemID>
-    <SKU>${cleanSku.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</SKU>
+    <ItemID>${xmlEscape(cleanId)}</ItemID>
+    <SKU>${xmlEscape(cleanSku)}</SKU>
   </Item>
 </${callName}Request>`;
 
@@ -1149,6 +1041,91 @@ export async function updateEbayListingSku(env, accessToken, listingId, sku) {
     return { success: true, message: `SKU '${cleanSku}' successfully pushed to eBay listing #${cleanId}`, ack };
   } else {
     throw new Error(errMsg || `eBay returned Ack=${ack} when updating SKU`);
+  }
+}
+
+/**
+ * Updates the Buy-It-Now or Start Price on an active eBay listing via the eBay Trading API
+ * (ReviseFixedPriceItem / ReviseItem).
+ *
+ * @param {object} env
+ * @param {string} accessToken
+ * @param {string} listingId - 12-digit numeric eBay Item ID
+ * @param {number|string} newPrice - Target price in USD
+ * @returns {Promise<{ success: boolean, message?: string, ack?: string, price: string }>}
+ */
+export async function updateEbayListingPrice(env, accessToken, listingId, newPrice) {
+  const cleanId = String(listingId).replace(/[^0-9]/g, '');
+  if (!cleanId) throw new Error('Invalid eBay Listing ID');
+  const numPrice = Number(newPrice);
+  if (isNaN(numPrice) || numPrice <= 0) throw new Error('Price must be a positive number');
+  const formattedPrice = numPrice.toFixed(2);
+
+  const isSandbox = isEbaySandbox(env);
+  const tradingEndpoint = isSandbox
+    ? 'https://api.sandbox.ebay.com/ws/api.dll'
+    : 'https://api.ebay.com/ws/api.dll';
+
+  const xmlEscape = (s) => String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+  const makePriceXml = (callName) => `<?xml version="1.0" encoding="utf-8"?>
+<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>${xmlEscape(accessToken)}</eBayAuthToken>
+  </RequesterCredentials>
+  <ErrorLanguage>en_US</ErrorLanguage>
+  <WarningLevel>High</WarningLevel>
+  <Item>
+    <ItemID>${xmlEscape(cleanId)}</ItemID>
+    <StartPrice currencyID="USD">${formattedPrice}</StartPrice>
+  </Item>
+</${callName}Request>`;
+
+  // 1. Try ReviseFixedPriceItem first
+  let res = await fetchWithTimeout(tradingEndpoint, {
+    method: 'POST',
+    headers: {
+      'X-EBAY-API-SITEID': '0',
+      'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+      'X-EBAY-API-CALL-NAME': 'ReviseFixedPriceItem',
+      'X-EBAY-API-IAF-TOKEN': accessToken,
+      'Content-Type': 'text/xml'
+    },
+    body: makePriceXml('ReviseFixedPriceItem')
+  }, 15000);
+
+  let text = await res.text();
+  let ack = extractXmlTag(text, 'Ack') || 'Failure';
+
+  // 2. Fallback to ReviseItem if listing format is auction
+  if (ack !== 'Success' && ack !== 'Warning') {
+    res = await fetchWithTimeout(tradingEndpoint, {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-SITEID': '0',
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+        'X-EBAY-API-CALL-NAME': 'ReviseItem',
+        'X-EBAY-API-IAF-TOKEN': accessToken,
+        'Content-Type': 'text/xml'
+      },
+      body: makePriceXml('ReviseItem')
+    }, 15000);
+    text = await res.text();
+    ack = extractXmlTag(text, 'Ack') || 'Failure';
+  }
+
+  const errMsg = extractXmlTag(text, 'LongMessage') ||
+                 extractXmlTag(text, 'ShortMessage') || null;
+
+  if (ack === 'Success' || ack === 'Warning') {
+    return { success: true, message: `Price successfully updated to $${formattedPrice} on eBay listing #${cleanId}`, ack, price: formattedPrice };
+  } else {
+    throw new Error(errMsg || `eBay returned Ack=${ack} when revising price`);
   }
 }
 

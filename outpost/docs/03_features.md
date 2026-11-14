@@ -729,6 +729,124 @@ Unification of pricing and margin calculation engines, exact integer-cent larges
    - Amazon / VineScout Ingestion Hardening (`import/amazon.js`, `export/vinescout-inventory.js`): Wraps Amazon import in `withAuth`, queries indexed `order_id`, prevents overwriting already sold items, preserves `taxCostAmt`, and cleans non-canonical statuses from export endpoints.
    - Batch Import Guardrails (`import/batch.js`): Uses `Number.isFinite` to preserve valid 0% fees, rounds manual comp averages with `round2`, and auto-computes pricing floors for unpriced imports.
 
+## Phase 3 Listing Security, Timeouts & Image Sync [ACTION ID: LIST-001 / AUDIT-007]
+
+HTML XSS sanitization across the eBay listing pipeline, Gemini API key hardening, AbortSignal timeout coverage on all external Worker fetches, AES-GCM crypto consolidation, Trading API XML injection protection, settings endpoint hardening, and dual-write image sync to `auction_item_images`.
+
+### Listing Security & Image Sync Capabilities
+
+1. **HTML XSS Sanitization in Listing Templates (`src/utils/ebayTemplate.js`, `src/utils/listingCopyGenerator.js`)**:
+   - `escapeHtml(val)` export: HTML entity-encodes `&`, `<`, `>`, `"`, `'` on all untrusted string interpolations in `generateEbayListingHtml`.
+   - `sanitizeListingHtml(raw)` export: Strips `<script>`, `<iframe>`, `on*` event handlers, `javascript:` href schemes, and `expression()` CSS values from AI-generated and user-supplied HTML bodies.
+   - All interpolated template fields in `generateEbayListingHtml` now pass through `escapeHtml()`: `title`, `description`, `conditionDetails`, `brand`, `model`, `features`, `authentication.*`, and `includedItems`.
+   - AI-generated middle section is double-sanitized: `stripInternalTrackingNotes` removes internal lot/item references, then `sanitizeListingHtml` strips residual XSS vectors.
+   - `src/utils/listingCopyGenerator.js` re-exports `escapeHtml` and `sanitizeListingHtml`; applies `escapeHtml` on `r.label`, `r.value` in `tableRowsHtml` and on `storeBanner`, `storeName`, `storeUrl` in the HTML footer strip.
+   - Word-boundary title truncation fixed in `generateEbayCopy`: replaces `substring(0, 80).trim()` with a `lastSpace`-aware cut (finds last space above 40 chars, falls back to hard cut only when no space exists).
+   - `src/components/ListingCopyModal.jsx`: `dangerouslySetInnerHTML` preview now sanitizes via `sanitizeListingHtml(curEbay.htmlBody)` before render.
+2. **Gemini API Key Header-Only Security (`functions/api/ai/generate-ebay-details.js`)**:
+   - Gemini API key removed from `?key=` URL query parameter; transmitted exclusively via `x-goog-api-key` request header, eliminating key exposure in Worker and proxy access logs.
+   - `stripInternalTrackingNotes` deduplication: local copy removed; function now imported from `../../../src/utils/ebayTemplate.js` alongside `sanitizeListingHtml`.
+3. **AbortSignal Timeout Coverage on All External Fetches**:
+   - `functions/api/items/image-preview.js`: `signal: AbortSignal.timeout(15000)` added to Amazon gateway fetch.
+   - `functions/api/market-alerts.js`: `signal: AbortSignal.timeout(15000)` added to gateway comps fetch.
+   - `functions/utils/auth.js`: `signal: AbortSignal.timeout(15000)` added to Resend transactional email API fetch.
+   - `src/utils/auctionApi.js`: `getTimeoutSignal(optionsSignal, timeoutMs)` helper using `globalThis.AbortSignal.timeout` with `AbortController` fallback applied to `apiFetch()` and all 4 external gateway wrappers: `fetchLiveComps`, `fetchEbayCatalog`, `fetchEbayItemDetail`, `fetchAmazonProduct`.
+4. **AES-GCM Crypto Deduplication & Trading API XML Injection Protection (`functions/api/ebay/tokenHelper.js`)**:
+   - Deduplication: Removed inline `OLD_SALT`, `NEW_SALT`, `PBKDF2_*`, `deriveKey`, `decryptToken`, `encryptToken`, `bufToBase64`, `base64ToBuf` from `tokenHelper.js`; replaced with `import ... from '../../utils/tokenCrypto.js'` + named re-exports for backward compatibility with existing test imports.
+   - XML Injection Protection: `xmlEscape()` helper added to `tokenHelper.js`; `makeXml(callName)` in `updateEbayListingSku` now XML-escapes `accessToken`, `cleanId`, and `cleanSku` before embedding in Trading API SOAP XML payloads.
+5. **Settings Endpoint Write-Hardening (`functions/api/sync/settings.js`)**:
+   - PUT handler restricted to 4 user-editable fields only: `ebay_auto_sync`, `ebay_sync_interval_m`, `vscout_auto_sync`, `vscout_sync_interval_m`.
+   - Server-managed sync timestamps (`last_*_at`, `last_*_status`, `last_*_error`) are always sourced from the existing DB row - never accepted from client body.
+6. **Dual-Write Image Sync to `auction_item_images`**:
+   - `functions/api/items/image-preview.js`: On successful eBay or Amazon image resolution, now dual-writes to both `auction_items.image_url` (via `COALESCE`) and `auction_item_images` (sort_order=0, is_primary=1, `ON CONFLICT(item_id, sort_order) DO UPDATE`) atomically via `DB.batch()`.
+   - `functions/api/ebay/sync-item.js`: Live eBay gallery image now also writes to `auction_item_images` with `ON CONFLICT DO UPDATE` upsert, and sets `auction_items.image_url = COALESCE(image_url, ?)`.
+   - `functions/api/items/[id].js` PUT handler: After successful item update writes primary image URL (from `nextAttrs.image_url`, `nextAttrs.ebay_image_url`, or `body.image_url`) to `auction_item_images` relationally.
+   - `functions/api/items/[id].js` DELETE handler: Cascade `DB.batch()` now includes `DELETE FROM auction_item_images`, `DELETE FROM auction_item_specs`, and `DELETE FROM auction_item_platform_listings` to prevent orphaned relational rows.
+   - `src/components/edit/EditTabDetails.jsx`: Multi-image gallery strip renders clickable thumbnails from `attributes.image_urls`; clicking any thumbnail calls `updateField('image_url', imgUrl)` to promote it as primary without a full save.
+
+## Phase 4 UI/UX Consolidation, Frontend State & Ergonomics [ACTION ID: UI-007 / AUDIT-008]
+
+Pruning of dead editing components and modal mounts, accessible confirm dialog architecture replacing browser `window.confirm()`, centralized 401/403 unauthorized event dispatch, SPA navigation sync, role-based admin gating, monotonic request sequencing, server-side portfolio KPI aggregation, and zero-dependency in-memory platform caching.
+
+### UI/UX & State Hygiene Capabilities
+
+1. **Dead Code Pruning & Clean Single-Path Editing**:
+   - Pruned 5 orphaned components totalling ~2,800+ lines: `EditTabListingPricing.jsx`, `LiveFeeReadout.jsx`, `QuickEditDrawer.jsx`, `EbayListingIdModal.jsx`, and `StatusFilterBar.jsx`.
+   - Cleaned `src/components/InventoryHubView.jsx`: Removed unused modal imports and unmounted dead `<LogSaleModal>` and `<EbayListingIdModal>` JSX trees, unifying item inspection and eBay listing association into `EditItemModal.jsx`.
+2. **Accessible `<ConfirmModal>` Component (`src/components/ui/ConfirmModal.jsx`)**:
+   - Replaced all 11 blocking native `window.confirm()` calls across Outpost Tracker with dark-mode first, keyboard-accessible (`Escape` to cancel, backdrop blur) `<ConfirmModal>` and `<ConfirmBannerModal>`.
+   - Migrated confirmation flows in `EbayConnectBanner.jsx` (OAuth disconnect), `EditItemModal.jsx` (unsaved changes discard), `InventoryHubView.jsx` (permanent item deletion), `SalesLogView.jsx` (sale record deletion), and `SettingsView.jsx` (auto-assign SKUs, push SKUs to eBay, remove category, delete platform, reset default platform schedules, regenerate API token, revoke API integration).
+3. **Session Invalidation & SPA Navigation Synchronization (`auctionApi.js`, `AuthContext.jsx`)**:
+   - `src/utils/auctionApi.js` exports `apiFetch` and dispatches `outpost:unauthorized` CustomEvent on both HTTP 401 and HTTP 403 responses (excluding eBay routes).
+   - `src/context/AuthContext.jsx` subscribes to `outpost:unauthorized` to clear session state, remove storage keys, and redirect cleanly without full page reloads.
+   - Fixed `AuthContext.jsx` logout and legacy reset pushState to dispatch `PopStateEvent('popstate')` so `App.jsx` updates active view reactively.
+4. **Role-Based Admin Gating (`App.jsx`, `AppLayout.jsx`, `AdminView.jsx`, `CommandPalette.jsx`)**:
+   - Replaced hardcoded email checks with dynamic role evaluation: `user?.role === 'admin' || Boolean(user?.is_admin) || (adminEmail && user?.email?.toLowerCase() === adminEmail.toLowerCase())`.
+5. **Raw `fetch()` Migration to `apiFetch`**:
+   - Migrated raw browser `fetch()` calls in `App.jsx` (email verification), `AdminView.jsx` (admin stats), `SalesLogView.jsx` (item detail lookup via `getItem`), `MarketAlertsPanel.jsx` (alerts query, mark read, and refresh all), and `InventoryContext.jsx` (platforms fetch via `getPlatforms`) to authenticated, timeout-guarded `apiFetch`.
+6. **Monotonic Request Sequencing (`fetchRequestIdRef`)**:
+   - Added monotonic `fetchRequestIdRef` sequence guards across `DashboardView.jsx`, `MarketAlertsPanel.jsx`, `AdminView.jsx`, `ViewInvoiceModal.jsx`, and `EditItemModal.jsx` (for `getItem` and `getComps`) to eliminate out-of-order race conditions from asynchronous responses.
+7. **Server-Side Portfolio KPI Aggregation & Multi-Column Sorting (`functions/api/items/enriched.js`)**:
+   - `/api/items/enriched` queries active portfolio totals (`active_count`, `total_landed_cost`, `total_list_value`) directly via SQLite aggregations and returns them in the `kpis` payload.
+   - `src/context/InventoryContext.jsx` exposes `portfolioKpis` to `InventoryHubView.jsx`, ensuring header metrics reflect the entire active portfolio rather than a 50-item paginated page slice.
+   - Added server-side sorting support for `net_profit`, `margin`, and `days_in_inventory` in `enriched.js`.
+8. **Ergonomics & Zero-Dependency Caching**:
+   - Added global keyboard shortcut `/` in `AppLayout.jsx` to focus the search input in the active view when not typing inside input/textarea fields.
+   - Added a 60-second in-memory cache for `getPlatforms()` in `src/utils/auctionApi.js` with automatic invalidation on mutations (`createPlatform`, `updatePlatform`, `deletePlatform`, `resetPlatforms`).
+
+## Automated Repricing & Aging-Inventory Decay Engine [ACTION ID: REPRICE-001 / AUDIT-009]
+
+The Automated Repricing & Aging-Inventory Decay Engine introduces algorithmic price adjustments for stagnant inventory, protecting operating capital while enforcing a strict mathematical break-even floor to prevent negative-margin sales.
+
+### Repricing Engine Capabilities
+
+1. **Aging Decay Buckets & Markdown Schedules**:
+   - Pure calculation engine implemented in `functions/utils/auction.js` (`computeAgingDecaySuggestion`) and mirrored in `src/utils/feeEngine.js`:
+     - `0-30d` (`Hold`): 0% discount, preserves initial asking price.
+     - `31-60d` (`Markdown 10`): Suggests a 10% discount off current list price.
+     - `61-90d` (`Markdown 20`): Suggests a 20% discount off current list price.
+     - `90d+` (`Liquidation`): Suggests an aggressive markdown (30% discount or down to break-even floor) to release tied-up capital.
+2. **Floor-Clamped Mathematical Invariant**:
+   - Every markdown suggestion is strictly evaluated against the canonical break-even floor price derived from `computePricingFloors` (`target_margin_pct: 0`):
+     - `min_sell_price = (true_total_cost + est_shipping_cost + platform_flat_fee) / (1 - platform_fee_pct - boost_pct)`.
+     - The suggestion can NEVER fall below `min_sell_price`.
+     - If an item's current list price is already at or below the floor, it is marked `at_floor_blocked: true`, locking the price from further downward decay and setting `dollar_drop: 0`.
+3. **Database Migration & Schema Extensions (`migrations/0012_repricing_channel_routing.sql`)**:
+   - Added `original_list_price` (REAL), `last_repriced_at` (TEXT), `reprice_locked` (INTEGER DEFAULT 0), and `reprice_tier` (TEXT) to `auction_items`.
+   - Created composite index `idx_auction_items_reprice ON auction_items(user_id, status, reprice_locked, date_listed)`.
+4. **Serverless REST Endpoints**:
+   - `GET /api/items/reprice-candidates`: Scans active inventory for the authenticated user, applies aging calculations, and returns categorized candidates with summary statistics (`total_candidates`, `potential_price_drop`, `tier_counts`, `locked_count`, `at_floor_count`).
+   - `POST /api/items/reprice-apply`: Accepts batch revisions, re-evaluates the break-even floor on the server to prevent client-side bypass, executes atomic batch updates via `chunkedBatch()`, and optionally pushes price revisions directly to active eBay listings via the eBay Trading API (`updateEbayListingPrice`).
+5. **UI Surfacing & Ergonomics**:
+   - `InventoryGridRow.jsx`: Displays color-coded age badges (`30d`, `60d`, `90d+`) in the status column and provides an inline lock toggle (`Lock` / `Unlock`).
+   - `InventoryCommandBar.jsx`: Adds a dedicated "Reprice Engine" action button to launch the review workflow.
+   - `AgingMarkdownModal.jsx`: Interactive batch modal displaying eligible items by tier, current price vs. suggested price, floor cushion, lock toggle, and one-click execution.
+
+## Sold-Comp Velocity & Channel-Routing Intelligence [ACTION ID: CHANNEL-001 / AUDIT-010]
+
+The Channel-Routing Intelligence system evaluates the real economics of selling an item on national shipped marketplaces (eBay) versus fee-free local pickup channels (Facebook Marketplace, Craigslist, OfferUp).
+
+### Channel-Routing Capabilities
+
+1. **Pure Comparative Economics (`compareChannelEconomics`)**:
+   - Evaluates net profit differences side-by-side:
+     - `eBay (Shipped)`: Factors in Final Value Fee (FVF), payment processing, promoted listing ad rate, platform flat fee, and seller outbound shipping label cost.
+     - `Facebook Marketplace / Local Pickup`: Factors in zero platform commissions (0%), zero shipping cost ($0.00), and optional local buyer cash discounts (e.g. 5% to 10%).
+   - Calculates `net_advantage`: The exact dollar difference between local net profit and eBay net profit.
+   - Generates automated channel recommendations with human-readable rationale (e.g., "Local pickup yields +$18.50 higher net profit by eliminating shipping expenses and marketplace commissions").
+2. **Dual-Template Copy Generation (`generateFacebookCopy`)**:
+   - Generates localized copy formatted for Facebook Marketplace, Craigslist, and OfferUp alongside the existing eBay template in `src/utils/listingCopyGenerator.js`:
+     - Clean, human-readable title without spammy keyword stuffing (under 100 characters).
+     - Formatted local cash asking price.
+     - Item condition, athlete/signer, and authenticator certificate verification.
+     - Bulleted key features and highlights.
+     - Local pickup instructions (safe public meeting location, cash/Venmo/Zelle terms, first-come first-served policy).
+     - Internal tracking notes and lot numbers stripped via `stripInternalTrackingNotes`.
+3. **UI Integration**:
+   - `EditTabFinancials.jsx`: Renders a side-by-side Channel Routing & Profit Comparison card comparing eBay Shipped vs. Facebook Local Pickup with profit margin percentages, fee breakdowns, and advantage callouts.
+   - `ListingCopyModal.jsx`: Adds a dedicated "Facebook / Local" tab to the multi-channel listing creator with one-click copy buttons for title, cash price, and full description.
+
+
 
 
 

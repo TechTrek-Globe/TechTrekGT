@@ -1,37 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bell, BellRing, Check, TrendingUp, TrendingDown, RefreshCw, AlertCircle, ExternalLink } from 'lucide-react';
-import { getApiUrl } from '../../utils/api';
+import { apiFetch } from '../../utils/auctionApi';
 
 export function MarketAlertsPanel() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const fetchRequestIdRef = useRef(0);
   
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
+    const reqId = ++fetchRequestIdRef.current;
     try {
-      const res = await fetch(getApiUrl('/api/market-alerts'), { credentials: 'include' });
-      const data = await res.json();
-      if (res.ok && data.alerts) {
+      const data = await apiFetch('/api/market-alerts');
+      if (reqId === fetchRequestIdRef.current && data?.alerts) {
         setAlerts(data.alerts);
       }
     } catch (err) {
-      setError('Failed to load alerts.');
+      if (reqId === fetchRequestIdRef.current) {
+        setError('Failed to load alerts.');
+      }
     } finally {
-      setLoading(false);
+      if (reqId === fetchRequestIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAlerts();
-  }, []);
+  }, [fetchAlerts]);
 
   const handleMarkRead = async (id) => {
     try {
       setAlerts(prev => prev.filter(a => a.id !== id));
-      await fetch(getApiUrl(`/api/market-alerts/${id}`), {
+      await apiFetch(`/api/market-alerts/${id}`, {
         method: 'PUT',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_read: true })
       });
@@ -43,9 +47,8 @@ export function MarketAlertsPanel() {
   const handleRefreshAll = async () => {
     setRefreshing(true);
     try {
-      await fetch(getApiUrl('/api/market-alerts/refresh-all'), {
-        method: 'POST',
-        credentials: 'include'
+      await apiFetch('/api/market-alerts/refresh-all', {
+        method: 'POST'
       });
       // Set a timeout to refetch alerts after background job has had some time
       setTimeout(fetchAlerts, 10000); 

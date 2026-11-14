@@ -5,7 +5,7 @@
  * net profit, ROI, and margin health tiers.
  */
 
-import { round2, computePricingFloors } from '../../functions/utils/auction.js';
+import { round2, computePricingFloors, computeAgingDecaySuggestion, compareChannelEconomics } from '../../functions/utils/auction.js';
 import { DEFAULT_PLATFORM_FEE_PCT, DEFAULT_PLATFORM_FLAT_FEE, DEFAULT_TARGET_MARGIN_PCT } from '../../functions/utils/constants.js';
 
 export function round(val, decimals = 2) {
@@ -208,3 +208,5 @@ export function computeTargetPriceFromMargin(
   const costBase = Number(cogs || 0) + netShippingBurden + Number(flatFee || 0);
   return round(costBase / divisor);
 }
+
+export { computeAgingDecaySuggestion, compareChannelEconomics };

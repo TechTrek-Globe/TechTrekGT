@@ -17,6 +17,8 @@ import { onRequestGet as itemsEnrichedHandler } from '../functions/api/items/enr
 import { onRequestPost as itemsAutoSkuHandler } from '../functions/api/items/auto-sku.js';
 import { onRequestGet as itemImagePreviewHandler } from '../functions/api/items/image-preview.js';
 import { onRequestGet as itemGetHandler, onRequestPut as itemPutHandler, onRequestDelete as itemDeleteHandler } from '../functions/api/items/[id].js';
+import { onRequestGet as repriceCandidatesHandler } from '../functions/api/items/reprice-candidates.js';
+import { onRequestPost as repriceApplyHandler } from '../functions/api/items/reprice-apply.js';
 import { onRequestGet as salesListHandler, onRequestPost as salesCreateHandler } from '../functions/api/sales/index.js';
 import { onRequestGet as saleGetHandler, onRequestPut as salePutHandler, onRequestDelete as saleDeleteHandler } from '../functions/api/sales/[id].js';
 import { onRequestGet as platformsListHandler, onRequestPost as platformsCreateHandler } from '../functions/api/platforms/index.js';
@@ -192,10 +194,12 @@ export const ROUTES = [
   { method: 'PUT',    pattern: '/api/invoices/:id',           handler: invoicePutHandler,         auth: 'session' },
   { method: 'DELETE', pattern: '/api/invoices/:id',           handler: invoiceDeleteHandler,      auth: 'session' },
 
-  // Items (7 routes)
+  // Items (9 routes)
   { method: 'GET',    pattern: '/api/items/image-preview',    handler: itemImagePreviewHandler,   auth: 'session' },
   { method: 'GET',    pattern: '/api/items/enriched',         handler: itemsEnrichedHandler,      auth: 'session' },
   { method: 'POST',   pattern: '/api/items/auto-sku',         handler: itemsAutoSkuHandler,       auth: 'session' },
+  { method: 'GET',    pattern: '/api/items/reprice-candidates', handler: repriceCandidatesHandler, auth: 'session' },
+  { method: 'POST',   pattern: '/api/items/reprice-apply',      handler: repriceApplyHandler,      auth: 'session' },
   { method: 'GET',    pattern: '/api/items',                  handler: itemsListHandler,          auth: 'session' },
   { method: 'GET',    pattern: '/api/items/:id',              handler: itemGetHandler,            auth: 'session' },
   { method: 'PUT',    pattern: '/api/items/:id',              handler: itemPutHandler,            auth: 'session' },

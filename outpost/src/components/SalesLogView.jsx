@@ -3,7 +3,7 @@ import {
   TrendingUp, Plus, Search, X, RefreshCw, Loader2, AlertCircle,
   Pencil, Trash2, DollarSign, Calendar, Tag, Package, Percent, Clock, ArrowUpRight, ChevronDown, ChevronUp, ExternalLink, Sparkles
 } from 'lucide-react';
-import { getSales, deleteSale, getPlatforms, updateSale } from '../utils/auctionApi';
+import { getSales, deleteSale, getPlatforms, updateSale, getItem } from '../utils/auctionApi';
 import { getApiUrl } from '../utils/api';
 import { LogSaleModal } from './LogSaleModal';
 import { EditItemModal } from './EditItemModal';
@@ -14,6 +14,7 @@ import { DEFAULT_SALES_COLUMNS, saveUserSettings } from '../utils/userSettings';
 import { ItemImageHoverTooltip } from './inventory/ItemImageHoverTooltip';
 import { SoldEbayVineMatcherModal } from './inventory/SoldEbayVineMatcherModal';
 import { InlineEditableCell } from './ui/InlineEditableCell';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 export function SalesLogView() {
   const {
@@ -82,6 +83,7 @@ export function SalesLogView() {
   const [modalOpen, setModalOpen] = useState(false);
   const [saleToEdit, setSaleToEdit] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [pendingDeleteSaleId, setPendingDeleteSaleId] = useState(null);
   const [expandedFeeRow, setExpandedFeeRow] = useState(null);
   const [selectedDetailItem, setSelectedDetailItem] = useState(null);
   const [soldMatcherOpen, setSoldMatcherOpen] = useState(false);
@@ -267,11 +269,8 @@ export function SalesLogView() {
 
     try {
       if (sale.item_id) {
-        const res = await fetch(getApiUrl(`/api/items/${sale.item_id}`), { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          it = data.item || data;
-        }
+        const data = await getItem(sale.item_id);
+        it = data?.item || data;
       }
     } catch (_) {}
 
@@ -295,12 +294,18 @@ export function SalesLogView() {
     setSelectedDetailItem(it);
   };
 
-  const handleDeleteSale = async (id) => {
-    if (!window.confirm('Delete this sale record? The item will be reverted back to active inventory.')) return;
+  const handleDeleteSale = (id) => {
+    setPendingDeleteSaleId(id);
+  };
+
+  const executeDeleteSale = async () => {
+    if (!pendingDeleteSaleId) return;
+    const id = pendingDeleteSaleId;
     setDeletingId(id);
     setError('');
     try {
       await deleteSale(id);
+      setPendingDeleteSaleId(null);
       await fetchSales(pagination.page);
     } catch (err) {
       setError(err.message || 'Failed to delete sale.');
@@ -1293,6 +1298,17 @@ export function SalesLogView() {
         onMatched={() => {
           fetchSales(pagination.page);
         }}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteSaleId)}
+        title="Delete Sale Record"
+        message="Are you sure you want to delete this sale record? The item will be reverted back to active inventory."
+        confirmLabel="Delete Sale"
+        variant="danger"
+        loading={Boolean(deletingId)}
+        onConfirm={executeDeleteSale}
+        onCancel={() => setPendingDeleteSaleId(null)}
       />
     </div>
   );

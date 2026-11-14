@@ -38,15 +38,29 @@ function getAuthErrorMessage(status, dataError, path = '') {
   return dataError || `HTTP ${status}`;
 }
 
-async function apiFetch(path, options = {}) {
-  const res = await fetch(getApiUrl(path), { ...OPTS, cache: 'no-store', ...options });
+function getTimeoutSignal(optionsSignal, timeoutMs = 15000) {
+  if (optionsSignal) return optionsSignal;
+  if (typeof globalThis !== 'undefined' && globalThis.AbortSignal && typeof globalThis.AbortSignal.timeout === 'function') {
+    return globalThis.AbortSignal.timeout(timeoutMs);
+  }
+  if (typeof AbortController !== 'undefined') {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
+    return controller.signal;
+  }
+  return undefined;
+}
+
+export async function apiFetch(path, options = {}) {
+  const signal = getTimeoutSignal(options.signal);
+  const res = await fetch(getApiUrl(path), { ...OPTS, cache: 'no-store', signal, ...options });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const isEbay = (typeof path === 'string' && path.includes('/ebay/')) || (typeof data.error === 'string' && /ebay/i.test(data.error));
-    if (res.status === 401 && !isEbay && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    if ((res.status === 401 || res.status === 403) && !isEbay && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
       const evt = typeof CustomEvent !== 'undefined'
-        ? new CustomEvent('outpost:unauthorized', { detail: { path, error: data.error } })
-        : { type: 'outpost:unauthorized', detail: { path, error: data.error } };
+        ? new CustomEvent('outpost:unauthorized', { detail: { path, status: res.status, error: data.error } })
+        : { type: 'outpost:unauthorized', detail: { path, status: res.status, error: data.error } };
       window.dispatchEvent(evt);
     }
     throw new Error(getAuthErrorMessage(res.status, data.error, path));
@@ -138,33 +152,58 @@ export const updateSale = (id, body) =>
 export const deleteSale = (id) =>
   apiFetch(`/api/sales/${id}`, { method: 'DELETE' });
 
-// --- Platforms ---
-export const getPlatforms = () =>
-  apiFetch('/api/platforms');
+let platformsCache = null;
+let platformsCacheTime = 0;
+const PLATFORMS_CACHE_TTL_MS = 60000;
 
-export const createPlatform = (body) =>
-  apiFetch('/api/platforms', {
+export const invalidatePlatformsCache = () => {
+  platformsCache = null;
+  platformsCacheTime = 0;
+};
+
+// --- Platforms ---
+export const getPlatforms = async (forceFresh = false) => {
+  const now = Date.now();
+  if (!forceFresh && platformsCache && (now - platformsCacheTime < PLATFORMS_CACHE_TTL_MS)) {
+    return platformsCache;
+  }
+  const data = await apiFetch('/api/platforms');
+  platformsCache = data;
+  platformsCacheTime = now;
+  return data;
+};
+
+export const createPlatform = async (body) => {
+  invalidatePlatformsCache();
+  return apiFetch('/api/platforms', {
     method: 'POST',
     headers: JSON_HEADERS,
     body: JSON.stringify(body)
   });
+};
 
-export const updatePlatform = (id, body) =>
-  apiFetch(`/api/platforms/${id}`, {
+export const updatePlatform = async (id, body) => {
+  invalidatePlatformsCache();
+  return apiFetch(`/api/platforms/${id}`, {
     method: 'PUT',
     headers: JSON_HEADERS,
     body: JSON.stringify(body)
   });
+};
 
-export const deletePlatform = (id) =>
-  apiFetch(`/api/platforms/${id}`, { method: 'DELETE' });
+export const deletePlatform = async (id) => {
+  invalidatePlatformsCache();
+  return apiFetch(`/api/platforms/${id}`, { method: 'DELETE' });
+};
 
-export const resetPlatforms = () =>
-  apiFetch('/api/platforms', {
+export const resetPlatforms = async () => {
+  invalidatePlatformsCache();
+  return apiFetch('/api/platforms', {
     method: 'POST',
     headers: JSON_HEADERS,
     body: JSON.stringify({ action: 'reset_defaults' })
   });
+};
 
 // --- Comps / Pricing Intelligence ---
 export const getComps = (params = {}) => {
@@ -204,12 +243,13 @@ export const getDashboard = () =>
 // Gateway endpoint: POST https://techtrekgt.com/api/ebay/comps
 // Uses official eBay REST API (Marketplace Insights + Browse fallback).
 // Option A: gateway returns raw data; caller uses saveComp() to persist to D1 if itemId is set.
-export const fetchLiveComps = (query, itemId = null) =>
+export const fetchLiveComps = (query, itemId = null, options = {}) =>
   fetch(`${getGatewayBase()}/api/ebay/comps`, {
     method: 'POST',
     credentials: 'include',
     headers: JSON_HEADERS,
-    body: JSON.stringify({ query, itemId })
+    body: JSON.stringify({ query, itemId }),
+    signal: getTimeoutSignal(options.signal)
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error, '/api/ebay/comps'));
@@ -217,10 +257,11 @@ export const fetchLiveComps = (query, itemId = null) =>
   });
 
 // --- eBay Catalog Search (via Central API Gateway) ---
-export const fetchEbayCatalog = (query) =>
+export const fetchEbayCatalog = (query, options = {}) =>
   fetch(`${getGatewayBase()}/api/ebay/catalog?q=${encodeURIComponent(query)}`, {
     credentials: 'include',
-    headers: JSON_HEADERS
+    headers: JSON_HEADERS,
+    signal: getTimeoutSignal(options.signal)
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error, '/api/ebay/catalog'));
@@ -228,13 +269,14 @@ export const fetchEbayCatalog = (query) =>
   });
 
 // --- eBay Item Details (via Central API Gateway) ---
-export const fetchEbayItemDetail = (idOrUrl) => {
+export const fetchEbayItemDetail = (idOrUrl, options = {}) => {
   const clean = String(idOrUrl || '').trim();
   const m = clean.match(/(?:itm\/|item=|\b)(\d{12})\b/);
   const targetId = m ? m[1] : clean;
   return fetch(`${getGatewayBase()}/api/ebay/item/${encodeURIComponent(targetId)}`, {
     credentials: 'include',
-    headers: JSON_HEADERS
+    headers: JSON_HEADERS,
+    signal: getTimeoutSignal(options.signal)
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(getAuthErrorMessage(r.status, data.error, '/api/ebay/item'));
@@ -245,12 +287,13 @@ export const fetchEbayItemDetail = (idOrUrl) => {
 // --- Amazon Product Fetch (via Central API Gateway) ---
 // Gateway endpoint: POST https://techtrekgt.com/api/amazon/fetch
 // Scrapes/parses Amazon product metadata from a URL or ASIN.
-export const fetchAmazonProduct = (input) =>
+export const fetchAmazonProduct = (input, options = {}) =>
   fetch(`${getGatewayBase()}/api/amazon/fetch`, {
     method: 'POST',
     credentials: 'include',
     headers: JSON_HEADERS,
-    body: JSON.stringify({ input })
+    body: JSON.stringify({ input }),
+    signal: getTimeoutSignal(options.signal)
   }).then(async r => {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);

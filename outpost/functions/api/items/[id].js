@@ -404,6 +404,7 @@ export async function onRequestPut(context) {
           quantity = ?, purchase_date = ?, floor_price = ?, buy_it_now_price = ?,
           buyer_shipping_cost = ?, attributes = ?,
           asin = ?, order_id = ?, image_url = ?, is_vinescout = ?, etv = ?, tax_cost = ?,
+          reprice_locked = COALESCE(?, reprice_locked),
           updated_at = datetime('now')
         WHERE id = ? AND user_id = ?
       `).bind(
@@ -427,8 +428,18 @@ export async function onRequestPut(context) {
         (nextAttrs.is_vinescout || nextAttrs.source === 'amazon_vinescout' || nextAttrs.asin) ? 1 : 0,
         nextAttrs.etv != null ? Number(nextAttrs.etv) : null,
         nextAttrs.tax_cost != null ? Number(nextAttrs.tax_cost) : null,
+        body.reprice_locked !== undefined ? (body.reprice_locked ? 1 : 0) : null,
         id, payload.userId
       ).run();
+
+      const primaryImg = nextAttrs.image_url || nextAttrs.ebay_image_url || body.image_url || null;
+      if (primaryImg) {
+        await env.DB.prepare(
+          `INSERT INTO auction_item_images (item_id, user_id, sort_order, image_url, is_primary)
+           VALUES (?, ?, 0, ?, 1)
+           ON CONFLICT(item_id, sort_order) DO UPDATE SET image_url = excluded.image_url, is_primary = 1`
+        ).bind(id, payload.userId, primaryImg).run().catch(() => {});
+      }
     } catch (updateErr) {
       console.error('[items] Failed to update item record in D1:', updateErr);
       if (updateErr?.message?.includes('UNIQUE constraint failed: auction_items.ebay_listing_id')) {
@@ -532,18 +543,30 @@ export async function onRequestDelete(context) {
       return err('Cannot delete an item that has recorded sales. Set status to "Returned" instead.', 409);
     }
 
+    const deleteImagesStmt = env.DB.prepare('DELETE FROM auction_item_images WHERE item_id = ? AND user_id = ?').bind(id, payload.userId);
+    const deleteSpecsStmt = env.DB.prepare('DELETE FROM auction_item_specs WHERE item_id = ? AND user_id = ?').bind(id, payload.userId);
+    const deletePlatformListingsStmt = env.DB.prepare('DELETE FROM auction_item_platform_listings WHERE item_id = ? AND user_id = ?').bind(id, payload.userId);
     const deleteAnalyticsStmt = env.DB.prepare('DELETE FROM auction_item_analytics WHERE item_id = ? AND user_id = ?').bind(id, payload.userId);
     const deleteTrafficStmt = env.DB.prepare('DELETE FROM listing_traffic WHERE item_id = ? AND user_id = ?').bind(id, payload.userId);
     const deleteCompsStmt = env.DB.prepare('DELETE FROM auction_comps WHERE item_id = ? AND user_id = ?').bind(id, payload.userId);
     const deleteItemStmt = env.DB.prepare('DELETE FROM auction_items WHERE id = ? AND user_id = ?').bind(id, payload.userId);
 
+    const deleteStmts = [
+      deleteImagesStmt,
+      deleteSpecsStmt,
+      deletePlatformListingsStmt,
+      deleteAnalyticsStmt,
+      deleteTrafficStmt,
+      deleteCompsStmt,
+      deleteItemStmt
+    ];
+
     if (typeof env.DB.batch === 'function') {
-      await env.DB.batch([deleteAnalyticsStmt, deleteTrafficStmt, deleteCompsStmt, deleteItemStmt]);
+      await env.DB.batch(deleteStmts);
     } else {
-      await deleteAnalyticsStmt.run().catch(() => {});
-      await deleteTrafficStmt.run().catch(() => {});
-      await deleteCompsStmt.run();
-      await deleteItemStmt.run();
+      for (const stmt of deleteStmts) {
+        await stmt.run().catch(() => {});
+      }
     }
 
     return ok({ success: true });

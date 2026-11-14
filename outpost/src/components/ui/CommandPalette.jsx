@@ -95,7 +95,7 @@ export function CommandPalette({
   const skuCacheRef = useRef(new Map());
 
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'jgk1865@gmail.com';
-  const isAdmin = user?.email?.toLowerCase() === adminEmail.toLowerCase();
+  const isAdmin = user?.role === 'admin' || Boolean(user?.is_admin) || (adminEmail && user?.email?.toLowerCase() === adminEmail.toLowerCase());
 
   // Static routes and tools catalog
   const staticActions = useMemo(() => {

@@ -355,7 +355,8 @@ export async function sendTransactionalEmail(env, {
           to: recipients,
           subject,
           text
-        })
+        }),
+        signal: AbortSignal.timeout(15000)
       });
       if (!res.ok) {
         console.error(`${logPrefix} mail provider returned`, res.status);

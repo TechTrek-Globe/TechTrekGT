@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getApiUrl } from '../utils/api';
+import { apiFetch } from '../utils/auctionApi';
 import { Users, Package, AlertTriangle, ShieldCheck, CheckCircle2, Lock, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function AdminView() {
@@ -10,9 +10,11 @@ export function AdminView() {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
+  const fetchRequestIdRef = useRef(0);
 
   // Fallback check, though App.jsx should protect the route
-  const isAdmin = user?.email?.toLowerCase() === (import.meta.env.VITE_ADMIN_EMAIL || 'jgk1865@gmail.com').toLowerCase();
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'jgk1865@gmail.com';
+  const isAdmin = user?.role === 'admin' || Boolean(user?.is_admin) || (adminEmail && user?.email?.toLowerCase() === adminEmail.toLowerCase());
 
   useEffect(() => {
     let active = true;
@@ -24,23 +26,16 @@ export function AdminView() {
 
     setLoading(true);
     setError('');
+    const reqId = ++fetchRequestIdRef.current;
 
     const fetchStats = async () => {
       try {
-        const res = await fetch(getApiUrl(`/api/admin/stats?page=${page}&limit=${limit}`), {
-          credentials: 'include'
-        });
-        const data = await res.json();
-        
-        if (!res.ok) {
-          throw new Error(data.error || 'Failed to fetch admin stats');
-        }
-        
-        if (active) setStats(data);
+        const data = await apiFetch(`/api/admin/stats?page=${page}&limit=${limit}`);
+        if (active && reqId === fetchRequestIdRef.current) setStats(data);
       } catch (err) {
-        if (active) setError(err.message);
+        if (active && reqId === fetchRequestIdRef.current) setError(err.message);
       } finally {
-        if (active) setLoading(false);
+        if (active && reqId === fetchRequestIdRef.current) setLoading(false);
       }
     };
 

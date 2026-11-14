@@ -71,19 +71,12 @@ export async function onRequestPut(context) {
 
     const allowed = [
       'ebay_auto_sync', 'ebay_sync_interval_m',
-      'vscout_auto_sync', 'vscout_sync_interval_m',
-      'last_ebay_sync_at', 'last_vscout_sync_at',
-      'last_ebay_sync_status', 'last_ebay_sync_error',
-      'last_vscout_sync_status', 'last_vscout_sync_error'
+      'vscout_auto_sync', 'vscout_sync_interval_m'
     ];
     const patch = {};
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        if (key.endsWith('_at') || key.endsWith('_status') || key.endsWith('_error')) {
-          patch[key] = body[key] ? String(body[key]) : null;
-        } else {
-          patch[key] = Math.max(0, parseInt(body[key], 10) || 0);
-        }
+        patch[key] = Math.max(0, parseInt(body[key], 10) || 0);
       }
     }
 
@@ -97,12 +90,12 @@ export async function onRequestPut(context) {
       ebay_sync_interval_m: patch.ebay_sync_interval_m ?? existing.ebay_sync_interval_m ?? DEFAULTS.ebay_sync_interval_m,
       vscout_auto_sync: patch.vscout_auto_sync ?? existing.vscout_auto_sync ?? DEFAULTS.vscout_auto_sync,
       vscout_sync_interval_m: patch.vscout_sync_interval_m ?? existing.vscout_sync_interval_m ?? DEFAULTS.vscout_sync_interval_m,
-      last_ebay_sync_at: patch.last_ebay_sync_at !== undefined ? patch.last_ebay_sync_at : (existing.last_ebay_sync_at ?? null),
-      last_vscout_sync_at: patch.last_vscout_sync_at !== undefined ? patch.last_vscout_sync_at : (existing.last_vscout_sync_at ?? null),
-      last_ebay_sync_status: patch.last_ebay_sync_status !== undefined ? patch.last_ebay_sync_status : (existing.last_ebay_sync_status ?? null),
-      last_ebay_sync_error: patch.last_ebay_sync_error !== undefined ? patch.last_ebay_sync_error : (existing.last_ebay_sync_error ?? null),
-      last_vscout_sync_status: patch.last_vscout_sync_status !== undefined ? patch.last_vscout_sync_status : (existing.last_vscout_sync_status ?? null),
-      last_vscout_sync_error: patch.last_vscout_sync_error !== undefined ? patch.last_vscout_sync_error : (existing.last_vscout_sync_error ?? null)
+      last_ebay_sync_at: existing.last_ebay_sync_at ?? null,
+      last_vscout_sync_at: existing.last_vscout_sync_at ?? null,
+      last_ebay_sync_status: existing.last_ebay_sync_status ?? null,
+      last_ebay_sync_error: existing.last_ebay_sync_error ?? null,
+      last_vscout_sync_status: existing.last_vscout_sync_status ?? null,
+      last_vscout_sync_error: existing.last_vscout_sync_error ?? null
     };
 
     await env.DB.prepare(`

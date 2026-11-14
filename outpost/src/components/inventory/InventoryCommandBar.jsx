@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
   Search, X, UploadCloud, Tag, Package,
-  RefreshCw, TableProperties, LayoutGrid, Sparkles
+  RefreshCw, TableProperties, LayoutGrid, Sparkles, TrendingDown
 } from 'lucide-react';
 import { SortPresetDropdown } from './SortPresetDropdown';
 import { ALL_STATUSES, LISTING_FORMATS } from '../../utils/constants';
@@ -44,7 +44,8 @@ export function InventoryCommandBar({
   overallMargin,
   onSyncEbay,
   syncing = false,
-  onOpenSoldMatcher
+  onOpenSoldMatcher,
+  onOpenAgingMarkdown
 }) {
   const searchInputRef = useRef(null);
 
@@ -283,6 +284,18 @@ export function InventoryCommandBar({
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span className="hidden lg:inline">Match Sold</span>
+          </button>
+        )}
+
+        {onOpenAgingMarkdown && (
+          <button
+            id="reprice-markdown-btn"
+            onClick={onOpenAgingMarkdown}
+            className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 transition-all"
+            title="Automated Repricing & Aging Inventory Decay Engine"
+          >
+            <TrendingDown className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden lg:inline">Reprice Engine</span>
           </button>
         )}
 

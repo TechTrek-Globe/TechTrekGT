@@ -768,3 +768,17 @@ CREATE INDEX IF NOT EXISTS idx_auction_items_user_status_created
 CREATE INDEX IF NOT EXISTS idx_market_alerts_user_unread
   ON auction_market_alerts(user_id, is_read, created_at DESC);
 
+-- ============================================================
+-- MIGRATION 0012: REPRICING & CHANNEL ROUTING INTELLIGENCE
+-- Adds tracking columns for aging inventory decay, automated
+-- repricing schedules, and locked price protection.
+-- ============================================================
+ALTER TABLE auction_items ADD COLUMN original_list_price REAL;
+ALTER TABLE auction_items ADD COLUMN last_repriced_at TEXT;
+ALTER TABLE auction_items ADD COLUMN reprice_locked INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE auction_items ADD COLUMN reprice_tier TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_auction_items_reprice
+  ON auction_items(user_id, status, reprice_locked, date_listed);
+
+

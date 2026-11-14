@@ -1,51 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { fetchWithTimeout } from '../ebay/tokenHelper.js';
-
-/**
- * Strips internal warehouse, auction lot, invoice, and tracking metadata
- * (e.g., 'Inventory tracked: Lot #12862710, Item #8183938', 'Lot #12862710 · Item #8183938',
- * Amazon order IDs, ASINs, etc.) from public-facing listing copy.
- *
- * @param {string} text
- * @returns {string}
- */
-function stripInternalTrackingNotes(text) {
-  if (!text || typeof text !== 'string') return '';
-
-  let cleaned = text;
-
-  // 1. Remove explicit 'Inventory tracked: ...' blocks (up to period, pipe, or newline)
-  cleaned = cleaned.replace(/Inventory\s+tracked\s*:[^.\n\r|]*(?:\.|$)/gi, '');
-  cleaned = cleaned.replace(/Inventory\s+tracked\s*:?[^\n\r|]*/gi, '');
-
-  // 2. Remove 'Lot #... · Item #...' or 'Lot #..., Item #...' or standalone 'Lot #...'
-  cleaned = cleaned.replace(/Lot\s*#?\s*\d+\s*[·•,;&|/-]?\s*(?:Item\s*#?\s*\d+)?/gi, '');
-
-  // 3. Remove standalone 'Item #...' (when followed by numbers, e.g. Item #8183938)
-  cleaned = cleaned.replace(/Item\s*#\s*\d+/gi, '');
-
-  // 4. Remove internal Amazon/Vine order IDs and ASIN markers
-  cleaned = cleaned.replace(/Order\s*ID\s*:\s*[\d-]+/gi, '');
-  cleaned = cleaned.replace(/\bASIN\s*:\s*B0[A-Z0-9]{8}\b/gi, '');
-  cleaned = cleaned.replace(/Imported\s+via\s+VineScout/gi, '');
-  cleaned = cleaned.replace(/Sold\s+on\s+eBay[^\n\r|]*/gi, '');
-
-  // 5. Clean up dangling delimiters like ' · ', ' | ', ' - ', leading/trailing commas, multiple spaces
-  cleaned = cleaned
-    .split('\n')
-    .map(line => {
-      let l = line.trim();
-      l = l.replace(/^[\s|·•,;:/-]+|[\s|·•,;:/-]+$/g, '').trim();
-      l = l.replace(/[\s|·•,;:/-]*[|·•][\s|·•,;:/-]*/g, ' · ').trim();
-      l = l.replace(/^[\s|·•,;:/-]+|[\s|·•,;:/-]+$/g, '').trim();
-      return l;
-    })
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-
-  return cleaned;
-}
+import { stripInternalTrackingNotes, sanitizeListingHtml } from '../../../src/utils/ebayTemplate.js';
 
 /**
  * Extracts plain text from Gemini API response structures.
@@ -202,7 +157,7 @@ export async function onRequestPost(context) {
     const cleanApiKey = apiKey.trim();
 
     const callGenerateContent = async (model, timeoutMs = 12000) => {
-      const generateContentUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cleanApiKey)}`;
+      const generateContentUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
       return fetchWithTimeout(generateContentUrl, {
         method: 'POST',
         headers: {
@@ -268,14 +223,8 @@ export async function onRequestPost(context) {
       return err('Gemini API returned an empty response. Please try again.', 502);
     }
 
-    // Sanitize markdown fences and whitespace
-    let sanitizedHtml = generatedText.trim()
-      .replace(/^```(?:html)?\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim();
-
-    // Enforce strict zero em-dash invariant
-    sanitizedHtml = sanitizedHtml.replace(/[\u2014\u2013]/g, '-');
+    // Sanitize markdown fences, HTML tags/attributes, and whitespace
+    let sanitizedHtml = sanitizeListingHtml(generatedText);
 
     // Strip any leaked internal tracking or warehouse lot metadata
     sanitizedHtml = stripInternalTrackingNotes(sanitizedHtml);

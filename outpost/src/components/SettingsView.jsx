@@ -15,7 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useInventory } from '../context/InventoryContext';
 import {
   getPlatforms, createPlatform, updatePlatform, deletePlatform, resetPlatforms,
-  getItems, getSales, getInvoices, getComps, getApiUrl,
+  getItems, getSales, getInvoices, getComps, getApiUrl, apiFetch,
   autoAssignSkus, pushAllSkusToEbay,
   getSyncSettings, updateSyncSettings, syncAllEbayItems, getVineScoutCatalog,
   getIntegrations, createIntegration, revokeIntegration,
@@ -24,6 +24,7 @@ import {
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES, getStoredUserSettings, saveUserSettings, resetColumnWidths } from '../utils/userSettings';
 import { escapeCsvCell } from '../utils/csvExport';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 const TABS = [
   { id: 'platforms', label: 'Marketplace Fees', icon: DollarSign, badge: null },
@@ -50,6 +51,7 @@ export function SettingsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [confirmModal, setConfirmModal] = useState(null);
 
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', fee_pct: '', flat_fee: '', notes: '', is_default: false });
@@ -131,30 +133,46 @@ export function SettingsView() {
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
-  const handleAutoAssignSkus = async () => {
-    if (!window.confirm('Auto-assign unique, structured SKUs (OP-YYMMDD-XXXX) to all inventory items currently missing one?')) return;
-    setSkuActionLoading(true);
-    try {
-      const res = await autoAssignSkus();
-      showSuccess(res.message || `Auto-assigned SKUs to ${res.count} items.`);
-    } catch (e) {
-      setError(`Failed to auto-assign SKUs: ${e.message}`);
-    } finally {
-      setSkuActionLoading(false);
-    }
+  const handleAutoAssignSkus = () => {
+    setConfirmModal({
+      title: 'Auto-Assign SKUs',
+      message: 'Auto-assign unique, structured SKUs (OP-YYMMDD-XXXX) to all inventory items currently missing one?',
+      variant: 'warning',
+      confirmLabel: 'Auto-Assign',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setSkuActionLoading(true);
+        try {
+          const res = await autoAssignSkus();
+          showSuccess(res.message || `Auto-assigned SKUs to ${res.count} items.`);
+        } catch (e) {
+          setError(`Failed to auto-assign SKUs: ${e.message}`);
+        } finally {
+          setSkuActionLoading(false);
+        }
+      }
+    });
   };
 
-  const handlePushAllSkusToEbay = async () => {
-    if (!window.confirm('Push all Outpost SKUs/Custom Labels to your active linked eBay listings?')) return;
-    setSkuActionLoading(true);
-    try {
-      const res = await pushAllSkusToEbay();
-      showSuccess(res.message || `Pushed ${res.synced} SKUs to eBay.`);
-    } catch (e) {
-      setError(`Failed to push SKUs to eBay: ${e.message}`);
-    } finally {
-      setSkuActionLoading(false);
-    }
+  const handlePushAllSkusToEbay = () => {
+    setConfirmModal({
+      title: 'Push SKUs to eBay',
+      message: 'Push all Outpost SKUs/Custom Labels to your active linked eBay listings?',
+      variant: 'warning',
+      confirmLabel: 'Push to eBay',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setSkuActionLoading(true);
+        try {
+          const res = await pushAllSkusToEbay();
+          showSuccess(res.message || `Pushed ${res.synced} SKUs to eBay.`);
+        } catch (e) {
+          setError(`Failed to push SKUs to eBay: ${e.message}`);
+        } finally {
+          setSkuActionLoading(false);
+        }
+      }
+    });
   };
 
   // P7: Sync engine handlers (delegate to InventoryContext, show local toast feedback)
@@ -270,11 +288,19 @@ export function SettingsView() {
       setError('Must keep at least one category.');
       return;
     }
-    if (!window.confirm(`Remove category '${cat}' from list?`)) return;
-    const categories = (userSettings?.categoryOrder || DEFAULT_CATEGORIES).filter(c => c !== cat);
-    const newSettings = saveUserSettings({ ...userSettings, categoryOrder: categories });
-    setUserSettingsState(newSettings);
-    showSuccess(`Removed category '${cat}'.`);
+    setConfirmModal({
+      title: 'Remove Category',
+      message: `Remove category '${cat}' from list?`,
+      variant: 'danger',
+      confirmLabel: 'Remove Category',
+      onConfirm: () => {
+        setConfirmModal(null);
+        const categories = (userSettings?.categoryOrder || DEFAULT_CATEGORIES).filter(c => c !== cat);
+        const newSettings = saveUserSettings({ ...userSettings, categoryOrder: categories });
+        setUserSettingsState(newSettings);
+        showSuccess(`Removed category '${cat}'.`);
+      }
+    });
   };
 
   // Platform Actions
@@ -306,15 +332,23 @@ export function SettingsView() {
     }
   };
 
-  const handleDeletePlatform = async (id, name) => {
-    if (!window.confirm(`Delete platform '${name}'?`)) return;
-    try {
-      await deletePlatform(id);
-      showSuccess(`Deleted platform ${name}`);
-      fetchPlatformsList();
-    } catch (err) {
-      setError(err.message || 'Failed to delete platform');
-    }
+  const handleDeletePlatform = (id, name) => {
+    setConfirmModal({
+      title: 'Delete Platform',
+      message: `Delete platform '${name}'?`,
+      variant: 'danger',
+      confirmLabel: 'Delete Platform',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await deletePlatform(id);
+          showSuccess(`Deleted platform ${name}`);
+          fetchPlatformsList();
+        } catch (err) {
+          setError(err.message || 'Failed to delete platform');
+        }
+      }
+    });
   };
 
   const handleAddPlatform = async (e) => {
@@ -337,15 +371,23 @@ export function SettingsView() {
     }
   };
 
-  const handleResetDefaults = async () => {
-    if (!window.confirm('Reset all platforms to standard factory default fee schedules? Any custom fee tweaks will be overwritten.')) return;
-    try {
-      await resetPlatforms();
-      showSuccess('Reset to factory platform schedules.');
-      fetchPlatformsList();
-    } catch (err) {
-      setError(err.message || 'Failed to reset platforms');
-    }
+  const handleResetDefaults = () => {
+    setConfirmModal({
+      title: 'Reset Platform Schedules',
+      message: 'Reset all platforms to standard factory default fee schedules? Any custom fee tweaks will be overwritten.',
+      variant: 'danger',
+      confirmLabel: 'Reset Schedules',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await resetPlatforms();
+          showSuccess('Reset to factory platform schedules.');
+          fetchPlatformsList();
+        } catch (err) {
+          setError(err.message || 'Failed to reset platforms');
+        }
+      }
+    });
   };
 
   // CSV Exporter Helpers
@@ -852,22 +894,28 @@ export function SettingsView() {
               onLoad={async () => {
                 setTokenLoading(true);
                 try {
-                  const res = await fetch(getApiUrl('/api/import/amazon-token'), { credentials: 'include' });
-                  const d = await res.json();
+                  const d = await apiFetch('/api/import/amazon-token');
                   if (d.token) setAmazonToken(d.token);
                   if (d.hasToken) setHasAmazonToken(true);
                 } catch (e) { console.error(e); } finally { setTokenLoading(false); }
               }}
-              onRotate={async () => {
-                if (!window.confirm('Regenerate your API token? The old token will stop working immediately.')) return;
-                setTokenRotating(true);
-                try {
-                  const res = await fetch(getApiUrl('/api/import/amazon-token'), { method: 'POST', credentials: 'include' });
-                  const d = await res.json();
-                  if (d.token) setAmazonToken(d.token);
-                  if (d.hasToken) setHasAmazonToken(true);
-                  showSuccess('API token regenerated successfully.');
-                } catch (e) { console.error(e); } finally { setTokenRotating(false); }
+              onRotate={() => {
+                setConfirmModal({
+                  title: 'Regenerate API Token',
+                  message: 'Regenerate your API token? The old token will stop working immediately.',
+                  variant: 'danger',
+                  confirmLabel: 'Regenerate Token',
+                  onConfirm: async () => {
+                    setConfirmModal(null);
+                    setTokenRotating(true);
+                    try {
+                      const d = await apiFetch('/api/import/amazon-token', { method: 'POST' });
+                      if (d.token) setAmazonToken(d.token);
+                      if (d.hasToken) setHasAmazonToken(true);
+                      showSuccess('API token regenerated successfully.');
+                    } catch (e) { console.error(e); } finally { setTokenRotating(false); }
+                  }
+                });
               }}
               onCopy={() => {
                 if (!amazonToken) return;
@@ -1621,6 +1669,16 @@ export function SettingsView() {
         onClose={() => setListingMatchOpen(false)}
         onSaved={() => {}}
       />
+
+      <ConfirmModal
+        isOpen={Boolean(confirmModal)}
+        title={confirmModal?.title || 'Confirm Action'}
+        message={confirmModal?.message}
+        variant={confirmModal?.variant || 'danger'}
+        confirmLabel={confirmModal?.confirmLabel || 'Confirm'}
+        onConfirm={confirmModal?.onConfirm}
+        onCancel={() => setConfirmModal(null)}
+      />
     </div>
   );
 }
@@ -1835,6 +1893,7 @@ function ApiIntegrationsSection() {
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
+  const [confirmModal, setConfirmModal] = useState(null);
 
   const loadIntegrations = useCallback(async () => {
     setLoading(true);
@@ -1887,22 +1946,28 @@ function ApiIntegrationsSection() {
     }
   };
 
-  const handleRevoke = async (id, label) => {
-    if (!window.confirm(`Revoke API integration "${label || id}"? Any external client using this key will immediately lose access.`)) {
-      return;
-    }
-    setRevokingId(id);
-    setErrorMsg('');
-    setStatusMsg('');
-    try {
-      await revokeIntegration(id);
-      setStatusMsg('Integration revoked successfully. An active slot has been freed.');
-      await loadIntegrations();
-    } catch (err) {
-      setErrorMsg(err.message || 'Failed to revoke integration');
-    } finally {
-      setRevokingId(null);
-    }
+  const handleRevoke = (id, label) => {
+    setConfirmModal({
+      title: 'Revoke Integration',
+      message: `Revoke API integration "${label || id}"? Any external client using this key will immediately lose access.`,
+      variant: 'danger',
+      confirmLabel: 'Revoke Key',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setRevokingId(id);
+        setErrorMsg('');
+        setStatusMsg('');
+        try {
+          await revokeIntegration(id);
+          setStatusMsg('Integration revoked successfully. An active slot has been freed.');
+          await loadIntegrations();
+        } catch (err) {
+          setErrorMsg(err.message || 'Failed to revoke integration');
+        } finally {
+          setRevokingId(null);
+        }
+      }
+    });
   };
 
   const copyToClipboard = (text) => {
@@ -2122,6 +2187,16 @@ function ApiIntegrationsSection() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(confirmModal)}
+        title={confirmModal?.title || 'Confirm Action'}
+        message={confirmModal?.message}
+        variant={confirmModal?.variant || 'danger'}
+        confirmLabel={confirmModal?.confirmLabel || 'Confirm'}
+        onConfirm={confirmModal?.onConfirm}
+        onCancel={() => setConfirmModal(null)}
+      />
     </div>
   );
 }

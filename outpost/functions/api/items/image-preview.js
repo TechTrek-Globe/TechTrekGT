@@ -100,12 +100,24 @@ export async function onRequestGet(context) {
           const singleDetail = await fetchSingleEbayListing(env, accessToken, listingId);
           const normSingle = normalizeHttps(singleDetail?.image_url);
           if (normSingle) {
-            // Cache back to attributes in DB so future hovers are instant
+            // Cache back to attributes and relational images in DB so future hovers are instant
             if (item) {
               attrs.ebay_image_url = normSingle;
-              await env.DB.prepare(
-                `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
-              ).bind(JSON.stringify(attrs), item.id, payload.userId).run().catch(() => {});
+              const updateItemStmt = env.DB.prepare(
+                `UPDATE auction_items SET image_url = COALESCE(image_url, ?), attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
+              ).bind(normSingle, JSON.stringify(attrs), item.id, payload.userId);
+              const insertImageStmt = env.DB.prepare(
+                `INSERT INTO auction_item_images (item_id, user_id, sort_order, image_url, is_primary)
+                 VALUES (?, ?, 0, ?, 1)
+                 ON CONFLICT(item_id, sort_order) DO UPDATE SET image_url = excluded.image_url, is_primary = 1`
+              ).bind(item.id, payload.userId, normSingle);
+
+              if (typeof env.DB.batch === 'function') {
+                await env.DB.batch([updateItemStmt, insertImageStmt]).catch(() => {});
+              } else {
+                await updateItemStmt.run().catch(() => {});
+                await insertImageStmt.run().catch(() => {});
+              }
             }
             return ok({ success: true, imageUrl: normSingle, source: 'eBay' });
           }
@@ -130,7 +142,8 @@ export async function onRequestGet(context) {
             'Content-Type': 'application/json',
             'Cookie': request.headers.get('Cookie') || ''
           },
-          body: JSON.stringify({ input: cleanAsin })
+          body: JSON.stringify({ input: cleanAsin }),
+          signal: AbortSignal.timeout(15000)
         });
 
         if (gwRes.ok) {
@@ -141,9 +154,21 @@ export async function onRequestGet(context) {
           if (img) {
             if (item) {
               attrs.image_url = img;
-              await env.DB.prepare(
-                `UPDATE auction_items SET attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
-              ).bind(JSON.stringify(attrs), item.id, payload.userId).run().catch(() => {});
+              const updateItemStmt = env.DB.prepare(
+                `UPDATE auction_items SET image_url = COALESCE(image_url, ?), attributes = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?`
+              ).bind(img, JSON.stringify(attrs), item.id, payload.userId);
+              const insertImageStmt = env.DB.prepare(
+                `INSERT INTO auction_item_images (item_id, user_id, sort_order, image_url, is_primary)
+                 VALUES (?, ?, 0, ?, 1)
+                 ON CONFLICT(item_id, sort_order) DO UPDATE SET image_url = excluded.image_url, is_primary = 1`
+              ).bind(item.id, payload.userId, img);
+
+              if (typeof env.DB.batch === 'function') {
+                await env.DB.batch([updateItemStmt, insertImageStmt]).catch(() => {});
+              } else {
+                await updateItemStmt.run().catch(() => {});
+                await insertImageStmt.run().catch(() => {});
+              }
             }
             return ok({ success: true, imageUrl: img, source: 'Amazon' });
           }

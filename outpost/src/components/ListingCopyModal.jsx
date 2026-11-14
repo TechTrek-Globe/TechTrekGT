@@ -8,10 +8,12 @@ import {
 } from 'lucide-react';
 import {
   generateEbayCopy,
+  generateFacebookCopy,
   generateWhatnotCopy,
   generateMercariCopy,
   generateSocialCopy,
-  stripInternalTrackingNotes
+  stripInternalTrackingNotes,
+  sanitizeListingHtml
 } from '../utils/listingCopyGenerator';
 import { getApiUrl } from '../utils/api';
 import { parseAmazonProductContent } from '../utils/amazonParser';
@@ -338,11 +340,12 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
       aiGeneratedMiddleSection
     };
     const ebay = generateEbayCopy(item, options);
+    const facebook = generateFacebookCopy(item, options);
     const whatnot = generateWhatnotCopy(item, options);
     const mercari = generateMercariCopy(item, options);
     const social = generateSocialCopy(item, options);
 
-    return { ebay, whatnot, mercari, social };
+    return { ebay, facebook, whatnot, mercari, social };
   }, [item, title, brand, productType, subtitle, conditionHeader, conditionSubheader, condition, features, parsedSpecs, parsedCompatibility, description, includedInSale, shippingPolicy, returnPolicy, aiGeneratedMiddleSection]);
 
   const copyToClipboard = (text, fieldName) => {
@@ -356,6 +359,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
   if (!isOpen || !item) return null;
 
   const curEbay = generated.ebay || {};
+  const curFacebook = generated.facebook || {};
   const curWhatnot = generated.whatnot || {};
   const curMercari = generated.mercari || {};
   const curSocial = generated.social || {};
@@ -726,6 +730,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
           <div className="flex border-b border-slate-800 bg-slate-950/60 pt-2 gap-2 overflow-x-auto rounded-t-xl px-2">
             {[
               { id: 'ebay', label: 'eBay (SEO & HTML)' },
+              { id: 'facebook', label: 'Facebook / Local' },
               { id: 'whatnot', label: 'Whatnot (Stream Notes)' },
               { id: 'mercari', label: 'Mercari (+ Tags)' },
               { id: 'social', label: 'Instagram / Social' }
@@ -940,7 +945,7 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
               {format === 'html_preview' && (
                 <div
                   className="p-4 rounded-xl bg-white text-slate-900 border border-slate-800 max-h-96 overflow-y-auto shadow-inner"
-                  dangerouslySetInnerHTML={{ __html: curEbay.htmlBody }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeListingHtml(curEbay.htmlBody) }}
                 />
               )}
 
@@ -949,6 +954,78 @@ export function ListingCopyModal({ isOpen, onClose, item }) {
                   {curEbay.htmlBody}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Facebook Marketplace / Local Pickup Tab Content */}
+          {platform === 'facebook' && (
+            <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 text-blue-300 font-semibold">
+                  <CheckCircle2 className="w-4 h-4 text-blue-400" />
+                  <span>Facebook Marketplace &amp; Local Pickup Optimized</span>
+                </div>
+                <span className="text-[11px] text-blue-300/80">
+                  Zero marketplace commission · Zero shipping label costs · Cash on pickup
+                </span>
+              </div>
+
+              {/* Title Section */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Marketplace Title ({curFacebook.title?.length || 0}/100 chars)
+                  </label>
+                  <button
+                    onClick={() => copyToClipboard(curFacebook.title, 'fb_title')}
+                    className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
+                  >
+                    {copiedField === 'fb_title' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedField === 'fb_title' ? 'Copied!' : 'Copy Title'}</span>
+                  </button>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-200 select-all">
+                  {curFacebook.title}
+                </div>
+              </div>
+
+              {/* Asking Price Section */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Asking Cash Price
+                  </label>
+                  <button
+                    onClick={() => copyToClipboard(curFacebook.price, 'fb_price')}
+                    className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
+                  >
+                    {copiedField === 'fb_price' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedField === 'fb_price' ? 'Copied!' : 'Copy Price'}</span>
+                  </button>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono font-bold text-emerald-400 select-all">
+                  {curFacebook.price}
+                </div>
+              </div>
+
+              {/* Full Description Section */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Listing Description &amp; Pickup Terms
+                  </label>
+                  <button
+                    onClick={() => copyToClipboard(curFacebook.textBody, 'fb_desc')}
+                    className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
+                  >
+                    {copiedField === 'fb_desc' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedField === 'fb_desc' ? 'Copied!' : 'Copy Description'}</span>
+                  </button>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 whitespace-pre-wrap select-all max-h-80 overflow-y-auto leading-relaxed">
+                  {curFacebook.textBody}
+                </div>
+              </div>
             </div>
           )}
 

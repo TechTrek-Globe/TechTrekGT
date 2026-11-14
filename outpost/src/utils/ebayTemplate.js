@@ -50,6 +50,48 @@ export function stripInternalTrackingNotes(text) {
   return cleaned;
 }
 
+/**
+ * Escapes unsafe characters for HTML/XML text nodes and attribute values.
+ *
+ * @param {*} val
+ * @returns {string}
+ */
+export function escapeHtml(val) {
+  if (val == null) return '';
+  return String(val)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Strict HTML allowlist sanitization for listing templates and AI-generated copy.
+ * Strips active scripts, iframes, embed/object tags, inline event handlers (on*),
+ * and dangerous URI schemes while preserving safe layout formatting.
+ *
+ * @param {string} raw
+ * @returns {string}
+ */
+export function sanitizeListingHtml(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  let out = raw;
+  // 1. Strip dangerous tags and their contents
+  out = out.replace(/<\s*(?:script|style|iframe|object|embed|applet|form|svg|math)\b[^>]*>[\s\S]*?<\s*\/\s*(?:script|style|iframe|object|embed|applet|form|svg|math)\s*>/gi, '');
+  // 2. Strip standalone or self-closing disallowed tags
+  out = out.replace(/<\s*\/?\s*(?:script|style|iframe|object|embed|applet|form|input|button|textarea|select|link|meta|base|svg|math|frame|frameset)\b[^>]*>/gi, '');
+  // 3. Strip all inline on* event handler attributes
+  out = out.replace(/\s+on[a-z0-9_-]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
+  // 4. Strip dangerous URI schemes from href/src/action
+  out = out.replace(/\s+(?:href|src|action)\s*=\s*(?:['"]\s*(?:javascript|vbscript|data):[^'"]*['"]|[^\s>]*(?:javascript|vbscript):[^\s>]*)/gi, '');
+  // 5. Strip expression() or url(javascript:...) in style attributes
+  out = out.replace(/style\s*=\s*(['"])(?:(?!\1)[\s\S])*?(?:expression\(|url\s*\(\s*['"]?\s*javascript:)(?:(?!\1)[\s\S])*?\1/gi, '');
+  // 6. Zero em-dash invariant
+  out = out.replace(/[\u2014\u2013]/g, '-');
+  return out.trim();
+}
+
 export const generateEbayListingHtml = (item = {}) => {
   // Parse Outpost attributes if stored as JSON string
   let parsedAttrs = {};
@@ -120,8 +162,8 @@ export const generateEbayListingHtml = (item = {}) => {
 
   // Build Key Details list
   const keyDetailsList = features.length > 0 
-    ? features.map(f => `<li>${f}</li>`).join('') 
-    : `<li>Brand: ${brand || 'N/A'}</li><li>Model: ${model || 'N/A'}</li><li>The item pictured is the exact item you will receive</li>`;
+    ? features.map(f => `<li>${escapeHtml(f)}</li>`).join('') 
+    : `<li>Brand: ${escapeHtml(brand) || 'N/A'}</li><li>Model: ${escapeHtml(model) || 'N/A'}</li><li>The item pictured is the exact item you will receive</li>`;
 
   // Build Authentication block (Conditional)
   const authBlock = authentication ? `
@@ -129,25 +171,25 @@ export const generateEbayListingHtml = (item = {}) => {
     <h3 style="color:rgb(241,193,91); margin-top:0;">Authentication</h3>
     <p style="color:#e0e0e0; margin-bottom:10px;">This item has been professionally authenticated.</p>
     <ul style="margin:0; padding-left:20px; color:#e0e0e0;">
-      <li>Authentication: ${authentication.provider}</li>
-      <li>Certification Number: ${authentication.certNumber}</li>
-      <li>Details: ${authentication.type}</li>
+      <li>Authentication: ${escapeHtml(authentication.provider)}</li>
+      <li>Certification Number: ${escapeHtml(authentication.certNumber)}</li>
+      <li>Details: ${escapeHtml(authentication.type)}</li>
     </ul>
   </div>` : '';
 
   // Build Included Items list
   const includedList = includedItems.length > 0
-    ? includedItems.map(i => `<li>${i}</li>`).join('')
-    : `<li>${title}</li><li>Exact item shown in the photos</li>`;
+    ? includedItems.map(i => `<li>${escapeHtml(i)}</li>`).join('')
+    : `<li>${escapeHtml(title)}</li><li>Exact item shown in the photos</li>`;
 
   // Resolve middle section: AI-generated Condition + Key Details cards, with fallback to static cards
   const hasAiMiddle = typeof item.aiGeneratedMiddleSection === 'string' && item.aiGeneratedMiddleSection.trim().length > 0;
   const middleSectionHtml = hasAiMiddle
-    ? stripInternalTrackingNotes(item.aiGeneratedMiddleSection.trim())
+    ? sanitizeListingHtml(stripInternalTrackingNotes(item.aiGeneratedMiddleSection.trim()))
     : `  <!-- Condition Section -->
   <div style="background-color:rgb(17,17,17); border:1px solid rgb(51,51,51); padding:18px; margin-bottom:15px; border-radius:6px;">
     <h3 style="color:rgb(241,193,91); margin-top:0;">Condition</h3>
-    <p style="margin-bottom:0; color:#e0e0e0;">${conditionDetails}</p>
+    <p style="margin-bottom:0; color:#e0e0e0;">${escapeHtml(conditionDetails)}</p>
   </div>
 
   <!-- Key Details Section -->
@@ -163,8 +205,8 @@ export const generateEbayListingHtml = (item = {}) => {
 
   <!-- Header Banner -->
   <div style="background-color:rgb(17,17,17); border:1px solid rgb(214,181,109); padding:18px; margin-bottom:15px; border-radius:6px; text-align:center;">
-    <h2 style="color:rgb(241,193,91); margin-top:0;${description ? '' : ' margin-bottom:0;'}">${title}</h2>
-    ${description ? `<p style="margin-bottom:0; color:#e0e0e0;">${description}</p>` : ''}
+    <h2 style="color:rgb(241,193,91); margin-top:0;${description ? '' : ' margin-bottom:0;'}">${escapeHtml(title)}</h2>
+    ${description ? `<p style="margin-bottom:0; color:#e0e0e0;">${escapeHtml(description)}</p>` : ''}
   </div>
 
 ${middleSectionHtml}

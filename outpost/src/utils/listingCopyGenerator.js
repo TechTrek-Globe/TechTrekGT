@@ -1,7 +1,7 @@
 import { getCertVerificationUrl } from './certLookup.js';
-import { generateEbayListingHtml, stripInternalTrackingNotes } from './ebayTemplate.js';
+import { generateEbayListingHtml, stripInternalTrackingNotes, escapeHtml, sanitizeListingHtml } from './ebayTemplate.js';
 
-export { generateEbayListingHtml, stripInternalTrackingNotes };
+export { generateEbayListingHtml, stripInternalTrackingNotes, escapeHtml, sanitizeListingHtml };
 
 /**
  * Generate multi-channel formatted listing copy for sports cards, memorabilia, and general/Amazon inventory.
@@ -65,7 +65,9 @@ export function generateEbayCopy(item, options = {}) {
     title += ` #${certNumber}`;
   }
   if (title.length > 80) {
-    title = title.substring(0, 80).trim();
+    const truncated = title.substring(0, 80);
+    const lastSpace = truncated.lastIndexOf(' ');
+    title = (lastSpace > 40 ? truncated.substring(0, lastSpace) : truncated).trim();
   }
 
   // Plain Text Version
@@ -98,7 +100,7 @@ export function generateEbayCopy(item, options = {}) {
     textLines.push('');
   }
 
-  const rawDescription = (options.description || '').trim();
+  const rawDescription = (options.description || options.notes || item.description || item.notes || '').trim();
   const cleanDescription = stripInternalTrackingNotes(rawDescription);
 
   if (cleanDescription) {
@@ -173,10 +175,10 @@ export function generateEbayCopy(item, options = {}) {
 
   const tableRowsHtml = itemDetailsRows.map(r => `      <tr>
         <td style="width: 34%; padding: 11px; background-color: rgb(247, 242, 232); color: rgb(17, 17, 17); border: 1px solid rgb(214, 181, 109); font-weight: bold; vertical-align: top;">
-          ${r.label}
+          ${escapeHtml(r.label)}
         </td>
         <td style="padding: 11px; background-color: rgb(255, 255, 255); color: rgb(17, 17, 17); border: 1px solid rgb(221, 221, 221); vertical-align: top;">
-          ${r.value}
+          ${escapeHtml(r.value)}
         </td>
       </tr>`).join('\n');
 
@@ -199,12 +201,16 @@ export function generateEbayCopy(item, options = {}) {
     aiGeneratedMiddleSection: options.aiGeneratedMiddleSection || item.aiGeneratedMiddleSection || ''
   });
 
+  const storeBanner = options.storeBannerUrl || 'https://i.ebayimg.com/images/g/fe4AAeSwSO1q8G1~/s-l1600.webp';
+  const storeName = options.storeName || 'TechTrek Outpost';
+  const storeUrl = options.storeUrl || 'https://www.ebay.com/usr/tt_globetrotter';
+
   // Full HTML Preview (includes header banner, delimiters, middle insertHtml, and compact footer)
   const htmlBody = `<div style="max-width: 900px; margin: 0 auto; font-family: Arial, Helvetica, sans-serif; color: #222222; box-sizing: border-box; line-height: 1.5;">
 
   <!-- Header Banner -->
   <div style="width: 100%; margin-bottom: 20px; border-bottom: 2px solid #e5e5e5; padding-bottom: 12px; box-sizing: border-box;">
-    <img src="https://i.ebayimg.com/images/g/fe4AAeSwSO1q8G1~/s-l1600.webp" alt="TechTrek Outpost" width="950" height="100" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;">
+    <img src="${escapeHtml(storeBanner)}" alt="${escapeHtml(storeName)}" width="950" height="100" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;">
   </div>
 
   <!-- Content Container -->
@@ -212,7 +218,7 @@ export function generateEbayCopy(item, options = {}) {
 
 <!-- =======================================================
        ADD LISTING INFO HERE
-======================================================= -->
+====================================================== -->
 
 ${insertHtml}
 
@@ -227,10 +233,10 @@ ${insertHtml}
     <tbody>
       <tr>
         <td style="color: #ffffff; font-size: 13px; font-family: Arial, Helvetica, sans-serif; text-align: left; vertical-align: middle;">
-          <strong style="color: #f1c15b;">TechTrek Outpost</strong> &nbsp;|&nbsp; Clear Item Details &nbsp;•&nbsp; Exact Photos &nbsp;•&nbsp; Carefully Packed
+          <strong style="color: #f1c15b;">${escapeHtml(storeName)}</strong> &nbsp;|&nbsp; Clear Item Details &nbsp;•&nbsp; Exact Photos &nbsp;•&nbsp; Carefully Packed
         </td>
         <td style="text-align: right; vertical-align: middle;">
-          <a href="https://www.ebay.com/usr/tt_globetrotter" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 7px 15px; background-color: #b37a16; color: #ffffff !important; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 4px; white-space: nowrap; font-family: Arial, Helvetica, sans-serif;">
+          <a href="${escapeHtml(storeUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 7px 15px; background-color: #b37a16; color: #ffffff !important; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 4px; white-space: nowrap; font-family: Arial, Helvetica, sans-serif;">
             Browse All Listings
           </a>
         </td>
@@ -241,6 +247,90 @@ ${insertHtml}
 </div>`.trim();
 
   return { title, textBody, htmlBody, insertHtml };
+}
+
+export function generateFacebookCopy(item = {}, options = {}) {
+  const titleInput = (options.title || item.item_name || '').trim();
+  const brand = (options.brand || '').trim();
+  const condition = options.condition || item.condition || 'Brand New / Excellent';
+  const athlete = (options.athlete || item.athlete_person || '').trim();
+  const rawAuth = (options.authenticator || item.authenticator || '').trim();
+  const certNumber = (options.certNumber || item.cert_number) ? String(options.certNumber || item.cert_number).trim() : '';
+  const isCertified = Boolean(rawAuth && !['Raw', 'Uncertified', 'None', 'Other', 'N/A'].includes(rawAuth));
+  const authenticator = isCertified ? rawAuth : '';
+
+  // Calculate or format asking price
+  const rawPrice = options.localPrice ?? options.price ?? item.current_list_price ?? item.suggested_list_price ?? item.unit_price ?? 0;
+  const numPrice = Number(rawPrice) || 0;
+  const priceFormatted = numPrice > 0 ? `$${numPrice.toFixed(0)}` : '';
+  const priceExact = numPrice > 0 ? `$${numPrice.toFixed(2)}` : '$0.00';
+
+  // Optimized Facebook Marketplace Title (up to 100 chars, readable)
+  let title = titleInput;
+  if (brand && !title.toLowerCase().includes(brand.toLowerCase())) {
+    title = `${brand} - ${title}`;
+  }
+  if (condition.toLowerCase().includes('brand new') && !title.toLowerCase().includes('new')) {
+    title = `${title} (New)`;
+  }
+  if (title.length > 100) {
+    const truncated = title.substring(0, 100);
+    const lastSpace = truncated.lastIndexOf(' ');
+    title = (lastSpace > 50 ? truncated.substring(0, lastSpace) : truncated).trim();
+  }
+
+  // Feature Bullet Points
+  let features = [];
+  if (Array.isArray(options.features)) {
+    features = options.features.filter(Boolean);
+  } else if (typeof options.features === 'string' && options.features.trim()) {
+    features = options.features.split('\n').map(s => s.trim().replace(/^[-•*]\s*/, '')).filter(Boolean);
+  }
+
+  const rawDescription = (options.description || options.notes || item.description || item.notes || '').trim();
+  const cleanDescription = stripInternalTrackingNotes(rawDescription);
+
+  const pickupLocation = options.pickupLocation || 'Public meeting location / local pickup';
+  const paymentTerms = options.paymentTerms || 'Cash, Venmo, or Zelle accepted upon pickup';
+
+  const bodyLines = [
+    titleInput,
+    priceFormatted ? `Price: ${priceFormatted} (${priceExact})` : null,
+    `Condition: ${condition}`,
+    ''
+  ];
+
+  if (athlete) {
+    bodyLines.push(`Athlete / Subject: ${athlete}`);
+  }
+  if (isCertified || certNumber) {
+    bodyLines.push(`Authentication: ${authenticator || 'Certified'}${certNumber ? ` (Cert #${certNumber})` : ''}`);
+    bodyLines.push('100% Guaranteed authentic.');
+  }
+
+  if (features.length > 0) {
+    bodyLines.push('', 'Highlights & Features:');
+    features.forEach(f => bodyLines.push(`• ${f}`));
+  }
+
+  if (cleanDescription) {
+    bodyLines.push('', 'Details:', cleanDescription);
+  }
+
+  bodyLines.push(
+    '',
+    'Local Pickup & Terms:',
+    `• ${pickupLocation}`,
+    `• ${paymentTerms}`,
+    '• First come, first served. Serious inquiries only. No trades.',
+    '',
+    'Feel free to message with any questions. Thanks for looking!'
+  );
+
+  const textBody = bodyLines.filter(line => line !== null).join('\n');
+  const description = textBody;
+
+  return { title, price: priceExact, description, textBody };
 }
 
 export function generateWhatnotCopy(item, options = {}) {

@@ -4,6 +4,7 @@ import {
   RefreshCw, Search, Loader2, Unlink, Zap
 } from 'lucide-react';
 import { getEbayOAuthStatus, findEbayListings, syncAllEbayItems, getGatewayBase } from '../utils/auctionApi';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 // T-10 item 9: resolved through the shared helper so there is no second
 // hardcoded hostname to drift.
@@ -27,6 +28,7 @@ export function EbayConnectBanner({ onFindListings }) {
   const [syncMsg, setSyncMsg] = useState('');
   const [error, setError] = useState('');
   const [disconnecting, setDisconnecting] = useState(false);
+  const [confirmDisconnectOpen, setConfirmDisconnectOpen] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -75,15 +77,20 @@ export function EbayConnectBanner({ onFindListings }) {
     window.location.href = `${GATEWAY_BASE}/api/ebay/oauth/start`;
   };
 
-  const handleDisconnect = async () => {
-    if (!window.confirm('Disconnect your eBay account? Webhooks and fee reconciliation will stop working.')) return;
+  const handleDisconnect = () => {
+    setConfirmDisconnectOpen(true);
+  };
+
+  const executeDisconnect = async () => {
+    setConfirmDisconnectOpen(false);
     setDisconnecting(true);
     setError('');
     setSyncMsg('');
     try {
       const res = await fetch(`${GATEWAY_BASE}/api/ebay/oauth/disconnect`, {
         method: 'DELETE',
-        credentials: 'include'
+        credentials: 'include',
+        signal: globalThis.AbortSignal ? globalThis.AbortSignal.timeout(15000) : undefined
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -303,6 +310,17 @@ export function EbayConnectBanner({ onFindListings }) {
           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmDisconnectOpen}
+        title="Disconnect eBay Account"
+        message="Are you sure you want to disconnect your eBay account? Webhooks, automated inventory synchronization, and fee reconciliation will stop working."
+        confirmLabel="Disconnect eBay"
+        variant="danger"
+        loading={disconnecting}
+        onConfirm={executeDisconnect}
+        onCancel={() => setConfirmDisconnectOpen(false)}
+      />
     </div>
   );
 }

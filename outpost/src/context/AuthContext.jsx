@@ -47,6 +47,26 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // Listen for unauthorized 401/403 session expiration events dispatched from apiFetch
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      try {
+        sessionStorage.removeItem('outpost_last_activity');
+        sessionStorage.removeItem('outpost_remember_me');
+      } catch (_) {}
+      setIsRememberMe(false);
+      setIsAuthenticated(false);
+      setUser(null);
+      if (typeof window !== 'undefined') {
+        window.history.pushState({}, '', '/outpost');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+    };
+
+    window.addEventListener('outpost:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('outpost:unauthorized', handleUnauthorized);
+  }, []);
+
   // Session Policy Decision (T-14 / SEC-020):
   // Option (a) - Honour rememberMe. When rememberMe is checked, the 15-minute client inactivity
   // timeout is bypassed to align with the 30-day session cookie and allow 30-60 minute background
@@ -101,7 +121,10 @@ export function AuthProvider({ children }) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (data.requiresReset || data.forcePasswordReset) {
-        window.location.href = `${getApiUrl('/reset-password')}?email=${encodeURIComponent(email)}&reason=legacy_hash`;
+        if (typeof window !== 'undefined') {
+          window.history.pushState({}, '', `/outpost/reset-password?email=${encodeURIComponent(email)}&reason=legacy_hash`);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
         return { requiresReset: true };
       }
       throw new Error(data.error || `Login failed (HTTP ${res.status})`);
@@ -240,6 +263,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', '/outpost');
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
     try {
       await fetch(getApiUrl('/api/auth/logout'), {

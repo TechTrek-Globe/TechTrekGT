@@ -224,6 +224,11 @@ export async function onRequestPost(context) {
     const liveImageUrl = normalizeHttps(liveListing?.image_url);
     if (liveImageUrl) {
       attrs.ebay_image_url = liveImageUrl;
+      await env.DB.prepare(
+        `INSERT INTO auction_item_images (item_id, user_id, sort_order, image_url, is_primary)
+         VALUES (?, ?, 0, ?, 1)
+         ON CONFLICT(item_id, sort_order) DO UPDATE SET image_url = excluded.image_url, is_primary = 1`
+      ).bind(itemId, payload.userId, liveImageUrl).run().catch(() => {});
     }
 
     // Clean up phantom sale records if reverting out of Sold state
@@ -241,6 +246,7 @@ export async function onRequestPost(context) {
         UPDATE auction_items SET
           ebay_listing_id = COALESCE(?, ebay_listing_id),
           current_list_price = COALESCE(?, current_list_price),
+          image_url = COALESCE(image_url, ?),
           date_listed = ?,
           status = ?,
           actual_sell_price = ?,
@@ -266,6 +272,7 @@ export async function onRequestPost(context) {
       `).bind(
         targetListingId || null,
         newPrice || null,
+        liveImageUrl || null,
         newDateListed,
         newStatus,
         nextActualSellPrice,

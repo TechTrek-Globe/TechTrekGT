@@ -35,25 +35,31 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
   // Extract primary image URL safely from item or form
   let rawImg = item?.image_url || null;
   let imageSource = null;
-  if (!rawImg && item?.attributes) {
+  let additionalImages = [];
+  if (item?.attributes) {
     try {
       const parsed = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : item.attributes;
-      if (parsed?.ebay_image_url) {
-        rawImg = parsed.ebay_image_url;
-        imageSource = 'eBay Active Listing';
-      } else if (parsed?.image_url) {
-        rawImg = parsed.image_url;
-        imageSource = 'Amazon Product';
-      } else if (Array.isArray(parsed?.image_urls) && parsed.image_urls[0]) {
-        rawImg = parsed.image_urls[0];
-        imageSource = 'Amazon Product';
+      if (Array.isArray(parsed?.image_urls)) {
+        additionalImages = parsed.image_urls.filter(Boolean);
+      }
+      if (!rawImg) {
+        if (parsed?.ebay_image_url) {
+          rawImg = parsed.ebay_image_url;
+          imageSource = 'eBay Active Listing';
+        } else if (parsed?.image_url) {
+          rawImg = parsed.image_url;
+          imageSource = 'Amazon Product';
+        } else if (additionalImages[0]) {
+          rawImg = additionalImages[0];
+          imageSource = 'Amazon Product';
+        }
       }
     } catch (_) {}
   }
   if (!imageSource && rawImg) {
     imageSource = rawImg.includes('ebayimg') ? 'eBay Active Listing' : (rawImg.includes('amazon') ? 'Amazon Product' : 'Outpost Media');
   }
-  const imageUrl = normalizeHttps(rawImg);
+  const imageUrl = normalizeHttps(form.image_url || rawImg);
 
   return (
     <div className="space-y-4">
@@ -106,6 +112,45 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
           )}
         </div>
       </div>
+
+      {/* Gallery Strip if multiple image assets exist */}
+      {additionalImages.length > 1 && (
+        <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Asset Gallery ({additionalImages.length} photos)
+            </span>
+            <span className="text-[10px] text-slate-500">Click to set as primary photo</span>
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {additionalImages.map((imgUrl, idx) => {
+              const isSelected = imgUrl === imageUrl;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    updateField('image_url', imgUrl);
+                    setImgError(false);
+                  }}
+                  className={`relative w-14 h-14 rounded-lg border overflow-hidden flex-shrink-0 transition-all ${
+                    isSelected
+                      ? 'border-amber-400 ring-2 ring-amber-400/30'
+                      : 'border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <img src={imgUrl} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-contain p-0.5" />
+                  {isSelected && (
+                    <span className="absolute bottom-0 inset-x-0 bg-amber-500 text-[8px] font-bold text-slate-950 text-center py-0.5">
+                      Primary
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 1. Primary Title / Description */}
       <div>

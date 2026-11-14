@@ -28,8 +28,9 @@ export function AppLayout({ activeView, onNavigate, children }) {
   const [financeSyncOpen, setFinanceSyncOpen] = useState(false);
   
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'jgk1865@gmail.com';
+  const isAdmin = user?.role === 'admin' || Boolean(user?.is_admin) || (adminEmail && user?.email?.toLowerCase() === adminEmail.toLowerCase());
   const visibleNavItems = [...NAV_ITEMS];
-  if (user?.email?.toLowerCase() === adminEmail.toLowerCase()) {
+  if (isAdmin) {
     visibleNavItems.push({ id: 'admin', label: 'Admin', icon: ShieldCheck });
   }
   const [taxReportOpen, setTaxReportOpen] = useState(false);
@@ -45,6 +46,13 @@ export function AppLayout({ activeView, onNavigate, children }) {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
         togglePalette();
+      } else if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && !document.activeElement?.isContentEditable) {
+        const searchInput = document.querySelector('input[placeholder*="Search"], input[type="search"]');
+        if (searchInput) {
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.select?.();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);

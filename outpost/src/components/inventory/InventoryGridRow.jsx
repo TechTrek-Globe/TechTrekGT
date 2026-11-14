@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag, RefreshCw, Shield, ShieldCheck, ExternalLink, CircleDollarSign, Package } from 'lucide-react';
+import { Copy, DollarSign, Trash2, Pencil, Loader2, Edit3, ShoppingBag, RefreshCw, Shield, ShieldCheck, ExternalLink, CircleDollarSign, Package, Lock, Unlock } from 'lucide-react';
 import { InlineEditCell } from './InlineEditCell';
 import { InlineStatusSelect } from './InlineStatusSelect';
 import { InlineSelectCell } from './InlineSelectCell';
@@ -8,6 +8,7 @@ import { cleanItemDescription, cleanAthleteName } from '../../utils/spreadsheetP
 import { LISTING_FORMATS } from '../../utils/constants';
 import { fmtCurrency } from '../../utils/formulaPreview';
 import { getCertVerificationUrl } from '../../utils/certLookup';
+import { daysBetween } from '../../../functions/utils/auction.js';
 
 function ItemThumbnailCell({ item, onShowTooltip, onHideTooltip, onClick }) {
   const [imgError, setImgError] = useState(false);
@@ -81,6 +82,10 @@ export function InventoryGridRow({
     (item.notes && item.notes.includes('ASIN:')) ||
     (item.attributes && (typeof item.attributes === 'string' ? item.attributes.includes('amazon_vinescout') : item.attributes?.source === 'amazon_vinescout'))
   );
+
+  // Compute aging in inventory
+  const listedDate = item.date_listed || item.date_acquired || item.purchase_date || item.created_at;
+  const daysListed = listedDate ? (daysBetween(listedDate, new Date().toISOString()) ?? 0) : 0;
 
   return (
     <tr className={`border-b border-slate-800/70 transition-colors group ${rowBg} hover:bg-amber-500/[0.08]`}>
@@ -257,6 +262,41 @@ export function InventoryGridRow({
             onUpdated={onUpdateItem}
             onMarkSold={onMarkSold}
           />
+          {item.status !== 'Sold' && daysListed > 0 && (
+            <div className="flex items-center gap-1 mt-1">
+              <span
+                className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold border tracking-wide ${
+                  daysListed > 90
+                    ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                    : daysListed > 60
+                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    : daysListed > 30
+                    ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                }`}
+                title={`Listed/Acquired: ${listedDate ? listedDate.slice(0, 10) : ''} (${daysListed} days in inventory)`}
+              >
+                {daysListed}d
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onUpdateItem) {
+                    onUpdateItem(item.id, { reprice_locked: item.reprice_locked ? 0 : 1 });
+                  }
+                }}
+                className={`p-0.5 rounded transition-colors ${
+                  item.reprice_locked
+                    ? 'text-amber-400 hover:text-amber-300 bg-amber-500/10'
+                    : 'text-slate-600 hover:text-slate-400'
+                }`}
+                title={item.reprice_locked ? 'Price locked against automated markdowns (click to unlock)' : 'Click to lock price against repricing'}
+              >
+                {item.reprice_locked ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
+              </button>
+            </div>
+          )}
         </td>
       )}
 

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { ALL_STATUSES, LISTING_FORMATS, LISTING_STATUSES } from '../../utils/constants';
 import { fmtCurrency, formatPercent } from '../../utils/formulaPreview';
-import { computeTargetPriceFromMargin } from '../../utils/feeEngine';
+import { computeTargetPriceFromMargin, compareChannelEconomics } from '../../utils/feeEngine';
 import { DEFAULT_PLATFORM_FEE_PCT, DEFAULT_PLATFORM_FLAT_FEE } from '../../../functions/utils/constants.js';
 import { MarginHealthBadge } from '../inventory/MarginHealthBadge';
 
@@ -133,6 +133,20 @@ export function EditTabFinancials({
     setAppliedSuggested(true);
     setTimeout(() => setAppliedSuggested(false), 3000);
   };
+
+  // Channel Routing Economics (eBay vs Local FB Marketplace)
+  const channelEconomics = useMemo(() => {
+    return compareChannelEconomics({
+      current_list_price: sellPrice,
+      unit_price: basePrice,
+      true_total_cost: landedCost,
+      buyer_shipping_cost: shippingCharged,
+      est_shipping_cost: estShippingCost,
+      platform_fee_pct: platformFeePct,
+      platform_flat_fee: platformFlatFee,
+      ebay_promoted_rate: promotedRate
+    });
+  }, [sellPrice, basePrice, landedCost, shippingCharged, estShippingCost, platformFeePct, platformFlatFee, promotedRate]);
 
   // Robust string normalizer
   const normalizeText = (str) =>
@@ -1667,6 +1681,124 @@ export function EditTabFinancials({
               {appliedSuggested ? <CheckCircle2 className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
               <span>{appliedSuggested ? 'Applied to List Price!' : 'Apply Suggested as List Price'}</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* CHANNEL ROUTING & LOCAL PROFIT ARBITRAGE CARD */}
+      {!isSold && channelEconomics && (
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-blue-500/30 space-y-3.5 shadow-md">
+          <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                <ShoppingBag className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-blue-300 uppercase tracking-wider block">
+                  Channel Routing &amp; Profit Comparison
+                </span>
+                <span className="text-[10.5px] text-slate-400">
+                  Shipped eBay vs. zero-fee Facebook Marketplace / Local Pickup arbitrage
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Top Recommendation</span>
+              <span className={`text-xs font-black px-2.5 py-0.5 rounded-full border ${
+                channelEconomics.recommended_channel.includes('Facebook')
+                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              }`}>
+                {channelEconomics.recommended_channel}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            {/* Channel 1: eBay Shipped */}
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-amber-400" />
+                  eBay (Shipped)
+                </span>
+                <span className="font-mono font-bold text-slate-300">
+                  {fmtCurrency(channelEconomics.ebay.gross_revenue)}
+                </span>
+              </div>
+              <div className="space-y-1 text-[11px] font-mono text-slate-400">
+                <div className="flex justify-between">
+                  <span>Marketplace Fees:</span>
+                  <span className="text-red-400">-{fmtCurrency(channelEconomics.ebay.platform_fees)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Outbound Label:</span>
+                  <span className="text-red-400">-{fmtCurrency(channelEconomics.ebay.shipping_cost)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Landed COGS:</span>
+                  <span className="text-blue-400">-{fmtCurrency(channelEconomics.cogs)}</span>
+                </div>
+                <div className="pt-1 border-t border-slate-800 flex justify-between font-bold text-slate-200">
+                  <span>Net Profit:</span>
+                  <span className={channelEconomics.ebay.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                    {channelEconomics.ebay.net_profit >= 0 ? `+${fmtCurrency(channelEconomics.ebay.net_profit)}` : fmtCurrency(channelEconomics.ebay.net_profit)}
+                    <span className="text-[10px] text-slate-400 font-normal ml-1">
+                      ({formatPercent(channelEconomics.ebay.margin_pct, 1)})
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Channel 2: Facebook Marketplace / Local Pickup */}
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-blue-500/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-blue-300 flex items-center gap-1.5">
+                  <ShoppingBag className="w-3.5 h-3.5 text-blue-400" />
+                  Facebook / Local Pickup
+                </span>
+                <span className="font-mono font-bold text-emerald-400">
+                  {fmtCurrency(channelEconomics.local.gross_revenue)}
+                </span>
+              </div>
+              <div className="space-y-1 text-[11px] font-mono text-slate-400">
+                <div className="flex justify-between">
+                  <span>Marketplace Fees:</span>
+                  <span className="text-emerald-400">$0.00 (0%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Outbound Label:</span>
+                  <span className="text-emerald-400">$0.00 (Local)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Landed COGS:</span>
+                  <span className="text-blue-400">-{fmtCurrency(channelEconomics.cogs)}</span>
+                </div>
+                <div className="pt-1 border-t border-slate-800 flex justify-between font-bold text-slate-200">
+                  <span>Net Profit:</span>
+                  <span className={channelEconomics.local.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                    {channelEconomics.local.net_profit >= 0 ? `+${fmtCurrency(channelEconomics.local.net_profit)}` : fmtCurrency(channelEconomics.local.net_profit)}
+                    <span className="text-[10px] text-slate-400 font-normal ml-1">
+                      ({formatPercent(channelEconomics.local.margin_pct, 1)})
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Recommendation Banner */}
+          <div className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between flex-wrap gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <span className="text-slate-300">{channelEconomics.reason}</span>
+            </div>
+            {channelEconomics.net_advantage !== 0 && (
+              <span className="font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Local Delta: {channelEconomics.net_advantage > 0 ? `+${fmtCurrency(channelEconomics.net_advantage)}` : fmtCurrency(channelEconomics.net_advantage)}
+              </span>
+            )}
           </div>
         </div>
       )}

@@ -18,12 +18,12 @@ import { AddInvoiceModal } from './AddInvoiceModal';
 import { ViewInvoiceModal } from './ViewInvoiceModal';
 import { AmazonItemModal } from './AmazonItemModal';
 import { SpreadsheetImporterModal } from './SpreadsheetImporterModal';
-import { LogSaleModal } from './LogSaleModal';
 import { ListingCopyModal } from './ListingCopyModal';
 import { EditItemModal } from './EditItemModal';
 import { DelistPendingAlert } from './DelistPendingAlert';
-import { EbayListingIdModal } from './EbayListingIdModal';
 import { SoldEbayVineMatcherModal } from './inventory/SoldEbayVineMatcherModal';
+import { AgingMarkdownModal } from './inventory/AgingMarkdownModal';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 export function InventoryHubView({ onNavigate }) {
   const {
@@ -43,6 +43,7 @@ export function InventoryHubView({ onNavigate }) {
     loading, error,
     setPendingSaleItem,
     userSettings, setUserSettings,
+    portfolioKpis,
     fetchItems, refreshAll,
     updateItemLocal,
     ebaySyncing, handleSyncEbay
@@ -74,14 +75,13 @@ export function InventoryHubView({ onNavigate }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [amazonModalOpen, setAmazonModalOpen] = useState(false);
   const [importerOpen, setImporterOpen] = useState(false);
-  const [saleModalOpen, setSaleModalOpen] = useState(false);
-  const [itemToSell, setItemToSell] = useState(null);
+  const [agingModalOpen, setAgingModalOpen] = useState(false);
   const [editModalItem, setEditModalItem] = useState(null);
   const [editModalTab, setEditModalTab] = useState('financial');
   const [copyModalItem, setCopyModalItem] = useState(null);
   const [queryEditModal, setQueryEditModal] = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const [listingIdModalItem, setListingIdModalItem] = useState(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [delistDismissed, setDelistDismissed] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState(null); // { invoiceRef, invoiceId }
 
@@ -96,15 +96,19 @@ export function InventoryHubView({ onNavigate }) {
     [items]
   );
 
-  const totalCost = useMemo(() =>
-    activeItems.reduce((s, it) => s + (Number(it.true_total_cost) || 0), 0),
-    [activeItems]
-  );
+  const totalCost = useMemo(() => {
+    if (portfolioKpis?.total_landed_cost != null && (!statusFilter || statusFilter === 'All')) {
+      return portfolioKpis.total_landed_cost;
+    }
+    return activeItems.reduce((s, it) => s + (Number(it.true_total_cost) || 0), 0);
+  }, [portfolioKpis, statusFilter, activeItems]);
 
-  const totalListValue = useMemo(() =>
-    activeItems.reduce((s, it) => s + (Number(it.current_list_price) || Number(it.suggested_list_price) || 0), 0),
-    [activeItems]
-  );
+  const totalListValue = useMemo(() => {
+    if (portfolioKpis?.total_list_value != null && (!statusFilter || statusFilter === 'All')) {
+      return portfolioKpis.total_list_value;
+    }
+    return activeItems.reduce((s, it) => s + (Number(it.current_list_price) || Number(it.suggested_list_price) || 0), 0);
+  }, [portfolioKpis, statusFilter, activeItems]);
 
   const { totalPotentialProfit, overallMargin, itemsWithComps } = useMemo(() => {
     let profit = 0;
@@ -128,12 +132,18 @@ export function InventoryHubView({ onNavigate }) {
   const delistPendingItems = items.filter(it => it.status === 'delist_pending');
 
   // --- Actions ---
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this item completely?')) return;
+  const handleDelete = (id) => {
+    setPendingDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
     setDeleting(id);
     setActionError('');
     try {
       await deleteItem(id);
+      setPendingDeleteId(null);
       refreshAll();
     } catch (e) {
       setActionError(`Delete failed: ${e.message}`);
@@ -318,6 +328,7 @@ export function InventoryHubView({ onNavigate }) {
         onSyncEbay={handleSyncEbayWithToast}
         syncing={ebaySyncing}
         onOpenSoldMatcher={() => setSoldMatcherOpen(true)}
+        onOpenAgingMarkdown={() => setAgingModalOpen(true)}
       />
 
       {/* eBay Sync result toast */}
@@ -424,13 +435,6 @@ export function InventoryHubView({ onNavigate }) {
         onClose={() => setImporterOpen(false)}
         onImportSuccess={() => fetchItems(1)}
       />
-      <LogSaleModal
-        isOpen={saleModalOpen}
-        item={itemToSell}
-        platforms={platforms}
-        onClose={() => { setSaleModalOpen(false); setItemToSell(null); }}
-        onCreated={() => fetchItems(pagination.page)}
-      />
       <ListingCopyModal
         isOpen={Boolean(copyModalItem)}
         item={copyModalItem}
@@ -451,19 +455,27 @@ export function InventoryHubView({ onNavigate }) {
         setQueryEditModal={setQueryEditModal}
         onConfirmSearch={handleConfirmSearch}
       />
-      <EbayListingIdModal
-        isOpen={Boolean(listingIdModalItem)}
-        item={listingIdModalItem}
-        onClose={() => setListingIdModalItem(null)}
-        onSaved={(id, patch) => {
-          handleItemLocalUpdate(id, patch);
-          setListingIdModalItem(null);
-        }}
-      />
       <SoldEbayVineMatcherModal
         isOpen={soldMatcherOpen}
         onClose={() => setSoldMatcherOpen(false)}
         onMatched={refreshAll}
+      />
+      <AgingMarkdownModal
+        isOpen={agingModalOpen}
+        onClose={() => setAgingModalOpen(false)}
+        onApplied={() => {
+          refreshAll();
+        }}
+      />
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteId)}
+        title="Delete Inventory Item"
+        message="Are you sure you want to completely delete this item? This action will remove the item record, image links, and specs."
+        confirmLabel="Delete Item"
+        variant="danger"
+        loading={Boolean(deleting)}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
       />
     </div>
   );

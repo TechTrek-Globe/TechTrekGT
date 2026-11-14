@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateEbayListingHtml, stripInternalTrackingNotes } from '../src/utils/ebayTemplate.js';
+import { generateEbayListingHtml, stripInternalTrackingNotes, escapeHtml, sanitizeListingHtml } from '../src/utils/ebayTemplate.js';
 import { generateEbayCopy } from '../src/utils/listingCopyGenerator.js';
 import { COMPILED_ROUTES, matchRoute } from '../src/worker.js';
 import { onRequestPost as generateEbayDetailsHandler } from '../functions/api/ai/generate-ebay-details.js';
@@ -145,6 +145,36 @@ test('[AI-001] eBay Listing HTML Generator with AI Middle Section', async (t) =>
     assert.equal(res.status, 503);
     const data = await res.json();
     assert.ok(data.error.includes('missing GEMINI_API_KEY'));
+  });
+
+  await t.test('escapeHtml neutralizes HTML special characters', () => {
+    assert.equal(escapeHtml('<script>alert("XSS")</script> & \'test\''), '&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt; &amp; &#39;test&#39;');
+    assert.equal(escapeHtml(null), '');
+    assert.equal(escapeHtml(undefined), '');
+  });
+
+  await t.test('sanitizeListingHtml neutralizes XSS payloads while preserving safe markup', () => {
+    const malicious = '<div style="color:red;"><script>alert(1)</script><p>Safe text</p><img src=x onerror=alert(2)><a href="javascript:alert(3)">Click</a><iframe src="//evil.com"></iframe></div>';
+    const cleaned = sanitizeListingHtml(malicious);
+    assert.ok(!cleaned.includes('<script>'), 'Must strip script tags');
+    assert.ok(!cleaned.includes('alert(1)'), 'Must strip script contents');
+    assert.ok(!cleaned.includes('onerror='), 'Must strip on* attributes');
+    assert.ok(!cleaned.includes('javascript:'), 'Must strip javascript: schemes');
+    assert.ok(!cleaned.includes('<iframe'), 'Must strip iframe tags');
+    assert.ok(cleaned.includes('<p>Safe text</p>'), 'Must preserve safe paragraph markup');
+  });
+
+  await t.test('generateEbayCopy truncates titles on word boundaries <= 80 characters without mid-word cuts', () => {
+    const item = {
+      item_name: 'Very Long Comprehensive Product Title With Many Descriptive Keywords That Exceeds Eighty Characters Easily'
+    };
+    const copy = generateEbayCopy(item);
+    assert.ok(copy.title.length <= 80, `Title length (${copy.title.length}) must be <= 80`);
+    assert.ok(!copy.title.endsWith('...'), 'Must not truncate with ellipsis');
+    // Ensure last character is not part of a broken word (matches end of a full word)
+    const words = item.item_name.split(' ');
+    const titleWords = copy.title.split(' ');
+    assert.equal(titleWords[titleWords.length - 1], words[titleWords.length - 1], 'Last word in title must be a whole word from source');
   });
 });
 

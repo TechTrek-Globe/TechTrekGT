@@ -18,6 +18,7 @@ import { EditTabDetails } from './edit/EditTabDetails';
 import { EditTabComps } from './edit/EditTabComps';
 import { EditTabPerformance } from './edit/EditTabPerformance';
 import { EditTabVineScout } from './edit/EditTabVineScout';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 const PLATFORM_FEE_PRESETS = {
   // T-10 item 3: the eBay preset uses the shared default rather than an inline
@@ -134,6 +135,7 @@ export function EditItemModal({
   // Completed sale & reconciled fee ledger state
   const [saleData, setSaleData] = useState(null);
   const [reconData, setReconData] = useState(null);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   // Auto-saving state for immediate seller assumption synchronization
   const [autoSaving, setAutoSaving] = useState(false);
@@ -329,9 +331,12 @@ export function EditItemModal({
       setReconData(initialRecon);
 
       if (item.status === 'Sold' || item.sale_id || populated.status === 'Sold') {
-        getItem(item.id).then(res => {
-          if (res?.sale) setSaleData(res.sale);
-          if (res?.reconciliation) setReconData(res.reconciliation);
+        const reqItemId = item.id;
+        getItem(reqItemId).then(res => {
+          if (lastItemIdRef.current === reqItemId) {
+            if (res?.sale) setSaleData(res.sale);
+            if (res?.reconciliation) setReconData(res.reconciliation);
+          }
         }).catch(err => {
           console.warn('[EditItemModal] Failed to fetch sale details:', err);
         });
@@ -391,8 +396,8 @@ export function EditItemModal({
   // Handle escape key
   const handleClose = useCallback(() => {
     if (isDirty) {
-      const confirmDiscard = window.confirm('You have unsaved changes. Discard changes and close?');
-      if (!confirmDiscard) return;
+      setShowDiscardConfirm(true);
+      return;
     }
     onClose();
   }, [isDirty, onClose]);
@@ -999,6 +1004,19 @@ export function EditItemModal({
           onOpenCopyModal={onOpenCopyModal}
         />
       </div>
+
+      <ConfirmModal
+        isOpen={showDiscardConfirm}
+        title="Discard Unsaved Changes"
+        message="You have unsaved changes on this item. Are you sure you want to discard your edits and close?"
+        confirmLabel="Discard & Close"
+        variant="warning"
+        onConfirm={() => {
+          setShowDiscardConfirm(false);
+          onClose();
+        }}
+        onCancel={() => setShowDiscardConfirm(false)}
+      />
     </div>
   );
 }

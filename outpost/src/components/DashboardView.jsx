@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DollarSign, TrendingUp, Package, Gavel, Clock, BarChart2,
   RefreshCw, Loader2, AlertCircle,
@@ -12,17 +12,25 @@ export function DashboardView({ onNavigate }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const fetchRequestIdRef = useRef(0);
 
   const fetchDashboard = useCallback(async () => {
+    const reqId = ++fetchRequestIdRef.current;
     setLoading(true);
     setError('');
     try {
       const res = await getDashboard();
-      setData(res);
+      if (reqId === fetchRequestIdRef.current) {
+        setData(res);
+      }
     } catch (err) {
-      setError(err.message || 'Failed to load dashboard.');
+      if (reqId === fetchRequestIdRef.current) {
+        setError(err.message || 'Failed to load dashboard.');
+      }
     } finally {
-      setLoading(false);
+      if (reqId === fetchRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 

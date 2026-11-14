@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Receipt, ExternalLink, Calendar, DollarSign, Package, Loader2, AlertCircle, FileText } from 'lucide-react';
 import { getInvoice } from '../utils/auctionApi';
 import { fmtCurrency } from '../utils/formulaPreview';
@@ -8,6 +8,7 @@ export function ViewInvoiceModal({ isOpen, onClose, invoiceRef, invoiceId }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [invoiceData, setInvoiceData] = useState(null);
+  const fetchRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (!isOpen || (!invoiceRef && !invoiceId)) {
@@ -16,6 +17,7 @@ export function ViewInvoiceModal({ isOpen, onClose, invoiceRef, invoiceId }) {
       return;
     }
 
+    const reqId = ++fetchRequestIdRef.current;
     let active = true;
     const fetchInvoiceData = async () => {
       setLoading(true);
@@ -23,7 +25,7 @@ export function ViewInvoiceModal({ isOpen, onClose, invoiceRef, invoiceId }) {
       try {
         const queryId = invoiceId || invoiceRef;
         const res = await getInvoice(queryId);
-        if (active) {
+        if (active && reqId === fetchRequestIdRef.current) {
           if (res?.invoice) {
             setInvoiceData(res);
           } else {
@@ -31,11 +33,11 @@ export function ViewInvoiceModal({ isOpen, onClose, invoiceRef, invoiceId }) {
           }
         }
       } catch (err) {
-        if (active) {
+        if (active && reqId === fetchRequestIdRef.current) {
           setError(err.message || 'Failed to load invoice details.');
         }
       } finally {
-        if (active) setLoading(false);
+        if (active && reqId === fetchRequestIdRef.current) setLoading(false);
       }
     };
 

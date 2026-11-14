@@ -67,7 +67,10 @@ export async function onRequestGet(context) {
       'listing_format': 'i.listing_format',
       'listing_status': 'i.listing_status',
       'floor_price': 'i.floor_price',
-      'buy_it_now_price': 'i.buy_it_now_price'
+      'buy_it_now_price': 'i.buy_it_now_price',
+      'net_profit': 'COALESCE(s.net_profit, (COALESCE(i.current_list_price, i.suggested_list_price, 0) - i.true_total_cost))',
+      'margin': 'COALESCE(i.target_margin_pct, 0)',
+      'days_in_inventory': 'COALESCE(i.days_on_market, 0)'
     };
     const sortCol = SORT_COLUMN_MAP[sortByParam] || 'i.created_at';
     const STATUS_CASE_SQL = `CASE LOWER(TRIM(i.status))
@@ -83,6 +86,12 @@ export async function onRequestGet(context) {
     let orderByClause;
     if (sortByParam === 'status') {
       orderByClause = `ORDER BY ${STATUS_CASE_SQL} ${sortDirParam}, i.created_at DESC`;
+    } else if (sortByParam === 'net_profit') {
+      orderByClause = `ORDER BY COALESCE(s.net_profit, (COALESCE(i.current_list_price, i.suggested_list_price, 0) - i.true_total_cost)) ${sortDirParam}, i.created_at DESC`;
+    } else if (sortByParam === 'margin') {
+      orderByClause = `ORDER BY COALESCE(i.target_margin_pct, 0) ${sortDirParam}, i.created_at DESC`;
+    } else if (sortByParam === 'days_in_inventory') {
+      orderByClause = `ORDER BY COALESCE(i.days_on_market, 0) ${sortDirParam}, i.created_at DESC`;
     } else if (sortByParam === 'created_at' && sortDirParam === 'DESC' && (!status || status === 'All')) {
       orderByClause = `ORDER BY ${STATUS_CASE_SQL} ASC, i.created_at DESC`;
     } else {
@@ -356,6 +365,26 @@ export async function onRequestGet(context) {
       };
     });
 
+    // Dynamic portfolio KPIs aggregation
+    const kpisSql = 'SELECT '
+      + 'COUNT(*) AS active_count, '
+      + 'COALESCE(SUM(i.true_total_cost), 0) AS total_landed_cost, '
+      + 'COALESCE(SUM(COALESCE(i.current_list_price, i.suggested_list_price, 0)), 0) AS total_list_value '
+      + 'FROM auction_items i '
+      + 'WHERE i.user_id = ? AND i.status IN (\'Available\', \'Listed\', \'Draft\')';
+
+    let kpisData = { active_count: 0, total_landed_cost: 0, total_list_value: 0 };
+    try {
+      const kpisRow = await env.DB.prepare(kpisSql).bind(payload.userId).first();
+      if (kpisRow) {
+        kpisData = {
+          active_count: Number(kpisRow.active_count || 0),
+          total_landed_cost: Math.round(((Number(kpisRow.total_landed_cost) || 0) + 1e-9) * 100) / 100,
+          total_list_value: Math.round(((Number(kpisRow.total_list_value) || 0) + 1e-9) * 100) / 100
+        };
+      }
+    } catch (_) {}
+
     return ok({
       items: enrichedItems,
       pagination: {
@@ -364,7 +393,8 @@ export async function onRequestGet(context) {
         limit,
         pages: Math.ceil(total / limit)
       },
-      status_counts: statusCounts
+      status_counts: statusCounts,
+      kpis: kpisData
     });
   });
 }

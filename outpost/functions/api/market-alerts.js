@@ -133,7 +133,8 @@ async function runMarketRefresh(userId, env, request) {
               'Content-Type': 'application/json',
               'Cookie': cookie || ''
             },
-            body: JSON.stringify({ query, itemId: item.id })
+            body: JSON.stringify({ query, itemId: item.id }),
+            signal: AbortSignal.timeout(15000)
           });
           
           if (!res.ok) return;

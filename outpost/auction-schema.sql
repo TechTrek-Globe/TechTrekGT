@@ -781,4 +781,52 @@ ALTER TABLE auction_items ADD COLUMN reprice_tier TEXT;
 CREATE INDEX IF NOT EXISTS idx_auction_items_reprice
   ON auction_items(user_id, status, reprice_locked, date_listed);
 
+-- ============================================================
+-- MIGRATION 0013: IMPORT BATCHES & FILE ARCHIVING
+-- Persists import batch metadata, chunked raw PDF/XLS/CSV payloads,
+-- and indexes batch lookups.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS import_batches (
+  id               TEXT PRIMARY KEY,
+  user_id          TEXT NOT NULL,
+  source_type      TEXT NOT NULL DEFAULT 'xlsx'
+                     CHECK(source_type IN ('pdf', 'xlsx', 'xls', 'csv', 'manual_batch', 'legacy_batch')),
+  file_name        TEXT,
+  mime_type        TEXT,
+  file_size        INTEGER NOT NULL DEFAULT 0,
+  file_sha256      TEXT,
+  strategy         TEXT NOT NULL DEFAULT 'append'
+                     CHECK(strategy IN ('append', 'replace')),
+  invoice_count    INTEGER NOT NULL DEFAULT 0,
+  item_count       INTEGER NOT NULL DEFAULT 0,
+  sale_count       INTEGER NOT NULL DEFAULT 0,
+  comp_count       INTEGER NOT NULL DEFAULT 0,
+  total_cost_basis REAL NOT NULL DEFAULT 0.0,
+  has_file_blob    INTEGER NOT NULL DEFAULT 0,
+  status           TEXT NOT NULL DEFAULT 'completed'
+                     CHECK(status IN ('completed', 'rolled_back')),
+  created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_import_batches_user_created
+  ON import_batches(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS import_batch_file_chunks (
+  batch_id    TEXT NOT NULL,
+  chunk_index INTEGER NOT NULL,
+  data        TEXT NOT NULL,
+  PRIMARY KEY (batch_id, chunk_index),
+  FOREIGN KEY (batch_id) REFERENCES import_batches(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_auction_invoices_batch
+  ON auction_invoices(user_id, import_batch_id)
+  WHERE import_batch_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_auction_items_batch
+  ON auction_items(user_id, import_batch_id)
+  WHERE import_batch_id IS NOT NULL;
+
+
 

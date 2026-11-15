@@ -28,11 +28,15 @@ import { onRequestGet as compGetHandler, onRequestPut as compPutHandler, onReque
 import { onRequestGet as marketCompsGetHandler, onRequestPost as marketCompsPostHandler, onRequestPut as marketCompsPutHandler, onRequestDelete as marketCompsDeleteHandler } from '../functions/api/comps/market.js';
 import { onRequestGet as dashboardHandler } from '../functions/api/dashboard.js';
 import { onRequestPost as batchImportHandler } from '../functions/api/import/batch.js';
+import { onRequestGet as importBatchesListHandler } from '../functions/api/import/batches.js';
+import { onRequestGet as importBatchDetailHandler } from '../functions/api/import/batches/[id].js';
+import { onRequestGet as importBatchFileHandler } from '../functions/api/import/batches/[id]/file.js';
 import { onRequestPost as amazonImportHandler } from '../functions/api/import/amazon.js';
 import { onRequestPost as amazonUrlImportHandler } from '../functions/api/import/amazon-url.js';
 import { onRequestGet as amazonTokenGetHandler, onRequestPost as amazonTokenPostHandler } from '../functions/api/import/amazon-token.js';
 import { onRequestGet as syncFinanceGetHandler, onRequestPost as syncFinancePostHandler } from '../functions/api/sync/finance.js';
 import { onRequestGet as taxReportGetHandler } from '../functions/api/reports/tax.js';
+import { onRequestGet as nonVinePnlGetHandler } from '../functions/api/reports/non-vine-pnl.js';
 import { onRequestGet as marketAlertsGetHandler, onRequestPut as marketAlertsPutHandler, onRequestPost as marketAlertsPostHandler } from '../functions/api/market-alerts.js';
 import { onRequestGet as adminStatsGetHandler } from '../functions/api/admin/stats.js';
 import { onRequestGet as ebayOAuthStatusHandler } from '../functions/api/ebay/oauth-status.js';
@@ -119,8 +123,11 @@ function addSecurityHeaders(response, isLocalhostOrOptions = false, maybeRequest
       "base-uri 'self'"
     ].join('; '));
   }
+  const contentType = newHeaders.get('content-type') || '';
+  const contentDisp = newHeaders.get('content-disposition') || '';
+  const isInlinePdf = contentType.includes('application/pdf') && contentDisp.startsWith('inline');
   newHeaders.set('X-Content-Type-Options', 'nosniff');
-  newHeaders.set('X-Frame-Options', 'DENY');
+  newHeaders.set('X-Frame-Options', isInlinePdf ? 'SAMEORIGIN' : 'DENY');
   newHeaders.set('X-XSS-Protection', '0');
   newHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   newHeaders.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
@@ -150,7 +157,6 @@ function addSecurityHeaders(response, isLocalhostOrOptions = false, maybeRequest
   newHeaders.set('Access-Control-Allow-Credentials', 'true');
   newHeaders.set('Access-Control-Max-Age', '86400');
 
-  const contentType = newHeaders.get('content-type') || '';
   const isHtml = contentType.includes('text/html');
   const isJson = contentType.includes('application/json');
   if (isHtml || isJson) {
@@ -234,17 +240,21 @@ export const ROUTES = [
   { method: 'GET',    pattern: '/api/dashboard',              handler: dashboardHandler,          auth: 'session' },
   { method: 'GET',    pattern: '/api/admin/stats',            handler: adminStatsGetHandler,      auth: 'session_admin' },
 
-  // Batch & Amazon Import (5 routes)
+  // Batch & Amazon Import (8 routes)
   { method: 'POST',   pattern: '/api/import/batch',           handler: batchImportHandler,        auth: 'session' },
+  { method: 'GET',    pattern: '/api/import/batches',         handler: importBatchesListHandler,  auth: 'session' },
+  { method: 'GET',    pattern: '/api/import/batches/:id',     handler: importBatchDetailHandler,  auth: 'session' },
+  { method: 'GET',    pattern: '/api/import/batches/:id/file', handler: importBatchFileHandler,   auth: 'session' },
   { method: 'POST',   pattern: '/api/import/amazon',          handler: amazonImportHandler,       auth: 'bearer_or_secret' },
   { method: 'POST',   pattern: '/api/import/amazon-url',      handler: amazonUrlImportHandler,    auth: 'session' },
   { method: 'GET',    pattern: '/api/import/amazon-token',    handler: amazonTokenGetHandler,     auth: 'session' },
   { method: 'POST',   pattern: '/api/import/amazon-token',    handler: amazonTokenPostHandler,    auth: 'session' },
 
-  // Sync & Reports (6 routes)
+  // Sync & Reports (7 routes)
   { method: 'GET',    pattern: '/api/sync/finance',           handler: syncFinanceGetHandler,     auth: 'session' },
   { method: 'POST',   pattern: '/api/sync/finance',           handler: syncFinancePostHandler,    auth: 'session' },
   { method: 'GET',    pattern: '/api/reports/tax',            handler: taxReportGetHandler,       auth: 'session' },
+  { method: 'GET',    pattern: '/api/reports/non-vine-pnl',   handler: nonVinePnlGetHandler,      auth: 'session' },
   { method: 'GET',    pattern: '/api/market-alerts',          handler: marketAlertsGetHandler,    auth: 'session' },
   { method: 'POST',   pattern: '/api/market-alerts/refresh-all', handler: marketAlertsPostHandler, auth: 'session' },
   { method: 'PUT',    pattern: '/api/market-alerts/:id',      handler: marketAlertsPutHandler,    auth: 'session' },

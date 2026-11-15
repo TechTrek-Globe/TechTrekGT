@@ -488,4 +488,18 @@ export const generateAiEbayDetails = (payload) =>
     body: JSON.stringify(payload)
   });
 
+// --- Import History & Source File Archive ---
+export const getImportBatches = (page = 1, limit = 25) =>
+  apiFetch(`/api/import/batches?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`);
+
+export const getImportBatch = (id) =>
+  apiFetch(`/api/import/batches/${encodeURIComponent(id)}`);
+
+export const getImportBatchFileUrl = (id, download = false) =>
+  getApiUrl(`/api/import/batches/${encodeURIComponent(id)}/file${download ? '?download=1' : ''}`);
+
+// --- Non-Vine Invoice Spend vs. Sold Net Standing ---
+export const getNonVinePnl = (range = 'all') =>
+  apiFetch(`/api/reports/non-vine-pnl?range=${encodeURIComponent(range)}`);
+
 

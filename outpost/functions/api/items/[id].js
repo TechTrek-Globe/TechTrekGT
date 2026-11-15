@@ -425,7 +425,7 @@ export async function onRequestPut(context) {
         nextAttrs.asin || null,
         nextAttrs.order_id || null,
         nextAttrs.image_url || nextAttrs.ebay_image_url || null,
-        (nextAttrs.is_vinescout || nextAttrs.source === 'amazon_vinescout' || nextAttrs.asin) ? 1 : 0,
+        (nextAttrs.is_vinescout || nextAttrs.source === 'amazon_vinescout' || nextAttrs.vine_program === true) ? 1 : 0,
         nextAttrs.etv != null ? Number(nextAttrs.etv) : null,
         nextAttrs.tax_cost != null ? Number(nextAttrs.tax_cost) : null,
         body.reprice_locked !== undefined ? (body.reprice_locked ? 1 : 0) : null,

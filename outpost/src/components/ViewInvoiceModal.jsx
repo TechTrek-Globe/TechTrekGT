@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Receipt, ExternalLink, Calendar, DollarSign, Package, Loader2, AlertCircle, FileText } from 'lucide-react';
-import { getInvoice } from '../utils/auctionApi';
+import { X, Receipt, ExternalLink, Calendar, DollarSign, Package, Loader2, AlertCircle, FileText, Eye, Download } from 'lucide-react';
+import { getInvoice, getImportBatchFileUrl } from '../utils/auctionApi';
 import { fmtCurrency } from '../utils/formulaPreview';
 import { cleanItemDescription, cleanAthleteName } from '../utils/spreadsheetParser';
+import { SourceFilePreviewModal } from './ImportHistoryModal';
 
 export function ViewInvoiceModal({ isOpen, onClose, invoiceRef, invoiceId }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [invoiceData, setInvoiceData] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const fetchRequestIdRef = useRef(0);
 
   useEffect(() => {
@@ -86,6 +88,31 @@ export function ViewInvoiceModal({ isOpen, onClose, invoiceRef, invoiceId }) {
           </div>
 
           <div className="flex items-center gap-2">
+            {Number(invoice?.import_batch?.has_file_blob) === 1 && (
+              <>
+                {invoice.import_batch.source_type === 'pdf' && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition-colors cursor-pointer"
+                    title="Preview original archived PDF invoice"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">View Source PDF</span>
+                    <span className="sm:hidden">PDF</span>
+                  </button>
+                )}
+                <a
+                  href={getImportBatchFileUrl(invoice.import_batch.id, true)}
+                  download={invoice.import_batch.file_name || undefined}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+                  title="Download original imported file"
+                >
+                  <Download className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">Source File</span>
+                </a>
+              </>
+            )}
             {isPristine && (
               <a
                 href="https://www.pristineauction.com/my-account/invoices"
@@ -266,6 +293,11 @@ export function ViewInvoiceModal({ isOpen, onClose, invoiceRef, invoiceId }) {
           </button>
         </div>
       </div>
+      <SourceFilePreviewModal
+        isOpen={previewOpen}
+        batch={invoice?.import_batch}
+        onClose={() => setPreviewOpen(false)}
+      />
     </div>
   );
 }

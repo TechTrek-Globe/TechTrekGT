@@ -9,6 +9,7 @@ import { getDashboard } from '../utils/auctionApi';
 import { fmtCurrency, fmtPct } from '../utils/formulaPreview';
 import { MarketAlertsPanel } from './dashboard/MarketAlertsPanel';
 import { AgingMarkdownModal } from './inventory/AgingMarkdownModal';
+import { NonVinePnlCard } from './dashboard/NonVinePnlCard';
 import { useInventory } from '../context/InventoryContext';
 
 export function DashboardView({ onNavigate }) {
@@ -321,6 +322,9 @@ export function DashboardView({ onNavigate }) {
           </p>
         </div>
       </div>
+
+      {/* 2b. Non-Vine Invoice Spend vs. Sold Net Standing */}
+      <NonVinePnlCard initialSummary={data?.non_vine_pnl} />
 
       {/* 3. Operational Action Center: Aging Radar & Unlisted Intake Queue */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -34,7 +34,21 @@ export async function onRequestGet(context) {
       'SELECT * FROM auction_items WHERE invoice_id = ? AND user_id = ? ORDER BY created_at ASC'
     ).bind(invoice.id, payload.userId).all();
 
-    return ok({ invoice, items: items.results || [] });
+    let importBatch = null;
+    if (invoice.import_batch_id) {
+      try {
+        importBatch = await env.DB.prepare(
+          'SELECT id, source_type, file_name, mime_type, file_size, has_file_blob, created_at FROM import_batches WHERE id = ? AND user_id = ? LIMIT 1'
+        ).bind(invoice.import_batch_id, payload.userId).first() || null;
+      } catch (_) {}
+    }
+
+    return ok({
+      invoice: importBatch
+        ? { ...invoice, import_batch: importBatch }
+        : invoice,
+      items: items.results || []
+    });
   });
 }
 

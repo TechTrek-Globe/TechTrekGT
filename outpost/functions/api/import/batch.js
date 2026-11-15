@@ -9,6 +9,7 @@ import {
   CHUNK_SIZE
 } from '../../utils/constants.js';
 import { generateSku } from '../utils/sku.js';
+import { prepareImportFileArchive } from '../../utils/importBatches.js';
 
 const MAX_RECORDS_PER_COLLECTION = 500;
 
@@ -82,7 +83,7 @@ export async function onRequestPost(context) {
     const { userId } = await requireAuth(request, env);
     if (!env.DB) return err('Database binding unavailable', 500);
     const body = await request.json().catch(() => ({}));
-    const { strategy = 'append', invoices = [], items = [], sales = [], comps = [] } = body;
+    const { strategy = 'append', invoices = [], items = [], sales = [], comps = [], file = null } = body;
 
     const validationErrors = validatePayload(body);
     if (validationErrors.length > 0) {
@@ -91,7 +92,12 @@ export async function onRequestPost(context) {
       return err(JSON.stringify({message:c+' validation error(s)',errors:d}), 400);
     }
 
+    if (invoices.length === 0 && items.length === 0 && sales.length === 0 && comps.length === 0) {
+      return ok({ success: true, imported: { invoices: 0, items: 0, sales: 0, comps: 0 } });
+    }
+
     const importBatchId = crypto.randomUUID();
+    const archive = prepareImportFileArchive(file);
     const seenSkus = new Set();
     const skuMap = new Map();
     const itemsNeedingSkus = [];
@@ -119,12 +125,19 @@ export async function onRequestPost(context) {
     const statements=[];
     const invoiceMap=new Map();
     const itemMap=new Map();
+    let invoiceCostSum = 0;
+    let itemCostSum = 0;
 
     for(const inv of invoices){
       const invId=inv.id||'inv-'+crypto.randomUUID();
       const ref=String(inv.invoice_ref||'Default').trim();
       invoiceMap.set(ref,invId);
-      statements.push(env.DB.prepare(`INSERT INTO auction_invoices (id,user_id,invoice_ref,description,base_total,discount,shipping,tax,date_acquired,created_at,import_batch_id) VALUES (?,?,?,?,?,?,?,?,?,datetime('now'),?) ON CONFLICT(id) DO UPDATE SET invoice_ref=excluded.invoice_ref,description=excluded.description,base_total=excluded.base_total,discount=excluded.discount,shipping=excluded.shipping,tax=excluded.tax,date_acquired=excluded.date_acquired,import_batch_id=excluded.import_batch_id`).bind(invId,userId,ref,inv.description||null,Number(inv.base_total)||0,Number(inv.discount)||0,Number(inv.shipping)||0,Number(inv.tax)||0,inv.date_acquired||null,importBatchId));
+      const baseTotal = Number(inv.base_total) || 0;
+      const discount = Number(inv.discount) || 0;
+      const shipping = Number(inv.shipping) || 0;
+      const tax = Number(inv.tax) || 0;
+      invoiceCostSum += (baseTotal - discount + shipping + tax);
+      statements.push(env.DB.prepare(`INSERT INTO auction_invoices (id,user_id,invoice_ref,description,base_total,discount,shipping,tax,date_acquired,created_at,import_batch_id) VALUES (?,?,?,?,?,?,?,?,?,datetime('now'),?) ON CONFLICT(id) DO UPDATE SET invoice_ref=excluded.invoice_ref,description=excluded.description,base_total=excluded.base_total,discount=excluded.discount,shipping=excluded.shipping,tax=excluded.tax,date_acquired=excluded.date_acquired,import_batch_id=excluded.import_batch_id`).bind(invId,userId,ref,inv.description||null,baseTotal,discount,shipping,tax,inv.date_acquired||null,importBatchId));
     }
 
     for(let i=0;i<items.length;i++){
@@ -138,6 +151,7 @@ export async function onRequestPost(context) {
         statements.push(env.DB.prepare(`INSERT INTO auction_invoices (id,user_id,invoice_ref,description,base_total,date_acquired,import_batch_id) VALUES (?,?,?,'Imported batch',?,?,?)`).bind(invId,userId,invRef||'Imported',Number(it.unit_price)||0,it.date_acquired||null,importBatchId));
       }
       const up=Number(it.unit_price)||0;const bt=Number(it.item_base_total||up);const tc=Number(it.true_total_cost||bt);
+      itemCostSum += tc;
       const feePct = Number.isFinite(Number(it.platform_fee_pct)) ? Number(it.platform_fee_pct) : DEFAULT_PLATFORM_FEE_PCT;
       const flatFee = Number.isFinite(Number(it.platform_flat_fee)) ? Number(it.platform_flat_fee) : DEFAULT_PLATFORM_FLAT_FEE;
       const estShip = Number.isFinite(Number(it.est_shipping_cost)) ? Number(it.est_shipping_cost) : DEFAULT_EST_SHIPPING_COST;
@@ -183,6 +197,40 @@ export async function onRequestPost(context) {
 
     if(statements.length===0)return ok({success:true,imported:{invoices:0,items:0,sales:0,comps:0}});
 
+    const totalCostBasis = round2(items.length > 0 ? itemCostSum : invoiceCostSum);
+    const persistedInvoiceCount = Math.max(invoices.length, invoiceMap.size);
+    statements.unshift(
+      env.DB.prepare(
+        `INSERT INTO import_batches (
+          id, user_id, source_type, file_name, mime_type, file_size, file_sha256,
+          strategy, invoice_count, item_count, sale_count, comp_count,
+          total_cost_basis, has_file_blob, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now'))`
+      ).bind(
+        importBatchId,
+        userId,
+        archive.sourceType,
+        archive.fileName,
+        archive.mimeType,
+        archive.fileSize,
+        archive.fileSha256,
+        strategy === 'replace' ? 'replace' : 'append',
+        persistedInvoiceCount,
+        items.length,
+        sales.length,
+        comps.length,
+        totalCostBasis,
+        archive.hasFileBlob ? 1 : 0
+      )
+    );
+    for (let chunkIdx = 0; chunkIdx < archive.chunks.length; chunkIdx++) {
+      statements.push(
+        env.DB.prepare(
+          `INSERT INTO import_batch_file_chunks (batch_id, chunk_index, data) VALUES (?, ?, ?)`
+        ).bind(importBatchId, chunkIdx, archive.chunks[chunkIdx])
+      );
+    }
+
     try{for(let i=0;i<statements.length;i+=CHUNK_SIZE)await env.DB.batch(statements.slice(i,i+CHUNK_SIZE));}
     catch(e){console.error('[batch] insert error:', e); await cleanupBatch(env.DB,importBatchId,userId);return err('Batch insert failed. No existing data was modified.',500);}
 
@@ -198,7 +246,12 @@ export async function onRequestPost(context) {
       catch(e){console.error('[batch] post-insert delete failed:', e); await cleanupBatch(env.DB,importBatchId,userId); return err('Batch replace failed during old records purge. Database rolled back.', 500);}
     }
 
-    return ok({success:true,imported:{invoices:invoices.length,items:items.length,sales:sales.length,comps:comps.length}});
+    return ok({
+      success: true,
+      import_batch_id: importBatchId,
+      has_file_blob: archive.hasFileBlob ? 1 : 0,
+      imported: { invoices: invoices.length, items: items.length, sales: sales.length, comps: comps.length }
+    });
   });
 }
 
@@ -208,7 +261,9 @@ async function cleanupBatch(db,batchId,userId){
       db.prepare('DELETE FROM auction_comps WHERE import_batch_id=?').bind(batchId),
       db.prepare('DELETE FROM auction_sales WHERE import_batch_id=?').bind(batchId),
       db.prepare('DELETE FROM auction_items WHERE import_batch_id=?').bind(batchId),
-      db.prepare('DELETE FROM auction_invoices WHERE import_batch_id=?').bind(batchId)
+      db.prepare('DELETE FROM auction_invoices WHERE import_batch_id=?').bind(batchId),
+      db.prepare('DELETE FROM import_batch_file_chunks WHERE batch_id=?').bind(batchId),
+      db.prepare('DELETE FROM import_batches WHERE id=?').bind(batchId)
     ];
     if (userId) {
       stmts.push(

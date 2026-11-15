@@ -912,3 +912,34 @@ Comprehensive mobile and tablet responsiveness optimization across all views, mo
    - `EditTabFinancials.jsx`: Restructured the 12-column Accounting Waterfall into responsive columns (`col-span-7 sm:col-span-6` for Line Item, `hidden sm:block sm:col-span-3` for Basis, and `col-span-5 sm:col-span-3` for Amount) with mobile summary subtitles.
    - `CommandPalette.jsx`: Upgraded full-screen mobile dialog to `h-[100dvh]` with `pt-safe` and `pb-safe`.
 
+## Import History Archive & Non-Vine Invoice Standing [ACTION ID: IMP-002 / PNL-001]
+
+The Import History Archive and Non-Vine Standing system provides durable source-document traceability for PDF/XLSX/XLS/CSV imports alongside a clear reconciliation of paid invoice acquisition spend against net sales proceeds with Amazon VineScout items excluded.
+
+### Import History & Source Document Archival Capabilities
+
+1. **Chunked D1 Source File Persistence (`migrations/0013_import_batches_and_files.sql`, `functions/utils/importBatches.js`)**:
+   - Captures batch metadata (`id`, `source_type`, `file_name`, `mime_type`, `file_size`, `file_sha256`, `strategy`, `invoice_count`, `item_count`, `sale_count`, `comp_count`, `total_cost_basis`, `has_file_blob`, `created_at`) in `import_batches` and stores encoded file bytes in 512 KB base64 chunks (`BASE64_CHUNK_CHARS = 524288`) inside `import_batch_file_chunks` up to `MAX_IMPORT_FILE_BYTES` (10 MB decoded).
+   - `POST /api/import/batch`: Links created `auction_invoices` and `auction_items` to `import_batch_id`, accepts optional `file` payloads (`content_base64`, `sha256`, metadata), returns `import_batch_id` and `has_file_blob`, and rolls back `import_batches` + `import_batch_file_chunks` in `cleanupBatch` on batch failure.
+2. **Historical Batch Browsing & Streaming Endpoints**:
+   - `GET /api/import/batches`: Lists paginated import history scoped to `user_id` with aggregated `invoice_refs`, counts, total cost basis, and blob availability (`ensureImportBatchTables` WeakSet fallback on missing tables).
+   - `GET /api/import/batches/:id`: Returns batch metadata alongside linked `auction_invoices` and `auction_items` (normalizing legacy VineScout flags).
+   - `GET /api/import/batches/:id/file`: Reassembles base64 chunks into raw bytes and streams original PDFs (`inline` by default, `attachment` with `?download=1`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` in `src/worker.js`) or spreadsheet exports with tenant ownership enforcement.
+   - `GET /api/invoices` and `GET /api/invoices/:id`: Expose `import_batch_id` and `invoice.import_batch` metadata.
+3. **Import History UI Surfaces**:
+   - `SpreadsheetImporterModal.jsx`: Computes SHA-256 and encodes raw uploaded PDF/XLSX/XLS/CSV files (<= 10 MB) on import, and adds `Import` / `History` tabs embedding `ImportHistoryPanel`.
+   - `ImportHistoryModal.jsx`: Provides `ImportHistoryPanel`, `ImportHistoryModal`, and `SourceFilePreviewModal` (blob-URL `<iframe src={blobUrl} />` inline PDF viewer and download trigger).
+   - `ViewInvoiceModal.jsx`: Displays `View Source PDF` and `Source File` download triggers in the invoice header whenever the linked batch has an archived blob.
+
+### Non-Vine Invoice Spend vs. Sold Net Standing Capabilities
+
+1. **Canonical Non-Vine Exclusion Engine (`functions/utils/nonVinePnl.js`)**:
+   - Filters out VineScout items via `NON_VINE_ITEM_SQL`, excluding both `is_vinescout = 1` and legacy JSON attributes (`source = 'amazon_vinescout'`, `is_vinescout`, `vine_program`) guarded by `json_valid(i.attributes)`.
+   - Tracks `total_non_vine_spend` (excluding `'Returned'` items), `sold_non_vine_cogs`, `active_non_vine_capital`, `kept_non_vine_cost`, `returned_non_vine_cost`, realized `net_payouts`, `net_cash_standing` (`net_payouts - total_non_vine_spend`), `cost_recovery_pct`, and `excluded_vine_items` / `excluded_vine_sold_net_payouts` via parameterized static SQL statements (`buildNonVinePnlStatements`).
+   - Repaired `functions/api/items/[id].js` PUT handler so non-Vine paid items with an `asin` no longer get coerced to `is_vinescout = 1`.
+2. **Reporting Endpoints & Dashboard Integration**:
+   - `GET /api/reports/non-vine-pnl`: Supports date range presets (`all`, `ytd`, `90d`, `30d`) via `?range=`.
+   - `GET /api/dashboard`: Embeds all-time `non_vine_pnl` summary inside the single atomic `env.DB.batch()` query.
+   - `src/components/dashboard/NonVinePnlCard.jsx` mounted in `src/components/DashboardView.jsx`: Displays interactive timeframe selector (`All Time`, `YTD`, `90D`, `30D`), Total Non-Vine Spend, Non-Vine Net Payouts, Net Cash Standing, recovery bar, cost breakdown (`Sold COGS`, `Active Stock`, `Kept`, `Returned`), and excluded VineScout context pill.
+
+

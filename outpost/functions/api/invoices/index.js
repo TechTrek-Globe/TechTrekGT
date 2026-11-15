@@ -18,6 +18,7 @@ export async function onRequestGet(context) {
       SELECT
         i.id, i.invoice_ref, i.description, i.base_total,
         i.discount, i.shipping, i.tax, i.date_acquired, i.created_at,
+        i.import_batch_id,
         COUNT(it.id) AS item_count,
         SUM(it.true_total_cost) AS total_landed_cost
       FROM auction_invoices i

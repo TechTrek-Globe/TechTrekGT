@@ -1,5 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../utils/guard.js';
 import { round2 } from '../utils/auction.js';
+import { buildNonVinePnlStatements, formatNonVinePnlSummary } from '../utils/nonVinePnl.js';
 
 /**
  * GET /api/dashboard
@@ -26,7 +27,10 @@ export async function onRequestGet(context) {
       recentAcquisitionsRes,
       agingSummaryRes,
       stagnantListingsRes,
-      unlistedQueueRes
+      unlistedQueueRes,
+      nonVineSpendRes,
+      nonVineSalesRes,
+      vineContextRes
     ] = await db.batch([
       // 1. Inventory Aggregations
       db.prepare(`
@@ -216,7 +220,10 @@ export async function onRequestGet(context) {
         WHERE i.user_id = ? AND i.status = 'Available'
         ORDER BY i.true_total_cost DESC, i.created_at DESC
         LIMIT 5
-      `).bind(userId)
+      `).bind(userId),
+
+      // 13-15. Non-Vine Invoice Spend vs. Sold Net Standing
+      ...buildNonVinePnlStatements(db, userId, null)
     ]);
 
     const invStats = invRes?.results?.[0];
@@ -238,6 +245,14 @@ export async function onRequestGet(context) {
     const listedCapital = Number(invStats?.listed_capital) || 0;
     const listedPotentialRevenue = Number(invStats?.listed_potential_revenue) || 0;
     const unrealizedProfit = round2(Math.max(0, listedPotentialRevenue - listedCapital));
+
+    const nonVinePnl = formatNonVinePnlSummary(
+      nonVineSpendRes?.results?.[0] || null,
+      nonVineSalesRes?.results?.[0] || null,
+      vineContextRes?.results?.[0] || null,
+      'all',
+      null
+    );
 
     return ok({
       inventory: {
@@ -280,7 +295,8 @@ export async function onRequestGet(context) {
       platforms: platformSalesRes?.results || [],
       monthly_trend: monthlyTrendRes?.results || [],
       recent_sales: recentSalesRes?.results || [],
-      recent_acquisitions: recentAcquisitionsRes?.results || []
+      recent_acquisitions: recentAcquisitionsRes?.results || [],
+      non_vine_pnl: nonVinePnl
     });
   });
 }

@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import { useWayfinder } from '../context/WayfinderContext';
 import { Compass, Home, User, LogOut, ShieldCheck, Shield, Menu, X, Coins, Settings, Backpack, Globe, Calendar, ChevronDown, FileText, Receipt, CheckSquare } from 'lucide-react';
 import { BottomTabBar } from './BottomTabBar';
 import { OfflineSyncBadge } from './common/OfflineSyncBadge';
@@ -16,6 +17,7 @@ const SettingsModal = lazy(() =>
 export function Layout({ children }) {
   const { user, isAuthenticated, setIsAuthModalOpen, logout } = useAuth();
   const { isSettingsOpen, setIsSettingsOpen } = useSettings();
+  const { agendaAccess } = useWayfinder();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isConverterOpen, setIsConverterOpen] = useState(false);
   const [isHubDropdownOpen, setIsHubDropdownOpen] = useState(false);
@@ -193,48 +195,54 @@ export function Layout({ children }) {
                           <div className="text-[10px] text-slate-400 font-normal">Day-by-day scroll & bookings</div>
                         </div>
                       </a>
-                      <a
-                        href="/wayfinder/poland-christmas-2026/private/documents"
-                        onClick={(e) => {
-                          setIsHubDropdownOpen(false);
-                          pushRoute(e, '/wayfinder/poland-christmas-2026/private/documents');
-                        }}
-                        className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
-                      >
-                        <FileText className="w-4 h-4 text-sky-400 shrink-0" />
-                        <div>
-                          <div className="leading-tight">Documents & Tickets</div>
-                          <div className="text-[10px] text-slate-400 font-normal">PDF vault & email imports</div>
-                        </div>
-                      </a>
-                      <a
-                        href="/wayfinder/poland-christmas-2026/private/packing"
-                        onClick={(e) => {
-                          setIsHubDropdownOpen(false);
-                          pushRoute(e, '/wayfinder/poland-christmas-2026/private/packing');
-                        }}
-                        className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
-                      >
-                        <Backpack className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <div>
-                          <div className="leading-tight">Packing List</div>
-                          <div className="text-[10px] text-slate-400 font-normal">Winter essentials sync</div>
-                        </div>
-                      </a>
-                      <a
-                        href="/wayfinder/poland-christmas-2026/private/expenses"
-                        onClick={(e) => {
-                          setIsHubDropdownOpen(false);
-                          pushRoute(e, '/wayfinder/poland-christmas-2026/private/expenses');
-                        }}
-                        className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
-                      >
-                        <Receipt className="w-4 h-4 text-amber-400 shrink-0" />
-                        <div>
-                          <div className="leading-tight">Expense Ledger</div>
-                          <div className="text-[10px] text-slate-400 font-normal">Shared costs & settlements</div>
-                        </div>
-                      </a>
+                      {agendaAccess?.permissions?.documents && (
+                        <a
+                          href="/wayfinder/poland-christmas-2026/private/documents"
+                          onClick={(e) => {
+                            setIsHubDropdownOpen(false);
+                            pushRoute(e, '/wayfinder/poland-christmas-2026/private/documents');
+                          }}
+                          className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                          <FileText className="w-4 h-4 text-sky-400 shrink-0" />
+                          <div>
+                            <div className="leading-tight">Documents &amp; Tickets</div>
+                            <div className="text-[10px] text-slate-400 font-normal">PDF vault &amp; email imports</div>
+                          </div>
+                        </a>
+                      )}
+                      {agendaAccess?.permissions?.packing !== false && (
+                        <a
+                          href="/wayfinder/poland-christmas-2026/private/packing"
+                          onClick={(e) => {
+                            setIsHubDropdownOpen(false);
+                            pushRoute(e, '/wayfinder/poland-christmas-2026/private/packing');
+                          }}
+                          className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                          <Backpack className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <div>
+                            <div className="leading-tight">Packing List</div>
+                            <div className="text-[10px] text-slate-400 font-normal">Winter essentials sync</div>
+                          </div>
+                        </a>
+                      )}
+                      {agendaAccess?.permissions?.expenses && (
+                        <a
+                          href="/wayfinder/poland-christmas-2026/private/expenses"
+                          onClick={(e) => {
+                            setIsHubDropdownOpen(false);
+                            pushRoute(e, '/wayfinder/poland-christmas-2026/private/expenses');
+                          }}
+                          className="flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                          <Receipt className="w-4 h-4 text-amber-400 shrink-0" />
+                          <div>
+                            <div className="leading-tight">Expense Ledger</div>
+                            <div className="text-[10px] text-slate-400 font-normal">Shared costs &amp; settlements</div>
+                          </div>
+                        </a>
+                      )}
                     </div>
                   )}
                 </div>
@@ -288,8 +296,8 @@ export function Layout({ children }) {
             )}
           </div>
 
-          {/* Mobile top bar: Offline Sync + Currency button + settings shortcut */}
-          <div className="md:hidden flex items-center space-x-1.5 sm:space-x-2">
+          {/* Mobile top bar: Offline Sync + Currency button + settings shortcut + sign out */}
+          <div className="md:hidden flex items-center space-x-1 sm:space-x-2">
             <OfflineSyncBadge />
             <button
               onClick={() => setIsConverterOpen(!isConverterOpen)}
@@ -303,9 +311,21 @@ export function Layout({ children }) {
               onClick={() => setIsSettingsOpen(true)}
               className="p-2 rounded-lg text-wf-muted hover:text-white hover:bg-white/5 min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="Settings"
+              title={isAuthenticated ? `Settings (${user?.name || user?.email})` : 'Settings'}
             >
               <Settings className="w-5 h-5" />
             </button>
+            {isAuthenticated && (
+              <button
+                type="button"
+                onClick={logout}
+                className="p-2 rounded-lg text-wf-muted hover:text-white hover:bg-white/5 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                aria-label="Sign Out"
+                title={`Sign Out (${user?.name || user?.email})`}
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            )}
             {(user?.isAdmin || user?.role === 'admin') && (
               <a
                 href="/wayfinder/admin"

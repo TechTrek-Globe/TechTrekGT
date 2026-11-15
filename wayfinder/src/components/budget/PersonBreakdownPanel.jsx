@@ -294,7 +294,13 @@ export function PersonBreakdownPanel({
           {/* Person Cards Grid - All Details Always Visible */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {participantBalances.map((person) => {
-              const isCurrentUser = person.id === currentUserId || person.name?.toLowerCase().includes('jon');
+              const participantMeta = participants.find(p => p.id === person.id);
+              const isCurrentUser = person.id === currentUserId;
+              const roleSubtitle = participantMeta?.role === 'owner'
+                ? 'Trip Organizer • Owner'
+                : participantMeta?.role === 'editor'
+                  ? 'Trip Editor • Collaborator'
+                  : 'Expedition Co-Traveler';
               const isTooltipOpen = activeTooltipId === person.id;
               const initials = person.name.split(' ').map(n => n[0]).join('').slice(0, 2);
               const otherFirstName = getOtherParticipantName(person.id);
@@ -335,7 +341,7 @@ export function PersonBreakdownPanel({
                           )}
                         </div>
                         <span className="text-[11px] text-slate-400">
-                          {isCurrentUser ? 'Trip Organizer • Primary Payer' : 'Expedition Co-Traveler'}
+                          {roleSubtitle}
                         </span>
                       </div>
                     </div>

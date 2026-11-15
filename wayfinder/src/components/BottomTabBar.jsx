@@ -40,7 +40,13 @@ export function BottomTabBar({ currentPath, onOpenConverter }) {
   const isSchedule = currentPath.includes('scroll=journey-sequence') || currentPath.includes('#journey-sequence') || (pathOnly.startsWith(`${BASE}/private`) && !isDocs && !isPacking && !isExpenses);
   const isHome = !isSchedule && (pathOnly.startsWith(`${BASE}/cities`) || pathOnly === BASE || pathOnly === `${BASE}/` || pathOnly === '/wayfinder' || pathOnly === '/wayfinder/' || pathOnly === '/');
   const isPractical = pathOnly.startsWith(`${BASE}/practical`);
-  const hubPath = agendaAccess.permissions.documents ? `${BASE}/private/documents` : `${BASE}/private`;
+  const hubPath = agendaAccess.permissions.documents
+    ? `${BASE}/private/documents`
+    : agendaAccess.permissions.expenses
+      ? `${BASE}/private/expenses`
+      : agendaAccess.permissions.packing
+        ? `${BASE}/private/packing`
+        : `${BASE}/private`;
 
   const handleScheduleClick = (e) => {
     e.preventDefault();

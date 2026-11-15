@@ -40,7 +40,7 @@ export async function handleImportJobs(context, url, method) {
          JOIN wayfinder_documents d ON j.document_id = d.id
          WHERE (d.user_id = ?
                 OR d.journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ?)
-                OR d.journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ? AND role = 'admin'))
+                OR d.journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ? AND role IN ('admin', 'editor')))
            AND d.deleted_at IS NULL
          ORDER BY j.created_at DESC`
       ).bind(user.userId, user.userId, user.userId).all();
@@ -55,7 +55,7 @@ export async function handleImportJobs(context, url, method) {
        WHERE id = ? 
          AND (user_id = ?
               OR journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ?)
-              OR journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ? AND role = 'admin'))
+              OR journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ? AND role IN ('admin', 'editor')))
          AND deleted_at IS NULL`
     ).bind(docId, user.userId, user.userId, user.userId).first();
     if (!doc) return json({ error: 'Document not found' }, 404);

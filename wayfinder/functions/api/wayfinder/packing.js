@@ -316,8 +316,9 @@ export async function handlePacking(context, url, method) {
       // Action: Clear All Packed Items
       if (action === 'clear_packed') {
         await env.DB.prepare(
-          `DELETE FROM wayfinder_packing_items WHERE (journey_id = ? OR journey_id = ?) AND user_id = ? AND is_packed = 1`
-        ).bind(journeyId, requestedJourneyId, user.userId).run();
+          `DELETE FROM wayfinder_packing_items
+           WHERE (journey_id = ? OR journey_id = ?) AND (user_id = ? OR is_shared = 1${scopeSql}) AND is_packed = 1`
+        ).bind(journeyId, requestedJourneyId, user.userId, ...scopeIds).run();
 
         const freshRows = await env.DB.prepare(
           `SELECT * FROM wayfinder_packing_items 
@@ -337,13 +338,13 @@ export async function handlePacking(context, url, method) {
         if (targetCategory) {
           await env.DB.prepare(
             `UPDATE wayfinder_packing_items SET is_packed = ?, updated_at = datetime('now')
-             WHERE (journey_id = ? OR journey_id = ?) AND user_id = ? AND category = ?`
-          ).bind(targetState, journeyId, requestedJourneyId, user.userId, targetCategory).run();
+             WHERE (journey_id = ? OR journey_id = ?) AND (user_id = ? OR is_shared = 1${scopeSql}) AND category = ?`
+          ).bind(targetState, journeyId, requestedJourneyId, user.userId, ...scopeIds, targetCategory).run();
         } else {
           await env.DB.prepare(
             `UPDATE wayfinder_packing_items SET is_packed = ?, updated_at = datetime('now')
-             WHERE (journey_id = ? OR journey_id = ?) AND user_id = ?`
-          ).bind(targetState, journeyId, requestedJourneyId, user.userId).run();
+             WHERE (journey_id = ? OR journey_id = ?) AND (user_id = ? OR is_shared = 1${scopeSql})`
+          ).bind(targetState, journeyId, requestedJourneyId, user.userId, ...scopeIds).run();
         }
 
         const freshRows = await env.DB.prepare(

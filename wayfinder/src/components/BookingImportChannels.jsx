@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 
 export function BookingImportChannels() {
-  const { fetchItinerary, fetchDocuments } = useWayfinder();
+  const { fetchItinerary, fetchDocuments, agendaAccess } = useWayfinder();
+  const canManageInbox = Boolean(agendaAccess?.permissions?.share);
 
   // Email Inbox state
   const [inbox, setInbox] = useState(null);
@@ -60,8 +61,13 @@ export function BookingImportChannels() {
   };
 
   useEffect(() => {
+    if (!agendaAccess?.loaded || !canManageInbox) return;
     loadInbox();
-  }, [loadInbox]);
+  }, [agendaAccess?.loaded, canManageInbox, loadInbox]);
+
+  if (!agendaAccess?.loaded || !canManageInbox) {
+    return null;
+  }
 
   const handleCopy = () => {
     if (!inbox?.email_address) return;

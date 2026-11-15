@@ -161,7 +161,7 @@ Tracks shared expedition costs, member split allocations, and debt settlements i
 - `itinerary_item_id`: optional foreign key referencing linked `wayfinder_itinerary_items(id)`.
 - `document_id`: optional foreign key referencing source `wayfinder_documents(id)`.
 - `user_id`: creator UUID (the authenticated user who recorded the expense in D1).
-- `paid_by_name`: display name of the member who actually fronted the payment (e.g. `Jonathan Kemp`, `Ronald Milton Few`).
+- `paid_by_name`: display name of the member who actually fronted the payment (e.g. `Jonathan Kemp`, `Ronnie Few`).
 - `paid_by_user_id`: UUID of the member who fronted the payment. This is the authoritative payer field used by `calculateSettleUp` in [expenseLedger.js](file:///e:/TechTrekGT/wayfinder/src/utils/expenseLedger.js) to determine net balances. Distinct from `user_id` (which is the row creator). Falls back to `user_id` for legacy rows where this column is null.
 - `category`: categorized domain (`flight`, `lodging`, `transit`, `activity`, `dining`, `market`, `other`).
 - `description`: expense title or merchant name.
@@ -198,6 +198,7 @@ Tracks shared expedition costs, member split allocations, and debt settlements i
 - `split_id`: optional foreign key referencing specific `wayfinder_expense_splits(id)` for item-by-item settlements.
 
 ### 9.4 Person-by-Person Breakdown Client State (`PersonBreakdownPanel.jsx` & `expenseLedger.js`)
+- `userScopeFilter`: state in `ExpenseLedger.jsx` (`'all' | 'mine' | 'paid_by_me'`) filtering expenses cleanly between all trip items, bookings involving `currentUserId` (payer or split participant), and items paid directly by `currentUserId`, without losing full trip cost visibility.
 - `personFilter`: lifted state in `ExpenseLedger.jsx` (`null | 'paid_by' | 'owed_by' | 'settled'`) controlling whether the main ledger feed is filtered by a participant's out-of-pocket spend, unsettled fair share liability, or fully settled items.
 - `activePersonId`: lifted state in `ExpenseLedger.jsx` (`null | string`) designating the selected traveler ID for filtering.
 - `isExpanded`: component state in `PersonBreakdownPanel.jsx` toggling expansion of the top-level participant overview dashboard.
@@ -274,7 +275,7 @@ Active persistent entities for confirmed trip reservations:
 ### 11.4 Inbound Transatlantic Flights
 - Document Record: `ea78634a-eaa9-46e8-b40c-b3703bb6e2ca` (`Poland_Delta.pdf`).
 - Itinerary Record: `471a82a3-2251-4d01-a308-a8f084b6108a` (`Flight: ATL to KRK`).
-- Expense Record: `exp-delta-flight-dl9208`, `amount_original: 1980.00`, `currency_original: USD`, `amount_usd: 1980.00`, `paid_by_name: Ronald Milton Few`, `paid_by_user_id: usr-ronald-few`, linked to splits `spl-flight-jon` (Jonathan owes $990.00 USD) and `spl-flight-ronald` (Ronald paid share of $990.00 USD).
+- Expense Record: `exp-delta-flight-dl9208`, `amount_original: 1980.00`, `currency_original: USD`, `amount_usd: 1980.00`, `paid_by_name: Ronnie Few`, `paid_by_user_id: usr-7cfbdbd4-f1f2-4853-915c-2addcdd58fa8`, linked to splits for Jon Kemp (`usr-1785511589441-3fvgv`, `$990.00 USD`) and Ronnie Few (`usr-7cfbdbd4-f1f2-4853-915c-2addcdd58fa8`, `$990.00 USD`).
 
 ### 11.5 Auschwitz & Wieliczka Guided Excursion
 - Document Record: `doc-gyg-7vkk692wy` (`GetYourGuide_Ticket_GYG7VKK692WY.pdf`).
@@ -523,14 +524,18 @@ Governs the state invariants, atomic transaction guarantees, and edge lifecycle 
   - Ownership is rooted in `wayfinder_journeys.created_by = user.userId` (or platform administrator status verified via `users.is_admin = 1`).
   - Journey record `'poland-christmas-2026'` is relationally owned by primary administrator ID `'usr-1785511589441-3fvgv'`.
 - Sensitive Data Boundary Invariant:
-  - Document vaults (`documents.js`), Expense Ledgers (`expenses.js`), Aggregated Budgets (`budget.js`), and Extraction Jobs (`import-jobs.js`) require `canViewSensitive(role)` (`owner` or `admin`).
-  - `editor`, `viewer`, and `none` callers querying sensitive endpoints receive HTTP 403 Forbidden.
+  - Document vaults (`documents.js`), Expense Ledgers (`expenses.js`), Aggregated Budgets (`budget.js`), and Extraction Jobs (`import-jobs.js`) require `canViewSensitive(role)` (`owner`, `admin`, or `editor`). SQL fallback filters in `documents.js` and `import-jobs.js` accept `role IN ('admin', 'editor')`.
+  - Cross-user document `DELETE`, agenda sharing (`agenda-shares.js`), and email inbox provisioning (`email-inboxes.js`) remain restricted to `canManage(role)` (`owner` or `admin`).
+  - `viewer` and `none` callers querying sensitive endpoints receive HTTP 403 Forbidden.
   - Naive fallbacks matching `journey.visibility !== 'public'` or hardcoded `OR journey_id = 'poland-christmas-2026'` are prohibited on all sensitive queries.
 - Accommodations Data Sanitization Invariant:
   - Accommodations endpoint requires `isMember(role)`. Non-members receive an empty list (`[]`).
-  - For non-sensitive member roles (`editor`, `viewer`), financial costs (`total_cost`, `currency`), and source document metadata (`source_document_id`, `filename`, `safe_display_name`, `mime_type`) are scrubbed to `null`.
-- Client-Side Isolation & Lazy Evaluation Invariant:
-  - `WayfinderContext` state hooks (`fetchDocuments`, `fetchJobs`) are gated on `agendaAccess.permissions.documents`. Unauthorized accounts never query or store private documents in client state.
+  - For `viewer` callers (`!canViewSensitive(role)`), financial costs (`total_cost`, `currency`), and source document metadata (`source_document_id`, `filename`, `safe_display_name`, `mime_type`) are scrubbed to `null`; `owner`, `admin`, and `editor` receive full fields.
+- Client-Side Isolation, Mobile Hub Routing & Expense Identity Invariant:
+  - `WayfinderContext` state hooks (`fetchDocuments`, `fetchJobs`) are gated on `agendaAccess.permissions.documents`. Unauthorized (`viewer` / `none`) accounts never query or store private documents in client state.
+  - `PrivateHub` propagates `agendaRole` to `PackingManager`, `ExpenseLedger`, and `DocumentCenter`, and `BookingImportChannels` only queries `/api/wayfinder/email-inboxes` when `agendaAccess.permissions.share` is true.
+  - `BottomTabBar` routes mobile **Hub** taps to `${BASE}/private/documents` for `permissions.documents`, `${BASE}/private/packing` for `viewer`, and `${BASE}/private` for `none`. `Layout` mobile header and `SettingsModal` provide Sign Out access across all authenticated roles.
+  - `PersonBreakdownPanel` matches `"You"` strictly via `person.id === currentUserId` without hardcoded name string checks.
   - If `role === 'none'`, `PrivateHub` renders `NoAccessPanel` and unmounts all private subviews (`ItineraryView`, `DocumentCenter`, `ExpenseLedger`, `PackingManager`).
   - Unpermitted deep link paths are intercepted and replaced with `/private`, rendering an explanatory notice.
 

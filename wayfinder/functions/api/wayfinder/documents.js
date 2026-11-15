@@ -176,7 +176,7 @@ export async function handleDocuments(context, url, method) {
       const journeyId = url.searchParams.get('journey_id') || url.searchParams.get('journeyId');
       let docs;
       if (journeyId) {
-        // Documents are restricted to owner, share admin and platform admin
+        // Documents are restricted to owner, share admin, platform admin, and editor
         const access = await resolveAgendaAccess(env, journeyId, user);
         const j = access.journey;
         if (!j) return json({ error: 'Journey not found' }, 404);
@@ -190,7 +190,7 @@ export async function handleDocuments(context, url, method) {
            WHERE deleted_at IS NULL 
              AND (user_id = ?
                   OR journey_id IN (SELECT id FROM wayfinder_journeys WHERE created_by = ?)
-                  OR journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ? AND role = 'admin'))
+                  OR journey_id IN (SELECT agenda_id FROM wayfinder_agenda_shares WHERE user_id = ? AND role IN ('admin', 'editor')))
            ORDER BY upload_date DESC`
         ).bind(user.userId, user.userId, user.userId).all();
       }

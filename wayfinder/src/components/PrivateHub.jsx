@@ -209,9 +209,9 @@ export function PrivateHub({ currentPath }) {
         ) : forbiddenTab ? null : (
           <Suspense fallback={<div className="flex items-center justify-center py-16 text-wf-muted text-sm">Loading section...</div>}>
             {isPacking ? (
-              <PackingManager />
+              <PackingManager agendaRole={agendaRole} />
             ) : isExpenses ? (
-              <ExpenseLedger />
+              <ExpenseLedger agendaRole={agendaRole} />
             ) : isDocs ? (
               <DocumentCenter initialDocId={routeDocId} agendaRole={agendaRole} />
             ) : (

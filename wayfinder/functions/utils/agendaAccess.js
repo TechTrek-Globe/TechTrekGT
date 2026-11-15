@@ -174,8 +174,8 @@ export async function getAgendaMembers(env, journey) {
 export const canEdit = (role) => role === 'owner' || role === 'admin' || role === 'editor';
 export const canManage = (role) => role === 'owner' || role === 'admin';
 export const isMember = (role) => role === 'owner' || role === 'admin' || role === 'editor' || role === 'viewer';
-// Documents, expenses, budget and import jobs: owner, share admin, platform admin only.
-export const canViewSensitive = (role) => role === 'owner' || role === 'admin';
+// Documents, expenses, budget and import jobs: owner, share admin, platform admin, and editor.
+export const canViewSensitive = (role) => role === 'owner' || role === 'admin' || role === 'editor';
 
 export function agendaPermissions(role) {
   return {

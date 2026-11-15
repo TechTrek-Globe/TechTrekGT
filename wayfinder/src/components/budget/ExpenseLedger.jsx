@@ -113,6 +113,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
   // Person-by-Person breakdown panel filter state
   const [activePersonId, setActivePersonId] = useState(null);
   const [personFilter, setPersonFilter] = useState(null); // null | 'paid_by' | 'owed_by' | 'settled'
+  const [userScopeFilter, setUserScopeFilter] = useState('all'); // 'all' | 'mine' | 'paid_by_me'
 
   // Form state for new expense
   const [formDesc, setFormDesc] = useState('');
@@ -239,13 +240,13 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
     for (const m of members) {
       if (!m?.id || seen.has(m.id)) continue;
       seen.add(m.id);
-      list.push({ id: m.id, name: m.name || m.email || 'Collaborator' });
+      list.push({ id: m.id, name: m.name || m.email || 'Collaborator', role: m.role || null });
     }
     if (!seen.has(currentUserId)) {
-      list.unshift({ id: currentUserId, name: currentUserName });
+      list.unshift({ id: currentUserId, name: currentUserName, role: agendaRole || null });
     }
     return list;
-  }, [members, currentUserId, currentUserName]);
+  }, [members, currentUserId, currentUserName, agendaRole]);
 
   // Load expenses and agenda members from D1
   const loadExpenses = async () => {
@@ -308,6 +309,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
   // Filtered expenses
   const filteredExpenses = useMemo(() => {
     let result = selectedCategory === 'all' ? expenses : expenses.filter(e => normalizeCategory(e.category) === selectedCategory);
+    if (userScopeFilter === 'mine') {
+      result = result.filter(e => (e.paid_by_user_id || e.user_id) === currentUserId || e.splits?.some(s => s.user_id === currentUserId));
+    } else if (userScopeFilter === 'paid_by_me') {
+      result = result.filter(e => (e.paid_by_user_id || e.user_id) === currentUserId);
+    }
     if (personFilter === 'paid_by' && activePersonId) {
       result = result.filter(e => (e.paid_by_user_id || e.user_id) === activePersonId);
     } else if (personFilter === 'owed_by' && activePersonId) {
@@ -331,7 +337,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
       );
     }
     return result;
-  }, [expenses, selectedCategory, personFilter, activePersonId, deferredSearchQuery]);
+  }, [expenses, selectedCategory, userScopeFilter, currentUserId, personFilter, activePersonId, deferredSearchQuery]);
 
   // Modal open handlers
   const handleOpenAddModal = () => {
@@ -674,7 +680,7 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
 
         {/* You Paid Card */}
         <div className="p-4 sm:p-5 rounded-2xl glass-panel border border-sky-500/20 bg-sky-950/20 space-y-1.5">
-          <span className="text-xs font-bold text-sky-400 uppercase tracking-wider">You Paid Out-of-Pocket</span>
+          <span className="text-xs font-bold text-sky-400 uppercase tracking-wider">You Paid ({currentUserName.split(' ')[0]})</span>
           <div className="text-2xl sm:text-3xl font-black text-white">
             {formatCurrency(userBalance.paid, displayCurrency)}
           </div>
@@ -688,11 +694,11 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
 
         {/* Your Share Card */}
         <div className="p-4 sm:p-5 rounded-2xl glass-panel border border-purple-500/20 bg-purple-950/20 space-y-1.5">
-          <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Your Total Share</span>
+          <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Your Share ({currentUserName.split(' ')[0]})</span>
           <div className="text-2xl sm:text-3xl font-black text-white">
             {formatCurrency(userBalance.owed, displayCurrency)}
           </div>
-          <span className="text-[11px] text-slate-400">Your split liability</span>
+          <span className="text-[11px] text-slate-400">Your split liability across all trip bookings</span>
         </div>
 
         {/* Net Balance Card */}
@@ -791,48 +797,76 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
         }}
       />
 
-      {/* Filter Tabs & Search Input */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
-        {/* Category Filter Pills */}
-        <div className="flex items-center space-x-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                selectedCategory === cat.id 
-                  ? 'bg-amber-500 text-slate-950 shadow-sm' 
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+      {/* Filter Tabs, Personal Scope Switcher & Search Input */}
+      <div className="space-y-3 border-b border-white/10 pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="inline-flex items-center space-x-1 p-1 rounded-xl bg-slate-950/80 border border-white/10 text-xs">
+            {[
+              { id: 'all', label: 'All Trip Expenses' },
+              { id: 'mine', label: `My Items & Splits (${currentUserName.split(' ')[0]})` },
+              { id: 'paid_by_me', label: 'Paid by Me' },
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setUserScopeFilter(opt.id)}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  userScopeFilter === opt.id
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <span className="text-[11px] text-slate-400 font-mono">
+            Showing {filteredExpenses.length} of {expenses.length} entries
+          </span>
         </div>
 
-        {/* Search Input (press / to focus) */}
-        <div className="relative w-full sm:w-64 shrink-0">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search expenses... (/)"
-            aria-label="Search expenses"
-            className="w-full pl-8 pr-8 py-1.5 rounded-xl bg-slate-950/90 border border-white/10 text-base sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400/60"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              aria-label="Clear expense search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Category Filter Pills */}
+          <div className="flex items-center space-x-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  selectedCategory === cat.id 
+                    ? 'bg-amber-500 text-slate-950 shadow-sm' 
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Input (press / to focus) */}
+          <div className="relative w-full sm:w-64 shrink-0">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search expenses... (/)"
+              aria-label="Search expenses"
+              className="w-full pl-8 pr-8 py-1.5 rounded-xl bg-slate-950/90 border border-white/10 text-base sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400/60"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear expense search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -865,6 +899,8 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
             const Icon = catMeta.icon || Receipt;
             const cur = exp.currency_original || 'PLN';
             const amt = Number(exp.amount_original || 0);
+            const mySplit = exp.splits?.find(s => s.user_id === currentUserId);
+            const iPaid = (exp.paid_by_user_id || exp.user_id) === currentUserId;
 
             return (
               <div
@@ -880,7 +916,15 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                       {exp.description}
                     </h4>
                     <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-400">
-                      <span>Paid by <strong className="text-slate-200">{exp.paid_by_name || 'Member'}</strong></span>
+                      <span>Paid by <strong className={iPaid ? 'text-emerald-300' : 'text-slate-200'}>{iPaid ? `${exp.paid_by_name || currentUserName} (You)` : (exp.paid_by_name || 'Member')}</strong></span>
+                      {mySplit && (
+                        <>
+                          <span>•</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-500/30 text-purple-200 text-[11px] font-semibold">
+                            Your share: {formatCurrency(mySplit.amount_owed, cur)}
+                          </span>
+                        </>
+                      )}
                       <span>•</span>
                       <span className="capitalize">{exp.category || 'expense'}</span>
                       {exp.purchase_site && (
@@ -949,17 +993,19 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                               <span className="text-emerald-400 font-medium">
                                 ✓ Settled {s.settle_method ? `via ${SETTLE_METHOD_MAP[s.settle_method] || s.settle_method}` : ''}
                               </span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleUndoSplit(s.id, exp.description);
-                                }}
-                                className="ml-1 text-slate-400 hover:text-red-300 underline text-[10px] cursor-pointer"
-                                title="Undo settlement for this item"
-                              >
-                                Undo
-                              </button>
+                              {!isViewer && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUndoSplit(s.id, exp.description);
+                                  }}
+                                  className="ml-1 text-slate-400 hover:text-red-300 underline text-[10px] cursor-pointer"
+                                  title="Undo settlement for this item"
+                                >
+                                  Undo
+                                </button>
+                              )}
                             </div>
                           ) : (
                             <div 
@@ -977,17 +1023,19 @@ export function ExpenseLedger({ journeyId = 'poland-christmas-2026', agendaRole 
                                   </span>
                                 )}
                               </span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveItemToSettle({ expense: exp, split: s });
-                                }}
-                                className="px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] transition-all cursor-pointer shadow-sm"
-                                title={`Settle ${firstName}'s share of this item`}
-                              >
-                                Settle Item
-                              </button>
+                              {!isViewer && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveItemToSettle({ expense: exp, split: s });
+                                  }}
+                                  className="px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] transition-all cursor-pointer shadow-sm"
+                                  title={`Settle ${firstName}'s share of this item`}
+                                >
+                                  Settle Item
+                                </button>
+                              )}
                             </div>
                           );
                         })}

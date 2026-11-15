@@ -29,9 +29,10 @@ const BAG_TYPES = [
 
 const LOCAL_STORAGE_KEY = 'wayfinder_offline_packing_v1';
 
-export function PackingManager() {
+export function PackingManager({ agendaRole = null }) {
   const { isAuthenticated, user, setIsAuthModalOpen } = useAuth();
   const { settings, updateSettings, openSettings } = useSettings();
+  const isViewer = agendaRole === 'viewer';
   const isLbs = (settings?.weight || 'lbs') === 'lbs';
   
   const [items, setItems] = useState([]);
@@ -175,6 +176,7 @@ export function PackingManager() {
 
   // 1-Click Load Poland Winter 2026 Preset
   const handleApplyPreset = async () => {
+    if (isViewer) return;
     if (isAuthenticated) {
       setIsSaving(true);
       try {
@@ -248,6 +250,7 @@ export function PackingManager() {
 
   // Toggle item packed state
   const handleTogglePacked = async (item) => {
+    if (isViewer) return;
     const updatedStatus = !item.is_packed;
     const optimistic = items.map(i => i.id === item.id ? { ...i, is_packed: updatedStatus } : i);
     setItems(optimistic);
@@ -265,6 +268,7 @@ export function PackingManager() {
 
   // Update item quantity
   const handleUpdateQuantity = async (item, delta) => {
+    if (isViewer) return;
     const newQty = Math.max(1, (item.quantity || 1) + delta);
     if (newQty === item.quantity) return;
     const optimistic = items.map(i => i.id === item.id ? { ...i, quantity: newQty } : i);
@@ -283,6 +287,7 @@ export function PackingManager() {
 
   // Delete item
   const handleDeleteItem = async (itemId) => {
+    if (isViewer) return;
     const existingTimer = pendingPutTimersRef.current.get(itemId);
     if (existingTimer) clearTimeout(existingTimer);
     pendingPutTimersRef.current.delete(itemId);
@@ -311,6 +316,7 @@ export function PackingManager() {
 
   // Toggle all in category
   const handleToggleCategory = async (catId, currentAllPacked) => {
+    if (isViewer) return;
     const targetState = !currentAllPacked;
     const optimistic = items.map(i => i.category === catId ? { ...i, is_packed: targetState } : i);
     setItems(optimistic);
@@ -342,6 +348,7 @@ export function PackingManager() {
   // Add custom item
   const handleCreateItem = async (e) => {
     e.preventDefault();
+    if (isViewer) return;
     if (!newItemName.trim()) return;
 
     const parsedInputWeight = parseFloat(newItemWeight) || 0;
@@ -403,6 +410,7 @@ export function PackingManager() {
 
   // Clear all packed items
   const handleClearPacked = async () => {
+    if (isViewer) return;
     if (!confirm('Remove all checked/packed items from your checklist?')) return;
 
     const optimistic = items.filter(i => !i.is_packed);
@@ -540,6 +548,12 @@ export function PackingManager() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {isViewer && (
+        <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs flex items-center space-x-2.5 shadow-sm">
+          <Lock className="w-4 h-4 shrink-0 text-sky-400" />
+          <span>Viewing shared expedition packing checklist (read-only collaborator access).</span>
+        </div>
+      )}
       {/* Top Banner / Auth Sync Alert */}
       {!isAuthenticated && (
         <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-slate-900 to-sky-500/15 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
@@ -607,33 +621,37 @@ export function PackingManager() {
               </button>
             </div>
 
-            <button
-              onClick={handleApplyPreset}
-              disabled={isSaving}
-              className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 hover:text-white text-xs font-bold transition-all flex items-center space-x-1.5 shadow-md active:scale-95 disabled:opacity-50"
-              title="Loads the 37-item curated Poland Winter gear checklist"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSaving ? 'animate-spin' : ''}`} />
-              <span>{items.length === 0 ? 'Load Winter 2026 Preset' : 'Append Winter Preset'}</span>
-            </button>
+            {!isViewer && (
+              <>
+                <button
+                  onClick={handleApplyPreset}
+                  disabled={isSaving}
+                  className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 hover:text-white text-xs font-bold transition-all flex items-center space-x-1.5 shadow-md active:scale-95 disabled:opacity-50"
+                  title="Loads the 37-item curated Poland Winter gear checklist"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSaving ? 'animate-spin' : ''}`} />
+                  <span>{items.length === 0 ? 'Load Winter 2026 Preset' : 'Append Winter Preset'}</span>
+                </button>
 
-            <button
-              onClick={() => setIsAddingItem(!isAddingItem)}
-              className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-black transition-all flex items-center space-x-1.5 shadow-md active:scale-95"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Custom Item</span>
-            </button>
+                <button
+                  onClick={() => setIsAddingItem(!isAddingItem)}
+                  className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-black transition-all flex items-center space-x-1.5 shadow-md active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Custom Item</span>
+                </button>
 
-            {stats.packedItems > 0 && (
-              <button
-                onClick={handleClearPacked}
-                className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold transition-colors flex items-center space-x-1"
-                title="Remove packed items from checklist"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Clear Packed ({stats.packedItems})</span>
-              </button>
+                {stats.packedItems > 0 && (
+                  <button
+                    onClick={handleClearPacked}
+                    className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold transition-colors flex items-center space-x-1"
+                    title="Remove packed items from checklist"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Clear Packed ({stats.packedItems})</span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -720,7 +738,7 @@ export function PackingManager() {
         </div>
 
         {/* Add Item Modal / Inline Drawer */}
-        {isAddingItem && (
+        {isAddingItem && !isViewer && (
           <form onSubmit={handleCreateItem} className="p-4 sm:p-5 rounded-2xl bg-slate-950 border border-sky-400/40 space-y-4 animate-scale-up">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-sm font-bold text-white flex items-center space-x-2">
@@ -928,14 +946,16 @@ export function PackingManager() {
           <p className="text-slate-300 text-sm max-w-md mx-auto">
             Load the verified Poland Winter 2026 expedition preset pre-populated with thermal base layers, sub-zero down parkas, ice grips, and plug converters.
           </p>
-          <button
-            onClick={handleApplyPreset}
-            disabled={isSaving}
-            className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-black shadow-xl hover-lift active:scale-95 transition-all inline-flex items-center space-x-2"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Load Curated Winter 2026 Preset (37 Items)</span>
-          </button>
+          {!isViewer && (
+            <button
+              onClick={handleApplyPreset}
+              disabled={isSaving}
+              className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-black shadow-xl hover-lift active:scale-95 transition-all inline-flex items-center space-x-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Load Curated Winter 2026 Preset (37 Items)</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -984,7 +1004,7 @@ export function PackingManager() {
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {totalCount > 0 && (
+                  {totalCount > 0 && !isViewer && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1025,8 +1045,9 @@ export function PackingManager() {
                           <div className="flex items-start sm:items-center space-x-3 min-w-0 flex-1">
                             <button
                               onClick={() => handleTogglePacked(item)}
-                              className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-transform active:scale-90 ${isPk ? 'text-emerald-400' : 'text-slate-400 hover:text-white'}`}
-                              title={isPk ? 'Mark unpacked' : 'Mark packed'}
+                              disabled={isViewer}
+                              className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-transform ${isViewer ? 'cursor-default opacity-80' : 'active:scale-90'} ${isPk ? 'text-emerald-400' : 'text-slate-400 hover:text-white'}`}
+                              title={isViewer ? (isPk ? 'Packed (Read-Only)' : 'To Pack (Read-Only)') : (isPk ? 'Mark unpacked' : 'Mark packed')}
                             >
                               {isPk ? (
                                 <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-500/20" />
@@ -1066,34 +1087,40 @@ export function PackingManager() {
                           <div className="flex items-center space-x-2 shrink-0">
                             {/* Quantity Adjuster */}
                             <div className="flex items-center bg-slate-950/90 rounded-lg border border-white/10 px-1 py-0.5 text-xs">
-                              <button
-                                onClick={() => handleUpdateQuantity(item, -1)}
-                                disabled={qty <= 1}
-                                className="px-2.5 py-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-white disabled:opacity-30 font-bold"
-                                title="Decrease quantity"
-                              >
-                                -
-                              </button>
-                              <span className="px-1 font-mono text-slate-200 text-[11px] min-w-[16px] text-center">
+                              {!isViewer && (
+                                <button
+                                  onClick={() => handleUpdateQuantity(item, -1)}
+                                  disabled={qty <= 1}
+                                  className="px-2.5 py-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-white disabled:opacity-30 font-bold"
+                                  title="Decrease quantity"
+                                >
+                                  -
+                                </button>
+                              )}
+                              <span className="px-1.5 font-mono text-slate-200 text-[11px] min-w-[20px] text-center">
                                 {qty}
                               </span>
-                              <button
-                                onClick={() => handleUpdateQuantity(item, 1)}
-                                className="px-2.5 py-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-white font-bold"
-                                title="Increase quantity"
-                              >
-                                +
-                              </button>
+                              {!isViewer && (
+                                <button
+                                  onClick={() => handleUpdateQuantity(item, 1)}
+                                  className="px-2.5 py-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-white font-bold"
+                                  title="Increase quantity"
+                                >
+                                  +
+                                </button>
+                              )}
                             </div>
 
                             {/* Delete Button */}
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                              title="Delete item"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {!isViewer && (
+                              <button
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                title="Delete item"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       );

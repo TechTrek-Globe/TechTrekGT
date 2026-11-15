@@ -4,20 +4,33 @@ import {
   FileText, Eye, ChevronDown, ChevronUp,
   Globe, Loader2, AlertCircle, CheckCircle2,
   SlidersHorizontal, RefreshCw, ExternalLink, ClipboardPaste,
-  RotateCcw
+  RotateCcw, ShieldCheck, ShieldAlert, DollarSign,
+  MapPin, Tag, Package, Music, Camera
 } from 'lucide-react';
 import {
   generateEbayCopy,
   generateFacebookCopy,
   generateWhatnotCopy,
   generateMercariCopy,
-  generateSocialCopy,
+  generateReverbCopy,
   stripInternalTrackingNotes,
   sanitizeListingHtml
 } from '../utils/listingCopyGenerator';
+import {
+  SUPPORTED_PLATFORMS,
+  PLATFORM_RULES_REGISTRY,
+  getPlatformRules,
+  computeUtf16Length
+} from '../utils/platformListingRules';
 import { getApiUrl } from '../utils/api';
 import { parseAmazonProductContent } from '../utils/amazonParser';
-import { fetchEbayItemDetail, fetchAmazonProduct, generateAiEbayDetails, createEbayListingApi } from '../utils/auctionApi';
+import {
+  fetchEbayItemDetail,
+  fetchAmazonProduct,
+  generateAiEbayDetails,
+  generateAiPlatformListingApi,
+  createEbayListingApi
+} from '../utils/auctionApi';
 
 /**
  * Extracts Order ID or ASIN from an item's notes or invoice_ref.
@@ -68,6 +81,22 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
   const [generatingAiDetails, setGeneratingAiDetails] = useState(false);
   const [aiDetailsMsg, setAiDetailsMsg] = useState(null);
 
+  // Multi-Platform Rules & AI Listing State
+  const [athlete, setAthlete] = useState('');
+  const [teamOrBand, setTeamOrBand] = useState('');
+  const [sportOrGenre, setSportOrGenre] = useState('');
+  const [authenticator, setAuthenticator] = useState('');
+  const [certNumber, setCertNumber] = useState('');
+  const [inscription, setInscription] = useState('');
+  const [size, setSize] = useState('');
+  const [isWearable, setIsWearable] = useState(false);
+  const [isCustomJersey, setIsCustomJersey] = useState(false);
+  const [isPickguardSignedGuitar, setIsPickguardSignedGuitar] = useState(false);
+  const [targetNet, setTargetNet] = useState('');
+  const [aiPlatformPayloads, setAiPlatformPayloads] = useState({});
+  const [generatingPlatformAi, setGeneratingPlatformAi] = useState(false);
+  const [platformAiMsg, setPlatformAiMsg] = useState(null);
+
   // 1-Click Publish to eBay State
   const [publishingEbay, setPublishingEbay] = useState(false);
   const [publishResult, setPublishResult] = useState(null);
@@ -76,6 +105,11 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
   useEffect(() => {
     if (!item) return;
     const initialAsin = extractAsinFromItem(item);
+    const combinedText = `${item.item_name || ''} ${item.category || ''} ${item.notes || ''}`.toLowerCase();
+    const detectedWearable = /\b(jersey|shirt|t-shirt|hoodie|jacket|hat|cap)\b/.test(combinedText);
+    const detectedCustomJersey = /\bcustom\b/.test(combinedText) && /\bjersey\b/.test(combinedText);
+    const detectedPickguard = /\b(pickguard|pick guard)\b/.test(combinedText) && /\bguitar\b/.test(combinedText);
+
     setAsinInput(initialAsin);
 
     setTitle(item.item_name || '');
@@ -90,6 +124,21 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
     setCompatibility('');
     setDescription(stripInternalTrackingNotes(item.notes || ''));
     setIncludedInSale('');
+    setAthlete(item.athlete_person || '');
+    setTeamOrBand(item.team_or_band || '');
+    setSportOrGenre(item.sport_genre || (item.category && item.category !== 'General' ? item.category : ''));
+    setAuthenticator(item.authenticator || '');
+    setCertNumber(item.cert_number || '');
+    setInscription(item.inscription || '');
+    setSize(item.size || '');
+    setIsWearable(Boolean(item.is_wearable ?? detectedWearable));
+    setIsCustomJersey(Boolean(item.is_custom_jersey ?? detectedCustomJersey));
+    setIsPickguardSignedGuitar(Boolean(item.is_pickguard_guitar ?? detectedPickguard));
+    const seedPrice = item.min_sell_price || item.suggested_list_price || item.current_list_price || item.unit_price || '';
+    setTargetNet(seedPrice ? String(seedPrice) : '');
+    setAiPlatformPayloads({});
+    setGeneratingPlatformAi(false);
+    setPlatformAiMsg(null);
     setAmazonMsg(null);
     setConditionMsg(null);
     setSmartPasteText('');
@@ -306,6 +355,76 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
     });
   };
 
+  // Generate AI Platform-Compliant Listing Payload via Worker
+  const handleGeneratePlatformAi = async (targetPlatform = platform) => {
+    if (!item) return;
+    setGeneratingPlatformAi(true);
+    setPlatformAiMsg(null);
+    try {
+      const cleanNotes = stripInternalTrackingNotes(description || item.notes || '');
+      const res = await generateAiPlatformListingApi({
+        platform: targetPlatform,
+        title: title || item.item_name || '',
+        brand: brand || '',
+        productType: productType || '',
+        condition: condition || '',
+        notes: cleanNotes,
+        specs: parsedSpecs,
+        features,
+        athlete,
+        teamOrBand,
+        sportOrGenre,
+        authenticator,
+        certNumber,
+        inscription,
+        size,
+        isWearable,
+        isCustomJersey,
+        isPickguardSignedGuitar,
+        targetNet: targetNet ? Number(targetNet) : null,
+        min_sell_price: item.min_sell_price,
+        suggested_list_price: item.suggested_list_price,
+        current_list_price: item.current_list_price
+      });
+
+      if (!res || res.success === false || !res.payload) {
+        throw new Error(res?.error || `Failed to generate ${targetPlatform} AI payload.`);
+      }
+
+      setAiPlatformPayloads(prev => ({
+        ...prev,
+        [targetPlatform]: {
+          payload: res.payload,
+          validation: res.validation,
+          rules_version: res.rules_version
+        }
+      }));
+      setPlatformAiMsg({
+        type: 'success',
+        text: `AI optimized ${getPlatformRules(targetPlatform).name} listing JSON generated and validated.`
+      });
+    } catch (err) {
+      setPlatformAiMsg({
+        type: 'error',
+        text: err.message || `Failed to generate AI listing payload for ${targetPlatform}.`
+      });
+    } finally {
+      setGeneratingPlatformAi(false);
+    }
+  };
+
+  const handleResetPlatformAi = (targetPlatform = platform) => {
+    setAiPlatformPayloads(prev => {
+      const next = { ...prev };
+      delete next[targetPlatform];
+      return next;
+    });
+    setPlatformAiMsg({
+      type: 'info',
+      text: `Reverted ${getPlatformRules(targetPlatform).name} to live rule-engine defaults.`
+    });
+  };
+
   // Parse Key-Value text blocks
   const parsedSpecs = useMemo(() => {
     if (!specs.trim()) return [];
@@ -329,6 +448,7 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
   const generated = useMemo(() => {
     if (!item) return {};
     const options = {
+      enforcePlatformRules: true,
       title: title || item.item_name,
       brand,
       productType,
@@ -343,16 +463,33 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
       includedInSale,
       shippingPolicy,
       returnPolicy,
-      aiGeneratedMiddleSection
+      aiGeneratedMiddleSection,
+      athlete,
+      teamOrBand,
+      sportOrGenre,
+      authenticator,
+      certNumber,
+      inscription,
+      size,
+      isWearable,
+      isCustomJersey,
+      isPickguardSignedGuitar,
+      targetNet: targetNet ? Number(targetNet) : undefined
     };
     const ebay = generateEbayCopy(item, options);
     const facebook = generateFacebookCopy(item, options);
     const whatnot = generateWhatnotCopy(item, options);
     const mercari = generateMercariCopy(item, options);
-    const social = generateSocialCopy(item, options);
+    const reverb = generateReverbCopy(item, options);
 
-    return { ebay, facebook, whatnot, mercari, social };
-  }, [item, title, brand, productType, subtitle, conditionHeader, conditionSubheader, condition, features, parsedSpecs, parsedCompatibility, description, includedInSale, shippingPolicy, returnPolicy, aiGeneratedMiddleSection]);
+    return { ebay, facebook, whatnot, mercari, reverb };
+  }, [
+    item, title, brand, productType, subtitle, conditionHeader, conditionSubheader,
+    condition, features, parsedSpecs, parsedCompatibility, description, includedInSale,
+    shippingPolicy, returnPolicy, aiGeneratedMiddleSection, athlete, teamOrBand,
+    sportOrGenre, authenticator, certNumber, inscription, size, isWearable,
+    isCustomJersey, isPickguardSignedGuitar, targetNet
+  ]);
 
   const copyToClipboard = (text, fieldName) => {
     navigator.clipboard.writeText(text);
@@ -364,11 +501,43 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
 
   if (!isOpen || !item) return null;
 
-  const curEbay = generated.ebay || {};
-  const curFacebook = generated.facebook || {};
-  const curWhatnot = generated.whatnot || {};
-  const curMercari = generated.mercari || {};
-  const curSocial = generated.social || {};
+  const mergeAiOverride = (key, fallbackObj) => {
+    const base = fallbackObj || {};
+    const aiOverride = aiPlatformPayloads[key];
+    if (!aiOverride || !aiOverride.payload) return base;
+    const p = aiOverride.payload;
+    return {
+      ...base,
+      title: p.title || base.title,
+      price: p.pricing_guidance?.suggested_list_price ? `$${p.pricing_guidance.suggested_list_price}` : base.price,
+      htmlBody: p.description_html || base.htmlBody,
+      textBody: p.description_plain_text || base.textBody,
+      notes: p.description_plain_text || base.notes,
+      description: p.description_plain_text || base.description,
+      hashtags: Array.isArray(p.hashtags) ? p.hashtags.join(' ') : base.hashtags,
+      payload: p,
+      validation: aiOverride.validation || base.validation,
+      isAiOptimized: true
+    };
+  };
+
+  const curEbay = mergeAiOverride('ebay', generated.ebay);
+  const curFacebook = mergeAiOverride('facebook', generated.facebook);
+  const curWhatnot = mergeAiOverride('whatnot', generated.whatnot);
+  const curMercari = mergeAiOverride('mercari', generated.mercari);
+  const curReverb = mergeAiOverride('reverb', generated.reverb);
+  const platformMap = {
+    ebay: curEbay,
+    facebook: curFacebook,
+    mercari: curMercari,
+    whatnot: curWhatnot,
+    reverb: curReverb
+  };
+  const activePlatformData = platformMap[platform] || curEbay;
+  const activePlatformRules = getPlatformRules(platform);
+  const activePayload = activePlatformData.payload || {};
+  const activeValidation = activePlatformData.validation || { passed: true, checks: [], errors: [], warnings: [] };
+  const activeTitleUtf16 = computeUtf16Length(activePlatformData.title || '');
 
   const handlePublishToEbay = async () => {
     if (!item?.id) return;
@@ -767,6 +936,157 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
                   />
                 </div>
 
+                {/* Memorabilia, Authentication & Platform Rule Guards */}
+                <div className="md:col-span-2 p-3.5 rounded-xl bg-slate-900/70 border border-amber-500/25 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                      Memorabilia, Sizing &amp; Platform Guardrails
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      Feeds all 5 platform rule engines (80-char UTF-16 budget, Size token, COA check, Pricing math)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Athlete / Artist / Signer
+                      </label>
+                      <input
+                        type="text"
+                        value={athlete}
+                        onChange={e => setAthlete(e.target.value)}
+                        placeholder="e.g. Brock Bowers, Taylor Swift"
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Team / Band / Franchise
+                      </label>
+                      <input
+                        type="text"
+                        value={teamOrBand}
+                        onChange={e => setTeamOrBand(e.target.value)}
+                        placeholder="e.g. Georgia Bulldogs"
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Authenticator (COA)
+                      </label>
+                      <input
+                        type="text"
+                        value={authenticator}
+                        onChange={e => setAuthenticator(e.target.value)}
+                        placeholder="e.g. JSA, PSA/DNA, Beckett, SWAU"
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Cert / Hologram #
+                      </label>
+                      <input
+                        type="text"
+                        value={certNumber}
+                        onChange={e => setCertNumber(e.target.value)}
+                        placeholder="e.g. AB12345"
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Sport / Music Genre
+                      </label>
+                      <input
+                        type="text"
+                        value={sportOrGenre}
+                        onChange={e => setSportOrGenre(e.target.value)}
+                        placeholder="e.g. Football, Country Guitar"
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Inscription (Exact)
+                      </label>
+                      <input
+                        type="text"
+                        value={inscription}
+                        onChange={e => setInscription(e.target.value)}
+                        placeholder="e.g. Go Dawgs, HOF 20"
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Wearable Size (XL, 52...)
+                      </label>
+                      <input
+                        type="text"
+                        value={size}
+                        onChange={e => setSize(e.target.value)}
+                        placeholder="Apparel only (e.g. XL, 52)"
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Target Net Payout ($)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={targetNet}
+                        onChange={e => setTargetNet(e.target.value)}
+                        placeholder="e.g. 200"
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono tabular-nums focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-slate-300">
+                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isWearable}
+                        onChange={e => setIsWearable(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-amber-400 focus:ring-amber-500"
+                      />
+                      <span>Wearable Apparel / Jersey (injects standalone Size token)</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isCustomJersey}
+                        onChange={e => setIsCustomJersey(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-amber-400 focus:ring-amber-500"
+                      />
+                      <span>Custom Stitched Jersey (strips Nike/NFL/OEM spoofing)</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isPickguardSignedGuitar}
+                        onChange={e => setIsPickguardSignedGuitar(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-amber-400 focus:ring-amber-500"
+                      />
+                      <span>Signed Pickguard Display Guitar (strips Fender/Gibson spoofing)</span>
+                    </label>
+                  </div>
+                </div>
+
                 {/* Detailed Description */}
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -798,27 +1118,186 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
             </div>
           )}
 
-          {/* Platform Selection Tabs */}
+          {/* Platform Selection Tabs (Amber Tactical 5-Platform Switcher) */}
           <div className="flex border-b border-slate-800 bg-slate-950/60 pt-2 gap-2 overflow-x-auto rounded-t-xl px-2">
-            {[
-              { id: 'ebay', label: 'eBay (SEO & HTML)' },
-              { id: 'facebook', label: 'Facebook / Local' },
-              { id: 'whatnot', label: 'Whatnot (Stream Notes)' },
-              { id: 'mercari', label: 'Mercari (+ Tags)' },
-              { id: 'social', label: 'Instagram / Social' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setPlatform(tab.id)}
-                className={`px-3.5 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                  platform === tab.id
-                    ? 'border-amber-400 text-amber-300 bg-amber-500/10'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {SUPPORTED_PLATFORMS.map(tabId => {
+              const ruleSpec = PLATFORM_RULES_REGISTRY[tabId];
+              const tabData = platformMap[tabId] || {};
+              const tabChars = computeUtf16Length(tabData.title || '');
+              const tabPassed = tabData.validation ? tabData.validation.passed : true;
+              const isSelected = platform === tabId;
+              return (
+                <button
+                  key={tabId}
+                  onClick={() => setPlatform(tabId)}
+                  className={`px-3.5 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+                    isSelected
+                      ? 'border-amber-400 text-amber-300 bg-amber-500/10'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${tabPassed ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                  <span>{ruleSpec.shortLabel}</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums ${
+                    tabChars > 80
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                      : isSelected
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        : 'bg-slate-900 text-slate-400 border border-slate-800'
+                  }`}>
+                    {tabChars}/80
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active Platform Intelligence Bar + Pre-Publish Validation Gate */}
+          <div className="glass-card rounded-xl border border-amber-500/25 bg-slate-900/75 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-amber-300">
+                    {activePlatformRules.name} Rules Engine
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono tabular-nums bg-slate-950 text-slate-300 border border-slate-800">
+                    UTF-16 Title: {activeTitleUtf16}/{activePlatformRules.titleMaxUtf16} (Target {activePlatformRules.titleTargetRange})
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 border ${
+                    activeValidation.passed
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                  }`}>
+                    {activeValidation.passed ? <ShieldCheck className="w-3 h-3" /> : <ShieldAlert className="w-3 h-3" />}
+                    <span>{activeValidation.passed ? 'Pre-Publish Gate Passed' : `${activeValidation.errors.length} Gate Violation(s)`}</span>
+                  </span>
+                  {activePlatformData.isAiOptimized && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      AI Schema Active
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {activePlatformRules.tagline} | Fee Math: <span className="text-slate-300 font-mono">{activePlatformRules.feeFormulaLabel}</span>
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {activePlatformData.isAiOptimized && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetPlatformAi(platform)}
+                    disabled={generatingPlatformAi}
+                    className="px-2.5 py-1.5 rounded-xl text-[11px] font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset Rule Engine</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleGeneratePlatformAi(platform)}
+                  disabled={generatingPlatformAi}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 disabled:opacity-50 flex items-center gap-1.5 shadow-md shadow-amber-500/15"
+                >
+                  {generatingPlatformAi ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                      <span>Optimizing {activePlatformRules.name}...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                      <span>AI Optimize {activePlatformRules.name} JSON</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(JSON.stringify(activePayload, null, 2), `${platform}_json`)}
+                  className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 flex items-center gap-1"
+                >
+                  {copiedField === `${platform}_json` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedField === `${platform}_json` ? 'JSON Copied!' : 'Copy JSON'}</span>
+                </button>
+              </div>
+            </div>
+
+            {platformAiMsg && (
+              <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 border ${
+                platformAiMsg.type === 'success'
+                  ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800'
+                  : platformAiMsg.type === 'info'
+                    ? 'bg-blue-950/40 text-blue-300 border-blue-800'
+                    : 'bg-rose-950/40 text-rose-300 border-rose-800'
+              }`}>
+                {platformAiMsg.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                )}
+                <span className="flex-1">{platformAiMsg.text}</span>
+                <button
+                  type="button"
+                  onClick={() => setPlatformAiMsg(null)}
+                  className="text-slate-400 hover:text-slate-200 text-xs px-1"
+                >
+                  x
+                </button>
+              </div>
+            )}
+
+            {/* Pricing Math & Photo Order Strip */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-1">
+              <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 space-y-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                  <DollarSign className="w-3 h-3 text-amber-400" />
+                  Fee-Adjusted Pricing Guidance
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs font-mono tabular-nums">
+                  {activePayload.pricing_guidance && Object.entries(activePayload.pricing_guidance).map(([k, v]) => (
+                    <div key={k} className="flex items-center gap-1">
+                      <span className="text-slate-500">{k.replace(/_/g, ' ')}:</span>
+                      <span className="text-emerald-400 font-bold">
+                        {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : `$${v}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 space-y-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                  <Camera className="w-3 h-3 text-amber-400" />
+                  Recommended 4-Photo Sequence
+                </div>
+                <div className="text-[11px] text-slate-300 leading-snug">
+                  {(activePayload.recommended_photo_order || activePlatformRules.photoOrder || []).map((step, i) => (
+                    <span key={step} className="mr-2 inline-block">
+                      <span className="text-amber-400 font-bold font-mono">{i + 1}.</span> {step}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Live Pre-Publish Checks */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {(activeValidation.checks || []).map(chk => (
+                <span
+                  key={chk.id}
+                  title={chk.detail}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium border flex items-center gap-1 ${
+                    chk.passed
+                      ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60'
+                      : 'bg-rose-950/60 text-rose-300 border-rose-500/50 font-bold'
+                  }`}
+                >
+                  {chk.passed ? <CheckCircle2 className="w-2.5 h-2.5" /> : <AlertCircle className="w-2.5 h-2.5" />}
+                  <span>{chk.label}: {chk.detail}</span>
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* eBay Tab Content */}
@@ -1122,59 +1601,122 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
           {/* Facebook Marketplace / Local Pickup Tab Content */}
           {platform === 'facebook' && (
             <div className="space-y-4">
-              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2 text-blue-300 font-semibold">
-                  <CheckCircle2 className="w-4 h-4 text-blue-400" />
-                  <span>Facebook Marketplace &amp; Local Pickup Optimized</span>
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-amber-300 font-semibold">
+                  <MapPin className="w-4 h-4 text-amber-400" />
+                  <span>
+                    {curFacebook.payload?.logistics?.risk_tier || 'Facebook Marketplace'} Meetup:{' '}
+                    {curFacebook.payload?.logistics?.meetup_location || 'Local Police Precinct / QT Safe Place'}
+                  </span>
                 </div>
-                <span className="text-[11px] text-blue-300/80">
-                  Zero marketplace commission · Zero shipping label costs · Cash on pickup
+                <span className="text-[11px] font-mono text-emerald-300">
+                  Local Payments: {(curFacebook.payload?.logistics?.accepted_local_payments || ['Cash', 'Apple Pay']).join(' / ')}
+                  {' · '}Brand: {curFacebook.payload?.brand === null ? 'null (Custom/Unbranded Guard)' : (curFacebook.payload?.brand || 'N/A')}
                 </span>
               </div>
 
-              {/* Title Section */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Marketplace Title ({curFacebook.title?.length || 0}/100 chars)
-                  </label>
-                  <button
-                    onClick={() => copyToClipboard(curFacebook.title, 'fb_title')}
-                    className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
-                  >
-                    {copiedField === 'fb_title' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedField === 'fb_title' ? 'Copied!' : 'Copy Title'}</span>
-                  </button>
+              {/* Primary + 14-Day Relist Titles */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Primary Marketplace Title ({computeUtf16Length(curFacebook.title || '')}/80 UTF-16)
+                    </label>
+                    <button
+                      onClick={() => copyToClipboard(curFacebook.title, 'fb_title')}
+                      className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
+                    >
+                      {copiedField === 'fb_title' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedField === 'fb_title' ? 'Copied!' : 'Copy Title'}</span>
+                    </button>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-200 select-all">
+                    {curFacebook.title}
+                  </div>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-200 select-all">
-                  {curFacebook.title}
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      14-Day Relist Title ({computeUtf16Length(curFacebook.payload?.relist_title || '')}/80 UTF-16)
+                    </label>
+                    <button
+                      onClick={() => copyToClipboard(curFacebook.payload?.relist_title || curFacebook.title, 'fb_relist_title')}
+                      className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
+                    >
+                      {copiedField === 'fb_relist_title' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedField === 'fb_relist_title' ? 'Copied!' : 'Copy Relist'}</span>
+                    </button>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-amber-200/90 select-all">
+                    {curFacebook.payload?.relist_title || curFacebook.title}
+                  </div>
                 </div>
               </div>
 
-              {/* Asking Price Section */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Asking Cash Price
-                  </label>
-                  <button
-                    onClick={() => copyToClipboard(curFacebook.price, 'fb_price')}
-                    className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
-                  >
-                    {copiedField === 'fb_price' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedField === 'fb_price' ? 'Copied!' : 'Copy Price'}</span>
-                  </button>
+              {/* Asking Price & Metadata Strip */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Suggested List Price (+15% Buffer)
+                    </label>
+                    <button
+                      onClick={() => copyToClipboard(curFacebook.price, 'fb_price')}
+                      className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
+                    >
+                      {copiedField === 'fb_price' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedField === 'fb_price' ? 'Copied!' : 'Copy Price'}</span>
+                    </button>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono font-bold text-emerald-400 tabular-nums select-all">
+                    {curFacebook.price} (Min Floor: ${curFacebook.payload?.pricing_guidance?.minimum_acceptable_price || '--'})
+                  </div>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono font-bold text-emerald-400 select-all">
-                  {curFacebook.price}
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Category &amp; Condition
+                    </label>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300">
+                    {curFacebook.payload?.marketplace_category || 'Collectibles'} | {curFacebook.payload?.condition || 'New'}
+                  </div>
                 </div>
               </div>
+
+              {/* Product Tags */}
+              {Array.isArray(curFacebook.payload?.product_tags) && curFacebook.payload.product_tags.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-amber-400" />
+                      Product Tags ({curFacebook.payload.product_tags.length} tags)
+                    </label>
+                    <button
+                      onClick={() => copyToClipboard(curFacebook.payload.product_tags.join(', '), 'fb_tags')}
+                      className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
+                    >
+                      {copiedField === 'fb_tags' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedField === 'fb_tags' ? 'Copied!' : 'Copy Tags'}</span>
+                    </button>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-wrap gap-1.5">
+                    {curFacebook.payload.product_tags.map(tag => (
+                      <span key={tag} className="px-2 py-0.5 rounded bg-slate-950 border border-slate-700 text-[11px] font-mono text-slate-300">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Full Description Section */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Listing Description &amp; Pickup Terms
+                    Plain-Text Marketplace Description &amp; Safe Meetup Terms
                   </label>
                   <button
                     onClick={() => copyToClipboard(curFacebook.textBody, 'fb_desc')}
@@ -1194,9 +1736,24 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
           {/* Whatnot Tab Content */}
           {platform === 'whatnot' && (
             <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-amber-300 font-semibold">
+                  <Package className="w-4 h-4 text-amber-400" />
+                  <span>
+                    {curWhatnot.payload?.listing_format_recommendation || 'Live Auction / BIN'} |{' '}
+                    Weight Tier: {curWhatnot.payload?.shipping_profile?.estimated_packed_weight || '1-2 lbs'}
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono text-slate-300">
+                  {curWhatnot.payload?.whatnot_category || 'Sports Memorabilia > Autographed Memorabilia'}
+                </span>
+              </div>
+
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stream Title</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Live-Show Scannable Title ({computeUtf16Length(curWhatnot.title || '')}/80 UTF-16)
+                  </label>
                   <button
                     onClick={() => copyToClipboard(curWhatnot.title, 'wn_title')}
                     className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
@@ -1212,7 +1769,9 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Auction / Stream Notes</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Plain-Text Show Notes &amp; Packaging Guarantee
+                  </label>
                   <button
                     onClick={() => copyToClipboard(curWhatnot.notes, 'wn_notes')}
                     className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
@@ -1221,7 +1780,7 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
                     <span>{copiedField === 'wn_notes' ? 'Copied!' : 'Copy Stream Notes'}</span>
                   </button>
                 </div>
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 whitespace-pre-wrap select-all max-h-60 overflow-y-auto leading-relaxed">
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 whitespace-pre-wrap select-all max-h-64 overflow-y-auto leading-relaxed">
                   {curWhatnot.notes}
                 </div>
               </div>
@@ -1231,10 +1790,22 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
           {/* Mercari Tab Content */}
           {platform === 'mercari' && (
             <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-amber-300 font-semibold">
+                  <Tag className="w-4 h-4 text-amber-400" />
+                  <span>
+                    Brand Field: {curMercari.payload?.brand || 'No Brand'} | Condition: {curMercari.payload?.condition || 'New'}
+                  </span>
+                </div>
+                <span className={`text-[11px] font-mono tabular-nums ${(curMercari.description || '').length > 1000 ? 'text-rose-400 font-bold' : 'text-emerald-300'}`}>
+                  Plain Text Length: {(curMercari.description || '').length}/1000 chars | Zero URLs
+                </span>
+              </div>
+
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Mercari Title ({curMercari.title?.length || 0}/80 chars)
+                    Mercari Title ({computeUtf16Length(curMercari.title || '')}/80 UTF-16)
                   </label>
                   <button
                     onClick={() => copyToClipboard(curMercari.title, 'mercari_title')}
@@ -1251,7 +1822,9 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Description &amp; Hashtags</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Plain-Text Description + {curMercari.payload?.hashtags?.length || 0} Hashtags (Max 1000 Chars)
+                  </label>
                   <button
                     onClick={() => copyToClipboard(curMercari.description, 'mercari_desc')}
                     className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
@@ -1260,36 +1833,94 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
                     <span>{copiedField === 'mercari_desc' ? 'Copied!' : 'Copy Description'}</span>
                   </button>
                 </div>
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 whitespace-pre-wrap select-all max-h-60 overflow-y-auto leading-relaxed">
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 whitespace-pre-wrap select-all max-h-64 overflow-y-auto leading-relaxed">
                   {curMercari.description}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Social Tab Content */}
-          {platform === 'social' && (
+          {/* Reverb Tab Content */}
+          {platform === 'reverb' && (
             <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-amber-300 font-semibold">
+                  <Music className="w-4 h-4 text-amber-400" />
+                  <span>
+                    Brand: {curReverb.payload?.brand || 'Unbranded'} | Model: {curReverb.payload?.model || 'Custom Display Acoustic Guitar'}
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono text-slate-300">
+                  Condition: {curReverb.payload?.condition || 'Mint'} | Handling: {curReverb.payload?.shipping_profile?.handling_days || 3} business days
+                </span>
+              </div>
+
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Instagram / Social Post Caption</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Reverb SEO Title ({computeUtf16Length(curReverb.title || '')}/80 UTF-16)
+                  </label>
                   <button
-                    onClick={() => copyToClipboard(curSocial.caption, 'social_caption')}
+                    onClick={() => copyToClipboard(curReverb.title, 'reverb_title')}
                     className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-bold"
                   >
-                    {copiedField === 'social_caption' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedField === 'social_caption' ? 'Copied!' : 'Copy Caption'}</span>
+                    {copiedField === 'reverb_title' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedField === 'reverb_title' ? 'Copied!' : 'Copy Title'}</span>
                   </button>
                 </div>
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 whitespace-pre-wrap select-all leading-relaxed">
-                  {curSocial.caption}
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-200 select-all">
+                  {curReverb.title}
                 </div>
               </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300">
+                <span className="text-amber-400 font-bold uppercase tracking-wider mr-2">Shipping Profile:</span>
+                {curReverb.payload?.shipping_profile?.box_dimensions_note}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                  <button
+                    onClick={() => setFormat('html_preview')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
+                      format !== 'html_code' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Eye className="w-3 h-3" /> HTML Preview
+                  </button>
+                  <button
+                    onClick={() => setFormat('html_code')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
+                      format === 'html_code' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <FileCode className="w-3 h-3" /> Raw HTML
+                  </button>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(curReverb.htmlBody || '', 'reverb_html')}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 transition-all flex items-center gap-1"
+                >
+                  {copiedField === 'reverb_html' ? <Check className="w-3.5 h-3.5 text-slate-950" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedField === 'reverb_html' ? 'Copied!' : 'Copy Reverb HTML'}</span>
+                </button>
+              </div>
+
+              {format === 'html_code' ? (
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-amber-300/80 whitespace-pre-wrap select-all max-h-80 overflow-y-auto">
+                  {curReverb.htmlBody}
+                </div>
+              ) : (
+                <div
+                  className="p-4 rounded-xl bg-white text-slate-900 border border-slate-800 max-h-80 overflow-y-auto shadow-inner"
+                  dangerouslySetInnerHTML={{ __html: sanitizeListingHtml(curReverb.htmlBody || '') }}
+                />
+              )}
             </div>
           )}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-3.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-slate-800 bg-slate-900/50 text-xs shrink-0">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <a
               href="https://www.ebay.com/sl/prelist/suggest"
               target="_blank"
@@ -1297,6 +1928,22 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
               className="text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium"
             >
               eBay Sell Hub ↗
+            </a>
+            <a
+              href="https://www.facebook.com/marketplace/create/item"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium"
+            >
+              FB Marketplace ↗
+            </a>
+            <a
+              href="https://www.mercari.com/sell/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-purple-400 hover:text-purple-300 flex items-center gap-1 font-medium"
+            >
+              Mercari ↗
             </a>
             <a
               href="https://www.whatnot.com"
@@ -1307,12 +1954,12 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
               Whatnot ↗
             </a>
             <a
-              href="https://www.mercari.com/sell/"
+              href="https://reverb.com/sell"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-purple-400 hover:text-purple-300 flex items-center gap-1 font-medium"
+              className="text-orange-400 hover:text-orange-300 flex items-center gap-1 font-medium"
             >
-              Mercari ↗
+              Reverb ↗
             </a>
           </div>
 

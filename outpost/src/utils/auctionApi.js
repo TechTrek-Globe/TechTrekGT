@@ -488,6 +488,13 @@ export const generateAiEbayDetails = (payload) =>
     body: JSON.stringify(payload)
   });
 
+export const generateAiPlatformListingApi = (payload) =>
+  apiFetch('/api/ai/generate-ebay-details', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ ...payload, mode: 'platform_listing' })
+  });
+
 // --- Import History & Source File Archive ---
 export const getImportBatches = (page = 1, limit = 25) =>
   apiFetch(`/api/import/batches?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`);

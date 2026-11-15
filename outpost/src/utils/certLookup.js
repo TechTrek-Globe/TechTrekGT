@@ -38,7 +38,7 @@ export function getCertVerificationUrl(authenticator, certNumber) {
 
   // Beckett / BGS / BAS
   if (auth.includes('beckett') || auth.includes('bgs') || auth.includes('bas')) {
-    return `https://www.beckett-authentication.com/verify-certificate?cert_number=${encodeURIComponent(cleanCert)}`;
+    return `https://www.beckett-authentication.com/get-data/${encodeURIComponent(cleanCert)}`;
   }
 
   // JSA (James Spence)

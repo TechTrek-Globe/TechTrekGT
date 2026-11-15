@@ -1,13 +1,50 @@
 import { getCertVerificationUrl } from './certLookup.js';
 import { generateEbayListingHtml, stripInternalTrackingNotes, escapeHtml, sanitizeListingHtml } from './ebayTemplate.js';
+import {
+  SUPPORTED_PLATFORMS,
+  PLATFORM_RULES_REGISTRY,
+  getPlatformRules,
+  computeUtf16Length,
+  buildPlatformPayload,
+  validatePlatformPayload
+} from './platformListingRules.js';
 
-export { generateEbayListingHtml, stripInternalTrackingNotes, escapeHtml, sanitizeListingHtml };
+export {
+  generateEbayListingHtml,
+  stripInternalTrackingNotes,
+  escapeHtml,
+  sanitizeListingHtml,
+  SUPPORTED_PLATFORMS,
+  PLATFORM_RULES_REGISTRY,
+  getPlatformRules,
+  computeUtf16Length,
+  buildPlatformPayload,
+  validatePlatformPayload
+};
 
 /**
  * Generate multi-channel formatted listing copy for sports cards, memorabilia, and general/Amazon inventory.
  */
 
-export function generateEbayCopy(item, options = {}) {
+export function generateEbayCopy(item = {}, options = {}) {
+  if (options.enforcePlatformRules) {
+    const { payload, validation } = buildPlatformPayload('ebay', item, options);
+    const insertHtml = generateEbayListingHtml({
+      ...item,
+      ...options,
+      title: payload.title,
+      description: options.description || item.notes || '',
+      aiGeneratedMiddleSection: options.aiGeneratedMiddleSection || item.aiGeneratedMiddleSection || ''
+    });
+    return {
+      title: payload.title,
+      textBody: payload.description_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+      htmlBody: payload.description_html,
+      insertHtml,
+      payload,
+      validation
+    };
+  }
   const athlete = (options.athlete || item.athlete_person || '').trim();
   const category = (options.category || item.category || 'General').trim();
   const rawAuth = (options.authenticator || item.authenticator || '').trim();
@@ -250,6 +287,19 @@ ${insertHtml}
 }
 
 export function generateFacebookCopy(item = {}, options = {}) {
+  if (options.enforcePlatformRules) {
+    const { payload, validation } = buildPlatformPayload('facebook', item, options);
+    const listPrice = payload.pricing_guidance?.suggested_list_price ?? 0;
+    return {
+      title: payload.title,
+      relistTitle: payload.relist_title,
+      price: `$${Number(listPrice).toFixed(2)}`,
+      description: payload.description_plain_text,
+      textBody: payload.description_plain_text,
+      payload,
+      validation
+    };
+  }
   const titleInput = (options.title || item.item_name || '').trim();
   const brand = (options.brand || '').trim();
   const condition = options.condition || item.condition || 'Brand New / Excellent';
@@ -333,7 +383,16 @@ export function generateFacebookCopy(item = {}, options = {}) {
   return { title, price: priceExact, description, textBody };
 }
 
-export function generateWhatnotCopy(item, options = {}) {
+export function generateWhatnotCopy(item = {}, options = {}) {
+  if (options.enforcePlatformRules) {
+    const { payload, validation } = buildPlatformPayload('whatnot', item, options);
+    return {
+      title: payload.title,
+      notes: payload.description_plain_text,
+      payload,
+      validation
+    };
+  }
   const titleInput = (options.title || item.item_name || '').trim();
   const athlete = (options.athlete || item.athlete_person || '').trim();
   const rawAuth = (options.authenticator || item.authenticator || '').trim();
@@ -357,7 +416,17 @@ export function generateWhatnotCopy(item, options = {}) {
   return { title, notes };
 }
 
-export function generateMercariCopy(item, options = {}) {
+export function generateMercariCopy(item = {}, options = {}) {
+  if (options.enforcePlatformRules) {
+    const { payload, validation } = buildPlatformPayload('mercari', item, options);
+    return {
+      title: payload.title,
+      description: payload.description_plain_text,
+      hashtags: (payload.hashtags || []).join(' '),
+      payload,
+      validation
+    };
+  }
   const titleInput = (options.title || item.item_name || '').trim();
   const athlete = (options.athlete || item.athlete_person || '').trim();
   const rawAuth = (options.authenticator || item.authenticator || '').trim();
@@ -440,4 +509,20 @@ export function generateSocialCopy(item, options = {}) {
 
   const caption = captionLines.join('\n');
   return { caption, tags };
+}
+
+export function generateReverbCopy(item = {}, options = {}) {
+  const { payload, validation } = buildPlatformPayload('reverb', item, options);
+  return {
+    title: payload.title,
+    htmlBody: payload.description_html,
+    textBody: payload.description_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+    payload,
+    validation
+  };
+}
+
+export function generatePlatformListing(platform = 'ebay', item = {}, options = {}) {
+  const normPlatform = String(platform || 'ebay').toLowerCase().trim();
+  return buildPlatformPayload(normPlatform, item, options);
 }

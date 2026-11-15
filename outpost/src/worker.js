@@ -58,6 +58,12 @@ import { onRequestGet as syncSettingsGetHandler, onRequestPut as syncSettingsPut
 import { onRequestGet as integrationsListHandler, onRequestPost as integrationsCreateHandler } from '../functions/api/integrations/index.js';
 import { onRequestPost as integrationRevokeHandler, onRequestDelete as integrationDeleteHandler } from '../functions/api/integrations/[id].js';
 import { onRequestPost as generateEbayDetailsHandler } from '../functions/api/ai/generate-ebay-details.js';
+import {
+  PLATFORM_RULES_REGISTRY,
+  getPlatformRules,
+  buildPlatformPayload,
+  validatePlatformPayload
+} from './utils/platformListingRules.js';
 
 // Durable Object export - required for wrangler DO binding
 export { RateLimitCounter } from '../functions/utils/RateLimitCounter.js';
@@ -694,7 +700,13 @@ export default {
   }
 };
 
-export { addSecurityHeaders };
+export {
+  addSecurityHeaders,
+  PLATFORM_RULES_REGISTRY,
+  getPlatformRules,
+  buildPlatformPayload,
+  validatePlatformPayload
+};
 
 /**
  * HIGH-001 / FUNC-001: Serverless/Worker-compatible spreadsheet parsing entrypoint.

@@ -28,8 +28,8 @@ export function stripInternalTrackingNotes(text) {
   cleaned = cleaned.replace(/Item\s*#\s*\d+/gi, '');
 
   // 4. Remove internal Amazon/Vine order IDs and ASIN markers
-  cleaned = cleaned.replace(/Order\s*ID\s*:\s*[\d-]+/gi, '');
-  cleaned = cleaned.replace(/\bASIN\s*:\s*B0[A-Z0-9]{8}\b/gi, '');
+  cleaned = cleaned.replace(/Order\s*ID\s*:?\s*[\d-]+/gi, '');
+  cleaned = cleaned.replace(/\bASIN\s*:?\s*B0[A-Z0-9]{8}\b/gi, '');
   cleaned = cleaned.replace(/Imported\s+via\s+VineScout/gi, '');
   cleaned = cleaned.replace(/Sold\s+on\s+eBay[^\n\r|]*/gi, '');
 

@@ -942,4 +942,21 @@ The Import History Archive and Non-Vine Standing system provides durable source-
    - `GET /api/dashboard`: Embeds all-time `non_vine_pnl` summary inside the single atomic `env.DB.batch()` query.
    - `src/components/dashboard/NonVinePnlCard.jsx` mounted in `src/components/DashboardView.jsx`: Displays interactive timeframe selector (`All Time`, `YTD`, `90D`, `30D`), Total Non-Vine Spend, Non-Vine Net Payouts, Net Cash Standing, recovery bar, cost breakdown (`Sold COGS`, `Active Stock`, `Kept`, `Returned`), and excluded VineScout context pill.
 
+## Multi-Platform Listing Optimization & Validation Engine [ACTION ID: LIST-003]
+
+Dynamic 5-platform listing rules registry, generator, AI optimizer, and pre-publish validation gate spanning `ebay`, `facebook`, `mercari`, `whatnot`, and `reverb`:
+
+1. **Shared Rules Registry (`src/utils/platformListingRules.js`)**:
+   - Enforces the `<= 80` UTF-16 code-unit title budget, independent conditional wearable `Size` token (injected strictly on wearables/jerseys, omitted on guitars, pickguards, balls, helmets, CDs, drumheads, and photos), single trailing category emoji outside the hard blocklist, banned hype-word removal, zero em/en dashes, and internal tracking/ASIN stripping.
+   - Enforces approved COA verification (`JSA`, `PSA/DNA`, `Beckett/BAS`, `Fanatics`, `B.A.M.`, `UDA`, `Steiner`, `SWAU`, `Schwartz`, MLB/NFL/NBA Authenticated) with direct lookup URL routing (`src/utils/certLookup.js`), including updated Beckett verification endpoint (`https://www.beckett-authentication.com/get-data/${certNumber}`), and rejects banned COA issuers (`Coach's Corner`, `USA Authentics`, `Operation Bullpen`, etc.).
+   - Enforces anti-spoofing brand guardrails preserving multi-word signer names (such as `Taylor Swift`) while blocking leaked OEM/league tokens: Facebook (`brand: null` on custom jerseys and unbranded display guitars), Mercari (`brand: "No Brand"` on custom jerseys), Reverb/eBay (`brand: "Unbranded"`, model `"Custom Display Acoustic Guitar"` on unbranded display guitars).
+   - Computes exact fee-adjusted pricing guidance per platform: Reverb (`ceil((net + 0.49) / 0.9181 * 1.12)`), Whatnot (`ceil((net + 0.30) / 0.891 * 1.12)`), Mercari (`ceil(net * 1.18)`), Facebook (`ceil(net * 1.15)`), eBay (`ceil((net + 0.40) / 0.864 * 1.12)`).
+   - Resolves platform logistics: Facebook Tier 1 High-Value (`Local Police Precinct lot or QuikTrip (QT) Safe Place lot`) vs Tier 2 Lower-Risk (`Mason Mill Park`) meetups with `["Cash", "Apple Pay"]` only and `relist_title` (`<= 80` UTF-16); Mercari plain text `<= 1000` chars with zero URLs and `8-12` hashtags; Whatnot packed weight tiers and live-show scannable bullet notes; Reverb `3-day` handling, `< 48"` box disclosure, and double title + Block 1 pickguard disclosure.
+2. **AI JSON Mode & Worker Wiring (`functions/api/ai/generate-ebay-details.js`, `src/worker.js`, `src/utils/auctionApi.js`)**:
+   - Preserves `gemini-3.5-flash-lite` (10s) + `gemini-3.5-flash` (15s) fallback via `x-goog-api-key` and routes `mode: 'platform_listing'` (`POST /api/ai/generate-ebay-details`) via `generateAiPlatformListing(env, itemData)`.
+   - Re-exports `PLATFORM_RULES_REGISTRY`, `getPlatformRules`, `buildPlatformPayload`, and `validatePlatformPayload` from `src/worker.js` while keeping the 85-route manifest intact.
+   - Exposes `generateAiPlatformListingApi(payload)` in `src/utils/auctionApi.js` and `generateReverbCopy` / `generatePlatformListing` in `src/utils/listingCopyGenerator.js`.
+3. **Amber Tactical Listing Studio UI (`src/components/ListingCopyModal.jsx`)**:
+   - Replaces static tabs with the 5-platform selector (`eBay`, `Facebook`, `Mercari`, `Whatnot`, `Reverb`) displaying live UTF-16 `XX/80` counters and validation dots, memorabilia/wearable size/variant guard controls, `AI Optimize` + `Copy JSON` actions (`finally {}` loading reset, non-blocking error banner), 4-photo upload sequence, pricing breakdown (`tabular-nums`), and live Pre-Publish Validation Gate checks.
+
 

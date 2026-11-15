@@ -1,6 +1,17 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { fetchWithTimeout } from '../ebay/tokenHelper.js';
 import { stripInternalTrackingNotes, sanitizeListingHtml } from '../../../src/utils/ebayTemplate.js';
+import {
+  SUPPORTED_PLATFORMS,
+  PLATFORM_RULES_REGISTRY,
+  getPlatformRules,
+  computeUtf16Length,
+  sanitizeNoEmDash,
+  detectItemVariantFlags,
+  buildPlatformPayload,
+  validatePlatformPayload,
+  buildPlatformSystemPrompt
+} from '../../../src/utils/platformListingRules.js';
 
 /**
  * Extracts plain text from Gemini API response structures.
@@ -45,6 +56,83 @@ function extractTextFromGeminiResponse(data) {
   }
 
   return '';
+}
+
+/**
+ * Calls Google Gemini API using gemini-3.5-flash-lite (primary) with gemini-3.5-flash (fallback),
+ * enforcing fetchWithTimeout (AUDIT-003 15s max) and header-only API key transmission.
+ */
+async function callGeminiWithFallback(apiKey, systemInstruction, userPrompt, responseMimeType = null) {
+  let generatedText = '';
+  const cleanApiKey = apiKey.trim();
+
+  const callGenerateContent = async (model, timeoutMs = 15000) => {
+    const generateContentUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const bodyPayload = {
+      systemInstruction: {
+        parts: [{ text: systemInstruction }]
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: userPrompt }]
+        }
+      ]
+    };
+    if (responseMimeType) {
+      bodyPayload.generationConfig = { responseMimeType };
+    }
+    return fetchWithTimeout(generateContentUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': cleanApiKey
+      },
+      body: JSON.stringify(bodyPayload)
+    }, timeoutMs);
+  };
+
+  try {
+    // Primary attempt: gemini-3.5-flash-lite for fast, low-latency generation
+    try {
+      const primaryRes = await callGenerateContent('gemini-3.5-flash-lite', 10000);
+      if (primaryRes.ok) {
+        const data = await primaryRes.json().catch(() => ({}));
+        generatedText = extractTextFromGeminiResponse(data);
+      } else {
+        const errBody = await primaryRes.text().catch(() => '');
+        console.warn(`[generate-ebay-details] Primary gemini-3.5-flash-lite returned ${primaryRes.status}: ${errBody.slice(0, 200)}. Falling back to gemini-3.5-flash.`);
+      }
+    } catch (primaryErr) {
+      console.warn(`[generate-ebay-details] Primary gemini-3.5-flash-lite exception: ${primaryErr.message}. Falling back to gemini-3.5-flash.`);
+    }
+
+    // Secondary attempt fallback: gemini-3.5-flash if primary attempt produced no text
+    if (!generatedText) {
+      const fallbackRes = await callGenerateContent('gemini-3.5-flash', 15000);
+      if (fallbackRes.ok) {
+        const fallbackData = await fallbackRes.json().catch(() => ({}));
+        generatedText = extractTextFromGeminiResponse(fallbackData);
+      } else {
+        const fallbackErr = await fallbackRes.text().catch(() => '');
+        console.error(`[generate-ebay-details] Fallback gemini-3.5-flash failed (${fallbackRes.status}):`, fallbackErr.slice(0, 300));
+        throw Object.assign(new Error(`Gemini API request failed (${fallbackRes.status}). Please check API key configuration.`), { statusCode: 502 });
+      }
+    }
+  } catch (apiErr) {
+    if (apiErr.statusCode) throw apiErr;
+    if (apiErr.isTimeout || apiErr.name === 'TimeoutError' || /timeout/i.test(apiErr.message)) {
+      throw Object.assign(new Error('AI generation timed out after 15 seconds. Please try again.'), { statusCode: 504, isTimeout: true });
+    }
+    console.error('[generate-ebay-details] Network exception:', apiErr);
+    throw Object.assign(new Error(apiErr.message || 'Failed to communicate with AI generation service.'), { statusCode: 500 });
+  }
+
+  if (!generatedText || !generatedText.trim()) {
+    throw Object.assign(new Error('Gemini API returned an empty response. Please try again.'), { statusCode: 502 });
+  }
+
+  return generatedText;
 }
 
 /**
@@ -133,74 +221,11 @@ export async function generateAiListingDetails(env, itemData = {}) {
   ].filter(Boolean);
 
   const userPrompt = promptLines.join('\n\n');
-
-  let generatedText = '';
-  const cleanApiKey = apiKey.trim();
-
-  const callGenerateContent = async (model, timeoutMs = 12000) => {
-    const generateContentUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-    return fetchWithTimeout(generateContentUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': cleanApiKey
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemInstruction }]
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: userPrompt }]
-          }
-        ]
-      })
-    }, timeoutMs);
-  };
-
-  try {
-    // Primary attempt: gemini-3.5-flash-lite for fast, low-latency generation (~1-2s)
-    try {
-      const primaryRes = await callGenerateContent('gemini-3.5-flash-lite', 10000);
-      if (primaryRes.ok) {
-        const data = await primaryRes.json().catch(() => ({}));
-        generatedText = extractTextFromGeminiResponse(data);
-      } else {
-        const errBody = await primaryRes.text().catch(() => '');
-        console.warn(`[generate-ebay-details] Primary gemini-3.5-flash-lite returned ${primaryRes.status}: ${errBody.slice(0, 200)}. Falling back to gemini-3.5-flash.`);
-      }
-    } catch (primaryErr) {
-      console.warn(`[generate-ebay-details] Primary gemini-3.5-flash-lite exception: ${primaryErr.message}. Falling back to gemini-3.5-flash.`);
-    }
-
-    // Secondary attempt fallback: gemini-3.5-flash if primary attempt produced no text
-    if (!generatedText) {
-      const fallbackRes = await callGenerateContent('gemini-3.5-flash', 15000);
-      if (fallbackRes.ok) {
-        const fallbackData = await fallbackRes.json().catch(() => ({}));
-        generatedText = extractTextFromGeminiResponse(fallbackData);
-      } else {
-        const fallbackErr = await fallbackRes.text().catch(() => '');
-        console.error(`[generate-ebay-details] Fallback gemini-3.5-flash failed (${fallbackRes.status}):`, fallbackErr.slice(0, 300));
-        throw Object.assign(new Error(`Gemini API request failed (${fallbackRes.status}). Please check API key configuration.`), { statusCode: 502 });
-      }
-    }
-  } catch (apiErr) {
-    if (apiErr.statusCode) throw apiErr;
-    if (apiErr.isTimeout || apiErr.name === 'TimeoutError' || /timeout/i.test(apiErr.message)) {
-      throw Object.assign(new Error('AI generation timed out after 15 seconds. Please try again.'), { statusCode: 504, isTimeout: true });
-    }
-    console.error('[generate-ebay-details] Network exception:', apiErr);
-    throw Object.assign(new Error(apiErr.message || 'Failed to communicate with AI generation service.'), { statusCode: 500 });
-  }
-
-  if (!generatedText || !generatedText.trim()) {
-    throw Object.assign(new Error('Gemini API returned an empty response. Please try again.'), { statusCode: 502 });
-  }
+  const generatedText = await callGeminiWithFallback(apiKey, systemInstruction, userPrompt);
 
   // Sanitize markdown fences, HTML tags/attributes, and whitespace
-  let sanitizedHtml = sanitizeListingHtml(generatedText);
+  const withoutFences = generatedText.replace(/^```(?:html)?\s*/i, '').replace(/```$/i, '').trim();
+  let sanitizedHtml = sanitizeListingHtml(withoutFences);
 
   // Strip any leaked internal tracking or warehouse lot metadata
   sanitizedHtml = stripInternalTrackingNotes(sanitizedHtml);
@@ -212,24 +237,123 @@ export async function generateAiListingDetails(env, itemData = {}) {
 }
 
 /**
+ * Generates a policy-compliant, platform-specific structured JSON listing payload
+ * for ebay, facebook, mercari, whatnot, or reverb using Gemini + deterministic rules fallback.
+ */
+export async function generateAiPlatformListing(env, itemData = {}) {
+  const rawApiKey = env?.GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : '');
+  const apiKey = (rawApiKey || '').trim().replace(/^['"]+|['"]+$/g, '');
+  if (!apiKey) {
+    throw Object.assign(new Error('AI generation service is not configured (missing GEMINI_API_KEY).'), { statusCode: 503 });
+  }
+
+  const normPlatform = String(itemData.platform || 'ebay').toLowerCase().trim();
+  if (!SUPPORTED_PLATFORMS.includes(normPlatform)) {
+    throw Object.assign(new Error(`Unsupported platform "${normPlatform}". Supported: ${SUPPORTED_PLATFORMS.join(', ')}`), { statusCode: 400 });
+  }
+
+  const trimmedTitle = String(itemData.title || itemData.item_name || '').trim();
+  const trimmedNotes = String(itemData.notes || itemData.description || '').trim();
+  if (!trimmedTitle && !trimmedNotes) {
+    throw Object.assign(new Error('Item title or notes are required to generate AI listing details.'), { statusCode: 400 });
+  }
+
+  const rules = getPlatformRules(normPlatform);
+  const systemInstruction = buildPlatformSystemPrompt(normPlatform);
+  const cleanNotes = stripInternalTrackingNotes(trimmedNotes);
+  const flags = detectItemVariantFlags(itemData, itemData);
+
+  const promptLines = [
+    `Target Platform: ${rules.name} (${normPlatform})`,
+    `Title: ${trimmedTitle}`,
+    itemData.athlete ? `Signer / Athlete / Artist: ${itemData.athlete}` : null,
+    itemData.teamOrBand ? `Team / Band / Franchise: ${itemData.teamOrBand}` : null,
+    itemData.sportOrGenre ? `Sport / Genre: ${itemData.sportOrGenre}` : null,
+    itemData.productType ? `Base Item Type: ${itemData.productType}` : null,
+    itemData.brand ? `Brand: ${itemData.brand}` : null,
+    itemData.condition ? `Condition: ${itemData.condition}` : null,
+    itemData.authenticator ? `Authenticator: ${itemData.authenticator}` : null,
+    itemData.certNumber ? `Cert #: ${itemData.certNumber}` : null,
+    itemData.inscription ? `Inscription / Milestone: ${itemData.inscription}` : null,
+    itemData.size ? `Wearable Size: ${itemData.size}` : null,
+    itemData.targetNet ? `Target Net Payout USD: ${itemData.targetNet}` : null,
+    flags.isCustomJersey ? 'Variant Flag: Custom Stitched Jersey (zero protected brands)' : null,
+    flags.isPickguardSignedGuitar ? 'Variant Flag: Signed Pickguard mounted to generic display acoustic guitar' : null,
+    cleanNotes ? `Item Notes:\n${cleanNotes}` : null
+  ].filter(Boolean);
+
+  const rawText = await callGeminiWithFallback(apiKey, systemInstruction, promptLines.join('\n'), 'application/json');
+  const cleanedJsonText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim();
+
+  let aiJson = {};
+  try {
+    aiJson = JSON.parse(cleanedJsonText);
+  } catch {
+    aiJson = {};
+  }
+
+  // Build deterministic baseline payload and merge valid AI fields cleanly
+  const { payload: baseline } = buildPlatformPayload(normPlatform, itemData, itemData);
+  const merged = {
+    ...baseline,
+    ...(aiJson && typeof aiJson === 'object' ? aiJson : {})
+  };
+
+  // Enforce deterministic pricing, logistics, brand nulling, and sanitization invariants
+  merged.pricing_guidance = baseline.pricing_guidance;
+  if (baseline.logistics) merged.logistics = baseline.logistics;
+  if (baseline.shipping_profile) merged.shipping_profile = baseline.shipping_profile;
+  if (normPlatform === 'facebook' && (flags.isCustomJersey || flags.isPickguardSignedGuitar || flags.isUnbrandedGuitar)) {
+    merged.brand = null;
+  }
+
+  merged.title = sanitizeNoEmDash(stripInternalTrackingNotes(String(merged.title || baseline.title)));
+  if (computeUtf16Length(merged.title) > 80 || !merged.title) {
+    merged.title = baseline.title;
+  }
+
+  if (normPlatform === 'facebook') {
+    merged.relist_title = sanitizeNoEmDash(stripInternalTrackingNotes(String(merged.relist_title || baseline.relist_title)));
+    if (computeUtf16Length(merged.relist_title) > 80 || !merged.relist_title) {
+      merged.relist_title = baseline.relist_title;
+    }
+    merged.char_count = computeUtf16Length(merged.title);
+  } else if (normPlatform === 'ebay') {
+    merged.ebay_char_count = computeUtf16Length(merged.title);
+  } else {
+    merged.title_char_count = computeUtf16Length(merged.title);
+  }
+
+  if (merged.description_html) {
+    merged.description_html = sanitizeNoEmDash(stripInternalTrackingNotes(sanitizeListingHtml(merged.description_html)));
+  }
+  if (merged.description_plain_text) {
+    merged.description_plain_text = sanitizeNoEmDash(stripInternalTrackingNotes(String(merged.description_plain_text).replace(/<[^>]+>/g, ' ')));
+    if (normPlatform === 'mercari' && merged.description_plain_text.length > 1000) {
+      merged.description_plain_text = baseline.description_plain_text;
+    }
+  }
+
+  const validation = validatePlatformPayload(normPlatform, merged, itemData);
+  merged.validation_passed = validation.passed;
+
+  return {
+    success: true,
+    platform: normPlatform,
+    rules_version: '2026.1',
+    payload: merged,
+    validation,
+    html: merged.description_html || ''
+  };
+}
+
+/**
  * POST /api/ai/generate-ebay-details
  *
- * Dynamically generates context-aware eBay listing HTML cards (Condition and Key Details)
- * using the Google Gemini API (gemini-3.5-flash-lite with gemini-3.5-flash fallback).
- *
- * Headers: Cookie: auth_token=...
- * Body:
- * {
- *   title: string,
- *   brand?: string,
- *   productType?: string,
- *   condition?: string,
- *   conditionHeader?: string,
- *   conditionSubheader?: string,
- *   notes?: string,
- *   specs?: string | array | object,
- *   features?: string | array
- * }
+ * Supports two modes:
+ * 1) Default legacy mode: returns { success, html } with eBay Condition and Key Details cards.
+ * 2) Multi-platform mode (mode === 'platform_listing' or responseFormat === 'json'):
+ *    returns { success, platform, payload, validation, html }.
  */
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -245,14 +369,18 @@ export async function onRequestPost(context) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const trimmedTitle = String(body?.title || '').trim();
-    const trimmedNotes = String(body?.notes || '').trim();
+    const trimmedTitle = String(body?.title || body?.item_name || '').trim();
+    const trimmedNotes = String(body?.notes || body?.description || '').trim();
 
     if (!trimmedTitle && !trimmedNotes) {
       return err('Item title or notes are required to generate AI listing details.', 400);
     }
 
     try {
+      if (body?.mode === 'platform_listing' || (body?.platform && body?.responseFormat === 'json')) {
+        const result = await generateAiPlatformListing(env, body);
+        return ok(result);
+      }
       const result = await generateAiListingDetails(env, body);
       return ok(result);
     } catch (e) {

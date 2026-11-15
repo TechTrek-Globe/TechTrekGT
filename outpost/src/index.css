@@ -15,6 +15,15 @@
   --color-brand-900: 120 53 15;
 }
 
+/* Guard against iOS Safari forced auto-zoom on narrow mobile viewports (<640px) */
+@layer base {
+  @media screen and (max-width: 639px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
+}
+
 /* Custom scrollbar - dark theme */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.9); }
@@ -53,6 +62,14 @@
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid rgba(51, 65, 85, 0.5);
   }
+  /* iOS Safe Area Utilities */
+  .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .pl-safe { padding-left: env(safe-area-inset-left, 0px); }
+  .pr-safe { padding-right: env(safe-area-inset-right, 0px); }
+  .px-safe { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+  .min-h-screen-safe { min-height: 100dvh; }
+  .h-screen-safe { height: 100dvh; }
 }
 
 /* Suppress native number spinners to prevent collision with custom currency/percentage adornments */
@@ -69,7 +86,7 @@ input[type="number"] {
 /* Base Component Classes */
 @layer components {
   .input-field {
-    @apply w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100
+    @apply w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-base sm:text-sm text-slate-100
            placeholder-slate-500 outline-none transition-all duration-200
            focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20;
   }

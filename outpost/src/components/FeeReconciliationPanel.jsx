@@ -144,7 +144,7 @@ export function FeeReconciliationPanel({ sale, onReconciled }) {
 
       {/* Order ID input + Reconcile button */}
       {!alreadyReconciled && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <input
             id={`fee-recon-order-id-${sale.id}`}
             type="text"

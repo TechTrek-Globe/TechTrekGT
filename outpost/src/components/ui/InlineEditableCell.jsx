@@ -81,6 +81,12 @@ export function InlineEditableCell({
     setIsEditing(true);
   }, [disabled, isSaving, internalSaving, isMobile, onMobileFallback, onEditStart, value]);
 
+  const handleCellClick = useCallback((e) => {
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+      handleStartEditing(e);
+    }
+  }, [handleStartEditing]);
+
   const handleCancel = useCallback(() => {
     isCancellingRef.current = true;
     setIsEditing(false);
@@ -189,6 +195,7 @@ export function InlineEditableCell({
       role="gridcell"
       tabIndex={disabled || isEditing ? -1 : 0}
       aria-label={computedAriaLabel}
+      onClick={handleCellClick}
       onDoubleClick={handleStartEditing}
       onKeyDown={handleCellKeyDown}
       className={`relative inline-flex items-center w-full h-[22px] min-h-[22px] max-h-[22px] select-none outline-none focus:ring-1 focus:ring-amber-500/50 rounded transition-all ${alignmentClass} ${

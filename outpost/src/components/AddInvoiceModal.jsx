@@ -173,30 +173,30 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
   const netLanded = baseTotal - (parseFloat(discount) || 0) + (parseFloat(shipping) || 0) + (parseFloat(tax) || 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm pt-6 pb-6 overflow-y-auto">
-      <div className="w-full max-w-3xl mx-4 glass-card rounded-2xl shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-3xl glass-card rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800/60">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-5 border-b border-slate-800/60 flex-shrink-0">
           <div>
-            <h2 className="text-lg font-black text-white">
-              {step === 1 ? 'New Invoice — Header' : `New Invoice — Line Items (${items.length})`}
+            <h2 className="text-base sm:text-lg font-black text-white">
+              {step === 1 ? 'New Invoice - Header' : `New Invoice - Line Items (${items.length})`}
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
               {step === 1 ? 'Enter the invoice totals. Proration is computed automatically.' : 'Add each signed item. True cost updates live as you type.'}
             </p>
           </div>
-          <button id="modal-close" onClick={handleClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all">
+          <button id="modal-close" onClick={handleClose} className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-2 px-6 py-3 border-b border-slate-800/40 bg-slate-950/30">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 border-b border-slate-800/40 bg-slate-950/30 flex-shrink-0">
           {[{ n: 1, label: 'Invoice Header' }, { n: 2, label: 'Line Items' }].map(({ n, label }) => (
             <div key={n} className="flex items-center gap-2">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black transition-all ${step >= n ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>{n}</div>
               <span className={`text-xs font-medium ${step >= n ? 'text-amber-400' : 'text-slate-600'}`}>{label}</span>
-              {n < 2 && <div className="w-12 h-px bg-slate-800 mx-1" />}
+              {n < 2 && <div className="w-8 sm:w-12 h-px bg-slate-800 mx-1" />}
             </div>
           ))}
           {baseTotal > 0 && (
@@ -209,14 +209,14 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
 
         {/* Error */}
         {error && (
-          <div className="mx-6 mt-4 p-3 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-xs flex gap-2">
+          <div className="mx-4 sm:mx-6 mt-4 p-3 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-xs flex gap-2 flex-shrink-0">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />{error}
           </div>
         )}
 
         {/* Step 1: Invoice Header */}
         {step === 1 && (
-          <div className="p-6 space-y-5">
+          <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 sm:col-span-1">
                 <label className="block text-xs font-semibold text-slate-400 mb-1.5">Invoice Reference *</label>
@@ -235,7 +235,7 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               {[
                 { id: 'inv-discount', label: 'Total Discount ($)', val: discount, set: setDiscount, Icon: Tag, hint: 'e.g. 45.00' },
                 { id: 'inv-shipping', label: 'Total Shipping ($)', val: shipping, set: setShipping, Icon: Truck, hint: 'e.g. 25.77' },
@@ -311,21 +311,21 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
                     </div>
 
                     {/* Category */}
-                    <div className="col-span-4">
+                    <div className="col-span-12 sm:col-span-4">
                       <select id={`item-cat-${idx}`} className="input-field text-sm" value={it.category} onChange={e => updateItem(it._key, 'category', e.target.value)}>
                         {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                       </select>
                     </div>
 
                     {/* Authenticator */}
-                    <div className="col-span-4">
+                    <div className="col-span-12 sm:col-span-4">
                       <select id={`item-auth-${idx}`} className="input-field text-sm" value={it.authenticator} onChange={e => updateItem(it._key, 'authenticator', e.target.value)}>
                         {AUTHENTICATORS.map(a => <option key={a}>{a}</option>)}
                       </select>
                     </div>
 
                     {/* Unit Price */}
-                    <div className="col-span-4">
+                    <div className="col-span-12 sm:col-span-4">
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold pointer-events-none">$</span>
                         <input
@@ -340,24 +340,24 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
                     </div>
 
                     {/* Athlete */}
-                    <div className="col-span-6">
+                    <div className="col-span-12 sm:col-span-6">
                       <input id={`item-athlete-${idx}`} type="text" className="input-field text-sm" placeholder="Athlete / Person" value={it.athlete_person} onChange={e => updateItem(it._key, 'athlete_person', e.target.value)} />
                     </div>
 
                     {/* Sport/Genre */}
-                    <div className="col-span-6">
+                    <div className="col-span-12 sm:col-span-6">
                       <input id={`item-sport-${idx}`} type="text" className="input-field text-sm" placeholder="Sport / Genre (e.g. Basketball, Movie)" value={it.sport_genre} onChange={e => updateItem(it._key, 'sport_genre', e.target.value)} />
                     </div>
 
                     {/* Platform */}
-                    <div className="col-span-4">
+                    <div className="col-span-12 sm:col-span-4">
                       <select id={`item-plat-${idx}`} className="input-field text-sm" value={it.platform} onChange={e => updateItem(it._key, 'platform', e.target.value)}>
                         {platforms.map(p => <option key={p.id || p.name} value={p.name}>{p.name}</option>)}
                       </select>
                     </div>
 
                     {/* Est Shipping */}
-                    <div className="col-span-4">
+                    <div className="col-span-12 sm:col-span-4">
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold pointer-events-none">$</span>
                         <input id={`item-ship-${idx}`} type="number" step="0.01" min="0" className="input-field text-sm pl-8" placeholder="Est. shipping" value={it.est_shipping_cost} onChange={e => updateItem(it._key, 'est_shipping_cost', e.target.value)} />
@@ -365,7 +365,7 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
                     </div>
 
                     {/* Target Margin % */}
-                    <div className="col-span-4">
+                    <div className="col-span-12 sm:col-span-4">
                       <div className="relative">
                         <input id={`item-margin-${idx}`} type="number" step="1" min="0" max="999" className="input-field text-sm pr-8" placeholder="Margin %" value={Math.round((parseFloat(it.target_margin_pct) || 0) * 100)} onChange={e => updateItem(it._key, 'target_margin_pct', (parseFloat(e.target.value) || 0) / 100)} />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold pointer-events-none">%</span>
@@ -373,14 +373,14 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
                     </div>
 
                     {/* Status */}
-                    <div className="col-span-4">
+                    <div className="col-span-12 sm:col-span-4">
                       <select id={`item-status-${idx}`} className="input-field text-sm" value={it.status} onChange={e => updateItem(it._key, 'status', e.target.value)}>
                         {STATUSES.map(s => <option key={s}>{s}</option>)}
                       </select>
                     </div>
 
                     {/* Notes */}
-                    <div className="col-span-8">
+                    <div className="col-span-12 sm:col-span-8">
                       <input id={`item-notes-${idx}`} type="text" className="input-field text-sm" placeholder="Notes / Best listing window" value={it.notes} onChange={e => updateItem(it._key, 'notes', e.target.value)} />
                     </div>
                   </div>
@@ -389,7 +389,7 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
             </div>
 
             {/* Add item + submit */}
-            <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-800/40">
+            <div className="flex flex-wrap items-center justify-between gap-3 mt-5 pt-4 border-t border-slate-800/40">
               <button id="add-item-btn" type="button" onClick={addItem} className="flex items-center gap-2 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors">
                 <Plus className="w-4 h-4" /> Add Another Item
               </button>

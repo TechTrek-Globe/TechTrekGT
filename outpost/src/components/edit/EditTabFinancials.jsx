@@ -867,7 +867,7 @@ export function EditTabFinancials({
             {/* MODE A: BROWSE ACTIVE STORE LISTINGS */}
             {pairingMode === 'browse' && (
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
@@ -1002,7 +1002,7 @@ export function EditTabFinancials({
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <input
                     type="text"
                     value={manualInput}
@@ -1346,50 +1346,50 @@ export function EditTabFinancials({
         {/* Step-by-Step Accounting Waterfall Table */}
         <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-950/60 text-xs">
           <div className="grid grid-cols-12 px-3 py-2 bg-slate-950 font-semibold text-slate-400 border-b border-slate-800 text-[11px]">
-            <span className="col-span-6">Financial Line Item</span>
-            <span className="col-span-3 text-right">Calculation Basis</span>
-            <span className="col-span-3 text-right">Amount</span>
+            <span className="col-span-7 sm:col-span-6">Financial Line Item</span>
+            <span className="hidden sm:block sm:col-span-3 text-right">Calculation Basis</span>
+            <span className="col-span-5 sm:col-span-3 text-right">Amount</span>
           </div>
 
           <div className="divide-y divide-slate-800/60">
             {/* 1. Item List / Sale Price */}
             <div className="grid grid-cols-12 px-3 py-2 items-center hover:bg-slate-900/30">
-              <span className="col-span-6 text-slate-200 font-medium flex items-center gap-1.5">
+              <span className="col-span-7 sm:col-span-6 text-slate-200 font-medium flex items-center gap-1.5 truncate">
                 <span className="text-emerald-400 font-bold">+</span> {isSold ? 'Item Final Sold Price' : 'Item Sale / List Price'}
               </span>
-              <span className="col-span-3 text-right text-slate-400 font-mono text-[11px]">{isSold ? 'eBay Final Sale' : 'Asking Price'}</span>
-              <span className="col-span-3 text-right font-mono font-bold text-slate-100">{fmtCurrency(isSold ? actualGross : sellPrice)}</span>
+              <span className="hidden sm:block sm:col-span-3 text-right text-slate-400 font-mono text-[11px]">{isSold ? 'eBay Final Sale' : 'Asking Price'}</span>
+              <span className="col-span-5 sm:col-span-3 text-right font-mono font-bold text-slate-100">{fmtCurrency(isSold ? actualGross : sellPrice)}</span>
             </div>
 
             {/* 2. Buyer Paid Shipping */}
             <div className="grid grid-cols-12 px-3 py-2 items-center hover:bg-slate-900/30">
-              <span className="col-span-6 text-slate-200 font-medium flex items-center gap-1.5">
+              <span className="col-span-7 sm:col-span-6 text-slate-200 font-medium flex items-center gap-1.5 truncate">
                 <span className="text-emerald-400 font-bold">+</span> Buyer Shipping Inflow
               </span>
-              <span className="col-span-3 text-right text-slate-400 font-mono text-[11px]">
+              <span className="hidden sm:block sm:col-span-3 text-right text-slate-400 font-mono text-[11px]">
                 {isSold ? (actualBuyerShipping > 0 ? 'Charged to Buyer' : 'Free Shipping') : (isFreeShipping ? 'Free Shipping' : 'Charged to Buyer')}
               </span>
-              <span className="col-span-3 text-right font-mono font-semibold text-sky-300">
+              <span className="col-span-5 sm:col-span-3 text-right font-mono font-semibold text-sky-300">
                 {isSold ? (actualBuyerShipping > 0 ? `+${fmtCurrency(actualBuyerShipping)}` : '$0.00') : (isFreeShipping ? '$0.00' : `+${fmtCurrency(shippingCharged)}`)}
               </span>
             </div>
 
             {/* Subtotal: Gross Inflow */}
             <div className="grid grid-cols-12 px-3 py-1.5 items-center bg-slate-900/50 font-semibold text-[11px]">
-              <span className="col-span-6 text-slate-300 uppercase tracking-wider">Total Gross Revenue Collected</span>
-              <span className="col-span-3 text-right text-slate-500 font-mono">{isSold ? 'Sold + Buyer Ship' : 'List + Buyer Ship'}</span>
-              <span className="col-span-3 text-right font-mono font-bold text-white">{fmtCurrency(isSold ? actualTotalGross : liveFees?.grossRevenue)}</span>
+              <span className="col-span-7 sm:col-span-6 text-slate-300 uppercase tracking-wider truncate">Total Gross Revenue Collected</span>
+              <span className="hidden sm:block sm:col-span-3 text-right text-slate-500 font-mono">{isSold ? 'Sold + Buyer Ship' : 'List + Buyer Ship'}</span>
+              <span className="col-span-5 sm:col-span-3 text-right font-mono font-bold text-white">{fmtCurrency(isSold ? actualTotalGross : liveFees?.grossRevenue)}</span>
             </div>
 
             {/* 3. Marketplace Final Value Fee */}
             <div className="grid grid-cols-12 px-3 py-2 items-center hover:bg-slate-900/30">
-              <span className="col-span-6 text-slate-300 flex items-center gap-1.5">
+              <span className="col-span-7 sm:col-span-6 text-slate-300 flex items-center gap-1.5 truncate">
                 <span className="text-red-400 font-bold">-</span> eBay Final Value Fee (FVF)
               </span>
-              <span className="col-span-3 text-right text-slate-400 font-mono text-[11px]">
+              <span className="hidden sm:block sm:col-span-3 text-right text-slate-400 font-mono text-[11px]">
                 {isSold ? (isReconciled ? 'Reconciled from eBay' : `${(platformFeePct * 100).toFixed(2)}% on gross`) : `${(platformFeePct * 100).toFixed(2)}% on gross`}
               </span>
-              <span className="col-span-3 text-right font-mono text-red-300">
+              <span className="col-span-5 sm:col-span-3 text-right font-mono text-red-300">
                 -{fmtCurrency(isSold ? actualFvf : liveFees?.finalValueFee)}
               </span>
             </div>
@@ -1397,11 +1397,11 @@ export function EditTabFinancials({
             {/* 4. Marketplace Flat Order Fee */}
             {!isSold && (
               <div className="grid grid-cols-12 px-3 py-2 items-center hover:bg-slate-900/30">
-                <span className="col-span-6 text-slate-300 flex items-center gap-1.5">
+                <span className="col-span-7 sm:col-span-6 text-slate-300 flex items-center gap-1.5 truncate">
                   <span className="text-red-400 font-bold">-</span> eBay Flat Order Fee
                 </span>
-                <span className="col-span-3 text-right text-slate-400 font-mono text-[11px]">Per-order transaction</span>
-                <span className="col-span-3 text-right font-mono text-red-300">
+                <span className="hidden sm:block sm:col-span-3 text-right text-slate-400 font-mono text-[11px]">Per-order transaction</span>
+                <span className="col-span-5 sm:col-span-3 text-right font-mono text-red-300">
                   -{fmtCurrency(platformFlatFee)}
                 </span>
               </div>
@@ -1410,13 +1410,13 @@ export function EditTabFinancials({
             {/* 5. Promoted Listing Ad Fee */}
             {((isSold && actualPromotedFee > 0) || (!isSold && promotedRate > 0)) && (
               <div className="grid grid-cols-12 px-3 py-2 items-center hover:bg-slate-900/30 bg-amber-950/10">
-                <span className="col-span-6 text-amber-300 flex items-center gap-1.5">
+                <span className="col-span-7 sm:col-span-6 text-amber-300 flex items-center gap-1.5 truncate">
                   <span className="text-red-400 font-bold">-</span> Promoted Listings Ad Fee
                 </span>
-                <span className="col-span-3 text-right text-amber-400/80 font-mono text-[11px]">
+                <span className="hidden sm:block sm:col-span-3 text-right text-amber-400/80 font-mono text-[11px]">
                   {isSold ? (isReconciled ? 'Actual eBay ad fee' : `${promotedRate}% of item price`) : `${promotedRate}% of item price`}
                 </span>
-                <span className="col-span-3 text-right font-mono text-red-300">
+                <span className="col-span-5 sm:col-span-3 text-right font-mono text-red-300">
                   -{fmtCurrency(isSold ? actualPromotedFee : liveFees?.promotedFee)}
                 </span>
               </div>
@@ -1424,45 +1424,48 @@ export function EditTabFinancials({
 
             {/* 6. Outbound Shipping Label Cost */}
             <div className="grid grid-cols-12 px-3 py-2 items-center hover:bg-slate-900/30">
-              <span className="col-span-6 text-slate-300 flex items-center gap-1.5">
+              <span className="col-span-7 sm:col-span-6 text-slate-300 flex items-center gap-1.5 truncate">
                 <span className="text-red-400 font-bold">-</span> Outbound Shipping Label (Seller Cost)
               </span>
-              <span className="col-span-3 text-right text-slate-400 font-mono text-[11px]">
+              <span className="hidden sm:block sm:col-span-3 text-right text-slate-400 font-mono text-[11px]">
                 {isSold ? (isReconciled ? 'eBay shipping label' : 'Actual label expense') : 'Est. label expense'}
               </span>
-              <span className="col-span-3 text-right font-mono text-red-300">
+              <span className="col-span-5 sm:col-span-3 text-right font-mono text-red-300">
                 -{fmtCurrency(isSold ? actualShippingLabel : estShippingCost)}
               </span>
             </div>
 
             {/* Subtotal: Net Proceeds */}
             <div className="grid grid-cols-12 px-3 py-1.5 items-center bg-slate-900/50 font-semibold text-[11px]">
-              <span className="col-span-6 text-slate-300 uppercase tracking-wider">Net Payout Proceeds</span>
-              <span className="col-span-3 text-right text-slate-500 font-mono">Gross - Fees - Shipping</span>
-              <span className="col-span-3 text-right font-mono font-bold text-cyan-300">{fmtCurrency(isSold ? actualNetProceeds : liveFees?.netProceeds)}</span>
+              <span className="col-span-7 sm:col-span-6 text-slate-300 uppercase tracking-wider truncate">Net Payout Proceeds</span>
+              <span className="hidden sm:block sm:col-span-3 text-right text-slate-500 font-mono">Gross - Fees - Shipping</span>
+              <span className="col-span-5 sm:col-span-3 text-right font-mono font-bold text-cyan-300">{fmtCurrency(isSold ? actualNetProceeds : liveFees?.netProceeds)}</span>
             </div>
 
             {/* 7. Landed Cost (COGS) */}
             <div className="grid grid-cols-12 px-3 py-2 items-center hover:bg-slate-900/30 bg-blue-950/10">
-              <span className="col-span-6 text-blue-300 font-semibold flex items-center gap-1.5">
+              <span className="col-span-7 sm:col-span-6 text-blue-300 font-semibold flex items-center gap-1.5 truncate">
                 <span className="text-red-400 font-bold">-</span> Landed Cost of Goods Sold (COGS)
               </span>
-              <span className="col-span-3 text-right text-blue-400/80 font-mono text-[11px]">Pillar 2 Cost</span>
-              <span className="col-span-3 text-right font-mono font-bold text-red-300">
+              <span className="hidden sm:block sm:col-span-3 text-right text-blue-400/80 font-mono text-[11px]">Pillar 2 Cost</span>
+              <span className="col-span-5 sm:col-span-3 text-right font-mono font-bold text-red-300">
                 -{fmtCurrency(landedCost)}
               </span>
             </div>
 
             {/* Final Bottom Line */}
             <div className="grid grid-cols-12 px-3 py-2.5 items-center bg-emerald-950/30 border-t border-emerald-500/30 font-bold">
-              <div className="col-span-6">
+              <div className="col-span-7 sm:col-span-6">
                 <span className="text-emerald-300 uppercase tracking-wider text-xs block">Bottom-Line Net Profit</span>
                 <span className="text-[10px] text-slate-400 font-normal">Take-home profit after all expenses</span>
+                <span className="block sm:hidden text-[10px] text-slate-300 font-mono mt-0.5">
+                  {formatPercent(isSold ? actualMarginPct : liveFees?.marginPct, 1)} Margin · {formatPercent(isSold ? actualRoiPct : liveFees?.roiPct, 1)} ROI
+                </span>
               </div>
-              <div className="col-span-3 text-right text-[11px] text-slate-300 font-mono">
+              <div className="hidden sm:block sm:col-span-3 text-right text-[11px] text-slate-300 font-mono">
                 {formatPercent(isSold ? actualMarginPct : liveFees?.marginPct, 1)} Margin · {formatPercent(isSold ? actualRoiPct : liveFees?.roiPct, 1)} ROI
               </div>
-              <div className="col-span-3 text-right">
+              <div className="col-span-5 sm:col-span-3 text-right">
                 <span className={`text-base font-black font-mono ${
                   (isSold ? actualNetProfit : (liveFees?.netProfit ?? 0)) >= 0 ? 'text-emerald-400' : 'text-red-400'
                 }`}>

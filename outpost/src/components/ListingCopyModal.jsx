@@ -436,40 +436,41 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="w-full max-w-4xl glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden my-auto animate-scale-up flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="w-full max-w-4xl glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden my-auto animate-scale-up flex flex-col max-h-[92dvh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80 shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800 bg-slate-900/80 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black flex-shrink-0">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-sm font-black text-slate-100 flex items-center gap-2">
                 Multi-Channel Listing Creator
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span className="hidden sm:inline px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   Enhanced
                 </span>
               </h2>
-              <p className="text-[11px] text-slate-400 truncate max-w-md">{item.item_name}</p>
+              <p className="text-[11px] text-slate-400 truncate max-w-xs sm:max-w-md">{item.item_name}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={() => setShowEditor(!showEditor)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
                 showEditor
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                   : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
               }`}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>{showEditor ? 'Hide Details Form' : 'Edit Listing Details'}</span>
+              <span className="hidden sm:inline">{showEditor ? 'Hide Details Form' : 'Edit Listing Details'}</span>
+              <span className="sm:hidden">{showEditor ? 'Hide' : 'Details'}</span>
               {showEditor ? <ChevronUp className="w-3 h-3 ml-0.5" /> : <ChevronDown className="w-3 h-3 ml-0.5" />}
             </button>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -477,7 +478,7 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
         </div>
 
         {/* Scrollable Container */}
-        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+        <div className="overflow-y-auto flex-1 p-3.5 sm:p-6 space-y-4 sm:space-y-6">
           {/* Collapsible Item Details / Amazon Lookup Form */}
           {showEditor && (
             <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-700/80 space-y-4 shadow-inner">
@@ -527,7 +528,7 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     value={asinInput}
@@ -1028,7 +1029,7 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
               </div>
 
               {/* Format Toggle for Description */}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
                 <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
                   <button
                     onClick={() => setFormat('text')}
@@ -1287,7 +1288,7 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between px-6 py-3.5 border-t border-slate-800 bg-slate-900/50 text-xs shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-3.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-slate-800 bg-slate-900/50 text-xs shrink-0">
           <div className="flex items-center gap-3">
             <a
               href="https://www.ebay.com/sl/prelist/suggest"

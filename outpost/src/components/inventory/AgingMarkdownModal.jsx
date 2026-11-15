@@ -151,12 +151,12 @@ export function AgingMarkdownModal({ isOpen, onClose, onApplied }) {
   const eligibleFilteredCount = filteredCandidates.filter(c => c.eligible).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="w-full max-w-5xl glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden my-auto animate-scale-up flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="w-full max-w-5xl glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden my-auto animate-scale-up flex flex-col max-h-[92dvh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90 shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800 bg-slate-900/90 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 flex-shrink-0">
               <TrendingDown className="w-4 h-4" />
             </div>
             <div>
@@ -164,18 +164,18 @@ export function AgingMarkdownModal({ isOpen, onClose, onApplied }) {
                 <h2 className="text-sm font-black text-slate-100 uppercase tracking-wider">
                   Automated Repricing &amp; Aging Decay Engine
                 </h2>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                <span className="hidden sm:inline px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
                   Floor-Guarded
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-400 line-clamp-1 sm:line-clamp-none">
                 Data-driven markdown schedules clamped strictly at 0% profit break-even floor
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors flex-shrink-0 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -212,7 +212,7 @@ export function AgingMarkdownModal({ isOpen, onClose, onApplied }) {
         )}
 
         {/* Content Body */}
-        <div className="overflow-y-auto flex-1 p-6 space-y-5">
+        <div className="overflow-y-auto flex-1 p-3.5 sm:p-6 space-y-5">
           {/* Summary Metric Cards */}
           {summary && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -309,8 +309,8 @@ export function AgingMarkdownModal({ isOpen, onClose, onApplied }) {
               No items matching filter.
             </div>
           ) : (
-            <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-950/60">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="rounded-xl overflow-hidden overflow-x-auto border border-slate-800 bg-slate-950/60">
+              <table className="w-full min-w-[680px] text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800 text-[10.5px] uppercase tracking-wider">
                     <th className="p-2.5 w-10 text-center">

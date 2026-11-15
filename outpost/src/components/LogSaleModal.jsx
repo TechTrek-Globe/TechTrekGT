@@ -348,10 +348,10 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/75 backdrop-blur-sm pt-6 pb-6 overflow-y-auto">
-      <div className="w-full max-w-2xl mx-4 glass-card rounded-2xl shadow-2xl border border-slate-700/60 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-2xl glass-card rounded-2xl shadow-2xl border border-slate-700/60 overflow-hidden my-auto max-h-[92dvh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/60 bg-slate-950/40">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800/60 bg-slate-950/40 shrink-0">
           <div>
             <h2 className="text-base font-black text-white flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-amber-400" />
@@ -364,7 +364,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
           <button
             id="close-log-sale-modal"
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all"
+            className="w-8 h-8 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -372,13 +372,13 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
 
         {/* Error */}
         {error && (
-          <div className="mx-6 mt-3 p-2.5 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-xs flex gap-2">
+          <div className="mx-4 sm:mx-6 mt-3 p-2.5 rounded-xl bg-red-950/40 border border-red-800/40 text-red-400 text-xs flex gap-2 shrink-0">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
           {/* Item Selector */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -400,7 +400,7 @@ export function LogSaleModal({ open, isOpen, saleToEdit, preselectedItem, item, 
               <div className="glass-card-light rounded-xl p-2.5 border border-amber-500/30 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-slate-100">{selectedItem.item_name}</p>
-                  <div className="flex items-center gap-2.5 text-[11px] text-slate-400 mt-0.5">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 mt-0.5">
                     <span>Category: <strong className="text-slate-300">{selectedItem.category || 'Memorabilia'}</strong></span>
                     {selectedItem.athlete_person && <span>Athlete: <strong className="text-slate-300">{selectedItem.athlete_person}</strong></span>}
                     <span>True Cost: <strong className="text-amber-400">{fmtCurrency(selectedItem.true_total_cost)}</strong></span>

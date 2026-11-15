@@ -74,34 +74,34 @@ export function FinanceSyncModal({ isOpen, onClose }) {
   const households = data?.households || [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-xl glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden animate-scale-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-xl max-h-[92dvh] flex flex-col glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden animate-scale-up">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/60">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800 bg-slate-900/60 flex-shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black flex-shrink-0">
               <ArrowRightLeft className="w-5 h-5 text-slate-950" />
             </div>
             <div>
               <h2 className="text-base font-black text-slate-100 flex items-center gap-2">
                 TechTrek Finance Integration
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="hidden sm:inline px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                   Live D1 Bridge
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">Sync realized auction net profits to your household budget</p>
+              <p className="text-xs text-slate-400 line-clamp-1 sm:line-clamp-none">Sync realized auction net profits to your household budget</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
+            className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors flex-shrink-0 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-5">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center text-slate-400">
               <Loader2 className="w-8 h-8 animate-spin text-amber-400 mb-2" />
@@ -188,7 +188,7 @@ export function FinanceSyncModal({ isOpen, onClose }) {
               </div>
 
               {/* Quick Actions & Links */}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
                 <a
                   href="https://techtrekgt.com/"
                   target="_blank"

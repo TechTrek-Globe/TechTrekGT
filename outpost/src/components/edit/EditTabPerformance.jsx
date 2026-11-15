@@ -22,7 +22,7 @@ function InfoTooltip({ title, children, formula, benchmark, position = 'bottom',
   return (
     <span className="relative inline-flex items-center group/tip cursor-help select-none" tabIndex={0} role="tooltip">
       <HelpCircle className="w-3.5 h-3.5 text-slate-500 hover:text-amber-400 focus:text-amber-400 transition-colors ml-1 flex-shrink-0" />
-      <span className={`absolute ${positionClasses} ${alignClasses} hidden group-hover/tip:flex group-focus-within/tip:flex flex-col w-64 sm:w-72 max-w-[calc(100vw-2rem)] max-h-[85vh] overflow-y-auto p-3 bg-slate-950/95 border border-slate-700/80 rounded-xl shadow-2xl backdrop-blur-md z-50 pointer-events-none text-left transition-opacity duration-150`}>
+      <span className={`absolute ${positionClasses} ${alignClasses} hidden group-hover/tip:flex group-focus-within/tip:flex flex-col w-64 sm:w-72 max-w-[calc(100vw-2rem)] max-h-[85dvh] overflow-y-auto p-3 bg-slate-950/95 border border-slate-700/80 rounded-xl shadow-2xl backdrop-blur-md z-50 pointer-events-none text-left transition-opacity duration-150`}>
         {title && (
           <span className="text-[11px] font-bold text-amber-300 pb-1 mb-1 border-b border-slate-800 flex items-center gap-1.5">
             <Info className="w-3 h-3 text-amber-400 flex-shrink-0" />

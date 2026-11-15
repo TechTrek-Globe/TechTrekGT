@@ -254,13 +254,13 @@ export function AuthPage({ onAuthSuccess, initialMode = 'signin', verifyNotifica
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 bg-grid-pattern flex flex-col items-center justify-between font-sans relative overflow-hidden">
+    <div className="min-h-screen min-h-[100dvh] pb-safe bg-slate-950 bg-grid-pattern flex flex-col items-center justify-between font-sans relative overflow-hidden">
 
       {/* --- Full-width Top Bar Header --- */}
-      <header className="w-full bg-black shadow-2xl relative z-20 flex justify-center items-center overflow-hidden" style={{ height: '280px', borderBottom: '1px solid rgba(180,130,20,0.3)' }}>
+      <header className="w-full bg-black shadow-2xl relative z-20 flex justify-center items-center overflow-hidden h-36 sm:h-52 lg:h-[280px]" style={{ borderBottom: '1px solid rgba(180,130,20,0.3)' }}>
         <a
           href="https://techtrekgt.com"
-          className="absolute top-4 left-4 z-30 flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700/80 hover:border-amber-500/50 shadow-lg backdrop-blur-md transition-all"
+          className="absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-30 flex items-center space-x-2 px-3.5 py-2 min-h-[40px] rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700/80 hover:border-amber-500/50 shadow-lg backdrop-blur-md transition-all"
           title="Return to TechTrekGT Main Launch Pad"
         >
           <Globe className="w-4 h-4 text-amber-400" />
@@ -425,12 +425,12 @@ export function AuthPage({ onAuthSuccess, initialMode = 'signin', verifyNotifica
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-1">
-                    <label className="flex items-center gap-2 cursor-pointer group">
+                    <label className="flex items-center gap-2 cursor-pointer group py-1 min-h-[36px]">
                       <div
-                        className={`w-4 h-4 rounded border transition-all duration-200 flex items-center justify-center ${rememberMe ? 'bg-amber-500 border-amber-500' : 'border-slate-600 group-hover:border-amber-500/60'}`}
+                        className={`w-5 h-5 rounded border transition-all duration-200 flex items-center justify-center ${rememberMe ? 'bg-amber-500 border-amber-500' : 'border-slate-600 group-hover:border-amber-500/60'}`}
                         onClick={() => setRememberMe(v => !v)}
                       >
-                        {rememberMe && <CheckCircle2 className="w-3 h-3 text-slate-950" strokeWidth={3} />}
+                        {rememberMe && <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" strokeWidth={3} />}
                       </div>
                       <span className="text-xs text-slate-400">Remember me</span>
                     </label>

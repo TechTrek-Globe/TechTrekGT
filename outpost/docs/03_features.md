@@ -889,3 +889,26 @@ The 1-Click eBay Listing Creation Engine enables sellers to publish full fixed-p
    - `EditTabFinancials.jsx`: Mounts a "1-Click Create on eBay" trigger directly in the pairing hub header for unlisted items, allowing immediate publishing without leaving the edit modal.
    - `InventoryHubView.jsx`: Integrated with `ListingCopyModal` callback to refresh inventory automatically when a new listing is created.
 
+## Mobile (iPhone 18 Pro) & Tablet (iPad) Responsiveness Engine [ACTION ID: RESP-001 / AUDIT-013]
+
+Comprehensive mobile and tablet responsiveness optimization across all views, modal surfaces, and data tables for iPhone 18 Pro (~402x874 CSS px) and iPad (768px-1366px portrait/landscape):
+
+1. **Root Viewport & iOS Safari Safe Area Insets**:
+   - `index.html`: Configured `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />` enabling hardware notch and Dynamic Island safe-area edge alignment.
+   - `src/index.css`: Injected utility classes `.pt-safe`, `.pb-safe`, `.pl-safe`, `.pr-safe`, and `.px-safe` utilizing `env(safe-area-inset-*)`.
+   - Global Base Font Zoom Guard: Declared iOS Safari input auto-zoom prevention rule in `src/index.css` (@layer base) enforcing `font-size: 16px !important` on `<input>`, `<select>`, and `<textarea>` elements on viewports `<640px` while maintaining desktop/tablet typography.
+2. **App Shell & Navigation Ergonomics**:
+   - `AppLayout.jsx`: Converted root shell to dynamic viewport height `h-[100dvh] max-h-[100dvh]`, eliminating bottom navigation and pagination clipping behind dynamic iOS Safari address/toolbar bars.
+   - Mounted `Tax / Schedule C` trigger button in `<1024px` mobile/tablet header.
+   - Upgraded all touch interactive targets in header and horizontal navigation bar to minimum 40px-44px heights with safe area clearance.
+3. **Data Grid & Touch Inline Editing**:
+   - `InventoryDataGrid.jsx` & `InventoryGridRow.jsx`: Restricted 3 sticky-left columns (`actions`, `image`, `item_name`) to `lg:sticky` (>=1024px) so iPhone 18 Pro and iPad Portrait viewports scroll the table smoothly without columns occluding scrolled data.
+   - Touch Pencils: Upgraded hover-only inline edit pencils (`InventoryGridRow.jsx`, `InlineEditCell.jsx`, `InlineSelectCell.jsx`, `MarketAlertsPanel.jsx`) from `opacity-0 group-hover:opacity-100` to `opacity-70 lg:opacity-0 lg:group-hover:opacity-100` for touch screen accessibility.
+   - `InlineEditableCell.jsx`: Added coarse pointer detection (`pointer: coarse`) activating single-tap editing on touchscreen tablets.
+   - `InventoryHubView.jsx`: Initialized default view mode to responsive pricing cards on mobile viewports (<640px).
+4. **Modal & Dialog Viewport Containment**:
+   - Standardized all modal overlays across `EditItemModal.jsx`, `AddInvoiceModal.jsx`, `ViewInvoiceModal.jsx`, `ListingMatchReviewModal.jsx`, `SoldEbayVineMatcherModal.jsx`, `AgingMarkdownModal.jsx`, `TaxReportModal.jsx`, `ListingCopyModal.jsx`, `LogSaleModal.jsx`, and `FinanceSyncModal.jsx` to `max-h-[90dvh]` to `max-h-[94dvh]` with flex-column internal scrolling and bottom safe-area padding.
+   - `AddInvoiceModal.jsx`: Converted multi-column grids (Step 1 and Step 2 line items) to responsive `col-span-12 sm:col-span-4/6/8` grids.
+   - `EditTabFinancials.jsx`: Restructured the 12-column Accounting Waterfall into responsive columns (`col-span-7 sm:col-span-6` for Line Item, `hidden sm:block sm:col-span-3` for Basis, and `col-span-5 sm:col-span-3` for Amount) with mobile summary subtitles.
+   - `CommandPalette.jsx`: Upgraded full-screen mobile dialog to `h-[100dvh]` with `pt-safe` and `pb-safe`.
+

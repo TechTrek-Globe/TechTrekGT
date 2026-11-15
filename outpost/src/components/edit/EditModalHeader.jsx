@@ -28,7 +28,7 @@ export function EditModalHeader({ form, item, isDirty, autoSaving, autoSavedTime
   const imageUrl = normalizeHttps(rawImg);
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md flex-shrink-0">
+    <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md flex-shrink-0">
       <div className="flex items-center gap-3 min-w-0 pr-4">
         <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-amber-400 flex-shrink-0 shadow-inner overflow-hidden relative">
           {imageUrl && !imgError ? (
@@ -117,7 +117,7 @@ export function EditModalHeader({ form, item, isDirty, autoSaving, autoSavedTime
       <button
         type="button"
         onClick={onClose}
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+        className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0 cursor-pointer"
         title="Close (Esc)"
         aria-label="Close modal"
       >

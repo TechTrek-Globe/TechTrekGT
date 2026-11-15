@@ -235,11 +235,11 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg max-h-[90vh] flex flex-col glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-lg max-h-[92dvh] flex flex-col glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/60 bg-gradient-to-r from-orange-950/60 to-slate-900/60 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-700/60 bg-gradient-to-r from-orange-950/60 to-slate-900/60 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center">
               <ShoppingCart className="w-4.5 h-4.5 text-orange-400" />
@@ -251,14 +251,14 @@ export function AmazonItemModal({ isOpen, platforms = [], onClose, onCreated }) 
           </div>
           <button
             onClick={handleClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-white hover:bg-slate-700/60 transition-all"
+            className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700/60 transition-all cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 flex-1 overflow-y-auto min-h-0">
+        <form onSubmit={handleSubmit} className="px-4 py-4 sm:px-6 sm:py-5 space-y-4 flex-1 overflow-y-auto min-h-0">
 
           {/* URL / ASIN / Order ID input + Search Button */}
           <div>

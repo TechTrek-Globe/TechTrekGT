@@ -68,7 +68,22 @@ export function InventoryHubView({ onNavigate }) {
   };
 
   // --- View State ---
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'pricing'
+  const [viewMode, setViewModeState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('outpost_inventory_view_mode');
+      if (saved) return saved;
+      if (window.innerWidth < 640) return 'pricing';
+    }
+    return 'table';
+  });
+
+  const setViewMode = useCallback((mode) => {
+    setViewModeState(mode);
+    try {
+      localStorage.setItem('outpost_inventory_view_mode', mode);
+    } catch (_) {}
+  }, []);
+
   const [showMetrics, setShowMetrics] = useState(false);
 
   // --- Modal States ---
@@ -255,7 +270,7 @@ export function InventoryHubView({ onNavigate }) {
   return (
     <div className="w-full flex-1 flex flex-col min-h-0 space-y-1.5">
       {pendingCertPrompt && (
-        <div className="bg-slate-900 border border-cyan-500/40 rounded-xl p-3 shadow-2xl flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="bg-slate-900 border border-cyan-500/40 rounded-xl p-3 shadow-2xl flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center gap-2.5 text-xs text-slate-200 min-w-0">
             <Shield className="w-4 h-4 text-cyan-400 flex-shrink-0" />
             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
@@ -265,7 +280,7 @@ export function InventoryHubView({ onNavigate }) {
               <span className="text-slate-400 text-[11px]">Did the official database find and verify this certificate?</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
             <button
               onClick={() => {
                 handleToggleCertVerified(pendingCertPrompt.item, true);

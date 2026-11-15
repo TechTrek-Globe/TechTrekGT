@@ -127,7 +127,7 @@ export function InventoryDataGrid({
                       left: stickyLeftVal
                     }}
                     className={`font-semibold py-2 ${key === 'image' ? 'px-1' : 'px-3'} border-b border-slate-800 relative select-none text-[11px] ${
-                      isStickyLeft ? 'sticky bg-slate-900 shadow-r z-30' : ''
+                      isStickyLeft ? 'lg:sticky bg-slate-900 shadow-r z-30' : ''
                     }`}
                   >
                     {key === 'image' ? (

@@ -98,7 +98,7 @@ export function InventoryGridRow({
             minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'actions')?.minWidth || 100}px`,
             maxWidth: `${actionsWidth}px`
           }}
-          className={`px-2 py-1.5 whitespace-nowrap overflow-hidden sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors ${stickyBg} group-hover:bg-[#1a263d]`}
+          className={`px-2 py-1.5 whitespace-nowrap overflow-hidden lg:sticky left-0 z-10 border-r border-slate-800/80 shadow-r transition-colors ${stickyBg} group-hover:bg-[#1a263d]`}
         >
           <div className="flex items-center gap-1">
             {/* Update / Sync Item Button */}
@@ -116,44 +116,44 @@ export function InventoryGridRow({
               }}
               disabled={updating}
               title={item.ebay_listing_id ? `Sync with eBay #${item.ebay_listing_id} (orders, fees & live price)` : 'Update / refresh item details'}
-              className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
+              className={`w-7 h-7 sm:w-6 sm:h-6 rounded flex items-center justify-center transition-all ${
                 updating
                   ? 'text-cyan-400 bg-cyan-500/20 animate-pulse'
                   : 'text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/15'
               }`}
             >
-              {updating ? <Loader2 className="w-3 h-3 animate-spin text-cyan-400" /> : <RefreshCw className="w-3 h-3" />}
+              {updating ? <Loader2 className="w-3.5 h-3.5 sm:w-3 sm:h-3 animate-spin text-cyan-400" /> : <RefreshCw className="w-3.5 h-3.5 sm:w-3 sm:h-3" />}
             </button>
 
             {/* Quick Edit & Details Button */}
             <button
               onClick={() => (onOpenEditModal ? onOpenEditModal(item) : (onOpenQuickEdit && onOpenQuickEdit(item)))}
               title="Open Item Details & Quick Edit"
-              className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-amber-500/15 transition-all"
+              className="w-7 h-7 sm:w-6 sm:h-6 rounded flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-amber-500/15 transition-all"
             >
-              <Edit3 className="w-3 h-3" />
+              <Edit3 className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
             </button>
 
             {/* eBay Listing ID Link Button */}
             <button
               onClick={() => onOpenListingIdModal && onOpenListingIdModal(item)}
               title={item.ebay_listing_id ? `Linked to eBay #${item.ebay_listing_id} (click to view / edit)` : 'Link to active eBay listing'}
-              className={`w-6 h-6 rounded flex items-center justify-center transition-all ${
+              className={`w-7 h-7 sm:w-6 sm:h-6 rounded flex items-center justify-center transition-all ${
                 item.ebay_listing_id
                   ? 'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 shadow-sm'
                   : 'text-slate-500 hover:text-amber-400 hover:bg-slate-800/80'
               }`}
             >
-              <ShoppingBag className="w-3 h-3" />
+              <ShoppingBag className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
             </button>
 
             {/* Listing Copy Button */}
             <button
               onClick={() => onOpenCopyModal && onOpenCopyModal(item)}
               title="Generate listing copy"
-              className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-slate-800/80 transition-all"
+              className="w-7 h-7 sm:w-6 sm:h-6 rounded flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-slate-800/80 transition-all"
             >
-              <Copy className="w-3 h-3" />
+              <Copy className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
             </button>
 
             {/* Log Sale Button */}
@@ -161,9 +161,9 @@ export function InventoryGridRow({
               <button
                 onClick={() => onOpenSaleModal && onOpenSaleModal(item)}
                 title="Record sale"
-                className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-emerald-400 hover:bg-slate-800/80 transition-all"
+                className="w-7 h-7 sm:w-6 sm:h-6 rounded flex items-center justify-center text-slate-500 hover:text-emerald-400 hover:bg-slate-800/80 transition-all"
               >
-                <DollarSign className="w-3 h-3" />
+                <DollarSign className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
               </button>
             )}
 
@@ -172,9 +172,9 @@ export function InventoryGridRow({
               onClick={() => onDelete && onDelete(item.id)}
               disabled={deleting === item.id || item.status === 'Sold'}
               title={item.status === 'Sold' ? 'Cannot delete a sold item' : 'Delete item'}
-              className="w-6 h-6 rounded flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-slate-800/80 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+              className="w-7 h-7 sm:w-6 sm:h-6 rounded flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-slate-800/80 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
             >
-              {deleting === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              {deleting === item.id ? <Loader2 className="w-3.5 h-3.5 sm:w-3 sm:h-3 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 sm:w-3 sm:h-3" />}
             </button>
 
             {/* Pricing & Profit Breakdown Hover Icon */}
@@ -184,9 +184,9 @@ export function InventoryGridRow({
               onMouseLeave={onHideTooltip}
               onClick={() => onOpenEditModal && onOpenEditModal(item)}
               aria-label="Pricing & cost breakdown"
-              className="w-6 h-6 rounded flex items-center justify-center text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 border border-amber-500/25 shadow-sm transition-all cursor-help"
+              className="w-7 h-7 sm:w-6 sm:h-6 rounded flex items-center justify-center text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 border border-amber-500/25 shadow-sm transition-all cursor-help"
             >
-              <CircleDollarSign className="w-3.5 h-3.5" />
+              <CircleDollarSign className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
           </div>
         </td>
@@ -201,7 +201,7 @@ export function InventoryGridRow({
             maxWidth: `${imageWidth}px`,
             left: `${actionsWidth}px`
           }}
-          className={`px-1 py-1 whitespace-nowrap overflow-hidden sticky z-10 border-r border-slate-800/80 shadow-r transition-colors ${stickyBg} group-hover:bg-[#1a263d]`}
+          className={`px-1 py-1 whitespace-nowrap overflow-hidden lg:sticky z-10 border-r border-slate-800/80 shadow-r transition-colors ${stickyBg} group-hover:bg-[#1a263d]`}
         >
           <div className="flex items-center justify-center">
             <ItemThumbnailCell
@@ -223,7 +223,7 @@ export function InventoryGridRow({
             maxWidth: `${columnWidths.item_name || 220}px`,
             left: `${actionsWidth + (isImageVisible ? imageWidth : 0)}px`
           }}
-          className={`px-3 py-1.5 border-r border-slate-800/60 transition-colors overflow-hidden text-xs sticky z-10 ${stickyBg} group-hover:bg-[#1a263d] shadow-r cursor-pointer`}
+          className={`px-3 py-1.5 border-r border-slate-800/60 transition-colors overflow-hidden text-xs lg:sticky z-10 ${stickyBg} group-hover:bg-[#1a263d] shadow-r cursor-pointer`}
           onClick={() => onOpenEditModal && onOpenEditModal(item)}
           title="Click to view & edit full item details"
         >
@@ -238,7 +238,7 @@ export function InventoryGridRow({
                 {cleanItemDescription(item.item_name, item.athlete_person, item.authenticator)}
               </span>
             </div>
-            <Pencil className="w-2.5 h-2.5 text-slate-500 group-hover/name:text-amber-400 transition-colors opacity-0 group-hover/name:opacity-100 flex-shrink-0" />
+            <Pencil className="w-2.5 h-2.5 text-slate-500 group-hover/name:text-amber-400 transition-colors opacity-70 lg:opacity-0 lg:group-hover/name:opacity-100 flex-shrink-0" />
           </div>
           {item.athlete_person && (
             <p className="text-slate-400 text-[10px] pointer-events-none truncate leading-none mt-0.5 font-medium">{cleanAthleteName(item.athlete_person)}</p>
@@ -569,7 +569,7 @@ export function InventoryGridRow({
                 <button
                   type="button"
                   onClick={() => setEditingCert(true)}
-                  className="opacity-0 group-hover/cert:opacity-100 p-0.5 text-slate-500 hover:text-amber-400 rounded transition-opacity flex-shrink-0"
+                  className="opacity-70 lg:opacity-0 lg:group-hover/cert:opacity-100 p-0.5 text-slate-500 hover:text-amber-400 rounded transition-opacity flex-shrink-0"
                   title="Edit cert number"
                 >
                   <Pencil className="w-2.5 h-2.5" />
@@ -710,7 +710,7 @@ export function InventoryGridRow({
                 <button
                   type="button"
                   onClick={() => setEditingInvoiceRef(true)}
-                  className="opacity-0 group-hover/inv:opacity-100 p-0.5 text-slate-500 hover:text-amber-400 rounded transition-opacity flex-shrink-0"
+                  className="opacity-70 lg:opacity-0 lg:group-hover/inv:opacity-100 p-0.5 text-slate-500 hover:text-amber-400 rounded transition-opacity flex-shrink-0"
                   title="Edit invoice reference"
                 >
                   <Pencil className="w-2.5 h-2.5" />

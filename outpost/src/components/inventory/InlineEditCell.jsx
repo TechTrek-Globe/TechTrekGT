@@ -109,7 +109,7 @@ export function InlineEditCell({
       <span className={`truncate text-xs ${value != null && value !== '' ? 'text-slate-200' : 'text-slate-500'}`}>
         {display}
       </span>
-      <Pencil className="w-2.5 h-2.5 text-slate-600 group-hover:text-amber-400 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0" />
+      <Pencil className="w-2.5 h-2.5 text-slate-500 group-hover:text-amber-400 transition-colors opacity-70 lg:opacity-0 lg:group-hover:opacity-100 flex-shrink-0" />
     </div>
   );
 }

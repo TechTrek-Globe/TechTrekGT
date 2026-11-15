@@ -77,7 +77,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
   };
 
   return (
-    <div className="h-screen max-h-screen bg-slate-950 flex font-sans overflow-hidden">
+    <div className="h-screen h-[100dvh] max-h-[100dvh] bg-slate-950 flex font-sans overflow-hidden">
 
       {/* --- Desktop Sidebar (Collapsible) --- */}
       <aside className={`hidden lg:flex flex-col ${isCollapsed ? 'w-16' : 'w-60'} bg-slate-900/60 border-r border-slate-800/60 backdrop-blur-md flex-shrink-0 min-h-0 overflow-y-auto transition-all duration-300 ease-in-out`}>
@@ -307,16 +307,16 @@ export function AppLayout({ activeView, onNavigate, children }) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Mobile top bar */}
-        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-slate-900/80 border-b border-slate-800/60 backdrop-blur-md">
+        <header className="lg:hidden flex items-center justify-between px-4 py-2.5 pt-safe px-safe bg-slate-900/80 border-b border-slate-800/60 backdrop-blur-md">
           <div className="flex items-center gap-2">
-            <img src={outpostLogo} alt="TechTrek Outpost" className="h-8 w-auto max-w-[220px] object-contain filter drop-shadow-md" />
+            <img src={outpostLogo} alt="TechTrek Outpost" className="h-8 w-auto max-w-[200px] object-contain filter drop-shadow-md" />
           </div>
 
           <div className="flex items-center gap-1.5">
             <a
               href="https://techtrekgt.com"
               title="Return to TechTrekGT Main Launch Pad"
-              className="p-1.5 rounded-lg bg-slate-800/80 text-slate-300 hover:text-amber-400 border border-slate-700/60 text-xs font-semibold flex items-center gap-1"
+              className="min-h-[40px] px-2.5 py-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-amber-400 border border-slate-700/60 text-xs font-semibold flex items-center gap-1"
             >
               <Globe className="w-3.5 h-3.5 text-amber-400" />
               <span className="hidden sm:inline">Launch Pad</span>
@@ -327,7 +327,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
               id="mobile-command-palette-btn"
               onClick={openPalette}
               title="Command Palette (Cmd+K)"
-              className="p-1.5 rounded-lg bg-slate-800/80 text-amber-400 border border-slate-700/60 text-xs font-bold flex items-center gap-1"
+              className="min-h-[40px] px-2.5 py-2 rounded-lg bg-slate-800/80 text-amber-400 border border-slate-700/60 text-xs font-bold flex items-center gap-1"
             >
               <Search className="w-3.5 h-3.5" />
               <span className="text-[10px] font-mono">⌘K</span>
@@ -335,26 +335,36 @@ export function AppLayout({ activeView, onNavigate, children }) {
 
             <button
               onClick={() => setFinanceSyncOpen(true)}
-              className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center gap-1"
+              title="Sync eBay Transactions"
+              className="min-h-[40px] px-2.5 py-2 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center gap-1"
             >
               <ArrowRightLeft className="w-3.5 h-3.5" />
               <span>Sync</span>
             </button>
 
-            <button id="mobile-logout-btn" onClick={logout} className="text-slate-500 hover:text-red-400 transition-colors p-1">
+            <button
+              onClick={() => setTaxReportOpen(true)}
+              title="Tax / Schedule C Report"
+              className="min-h-[40px] px-2.5 py-2 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 text-xs font-bold flex items-center gap-1"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Tax</span>
+            </button>
+
+            <button id="mobile-logout-btn" onClick={logout} title="Sign Out" className="text-slate-500 hover:text-red-400 transition-colors p-2 min-h-[40px] min-w-[40px] flex items-center justify-center">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
         </header>
 
         {/* Mobile nav */}
-        <nav className="lg:hidden flex gap-1 px-3 pt-3 pb-1 overflow-x-auto">
+        <nav className="lg:hidden flex gap-1 px-3 px-safe pt-2.5 pb-1 overflow-x-auto">
           {visibleNavItems.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               id={`mobile-nav-${id}`}
               onClick={() => onNavigate(id)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-lg text-xs font-medium transition-all ${
                 activeView === id
                   ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
                   : 'text-slate-500 hover:text-slate-200 border border-transparent'
@@ -367,7 +377,7 @@ export function AppLayout({ activeView, onNavigate, children }) {
         </nav>
 
         {/* Page content */}
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 lg:p-3 bg-grid-pattern">
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 lg:p-3 pb-safe px-safe bg-grid-pattern">
           {children}
         </main>
       </div>

@@ -198,7 +198,7 @@ export function DashboardView({ onNavigate }) {
           <button
             id="refresh-dashboard-btn"
             onClick={fetchDashboard}
-            className="w-9 h-9 rounded-xl border border-slate-700 flex items-center justify-center text-slate-500 hover:text-amber-400 hover:border-amber-500/40 transition-all"
+            className="w-10 h-10 sm:w-9 sm:h-9 min-h-[40px] min-w-[40px] sm:min-h-0 sm:min-w-0 rounded-xl border border-slate-700 flex items-center justify-center text-slate-500 hover:text-amber-400 hover:border-amber-500/40 transition-all cursor-pointer"
             title="Refresh dashboard metrics"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -354,7 +354,7 @@ export function DashboardView({ onNavigate }) {
             </div>
 
             {/* Visual 4-Tier Distribution Bar */}
-            <div className="grid grid-cols-4 gap-2 mb-4 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 text-center font-mono">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 text-center font-mono">
               <div className="p-1.5 rounded-lg bg-slate-900/60">
                 <span className="text-[10px] text-slate-400 block font-sans">0-30d Fresh</span>
                 <span className="text-sm font-black text-emerald-400">{agingSummary.fresh_count}</span>
@@ -392,7 +392,7 @@ export function DashboardView({ onNavigate }) {
                           <span title="Price locked from markdown"><Lock className="w-3 h-3 text-amber-400 flex-shrink-0" /></span>
                         ) : null}
                       </div>
-                      <p className="text-[10.5px] text-slate-500 mt-0.5 font-mono">
+                      <p className="text-[10.5px] text-slate-500 mt-0.5 font-mono truncate">
                         {item.sku || 'No SKU'} · <span className="text-amber-400">{item.platform || 'eBay'}</span> · Cost: {fmtCurrency(item.true_total_cost)} · Floor: {fmtCurrency(item.min_sell_price)}
                       </p>
                     </div>
@@ -472,7 +472,7 @@ export function DashboardView({ onNavigate }) {
                   <div key={item.id} className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/70 hover:border-slate-700 flex items-center justify-between transition-colors">
                     <div className="min-w-0 pr-3">
                       <p className="text-xs font-semibold text-slate-200 truncate">{item.item_name}</p>
-                      <p className="text-[10.5px] text-slate-500 mt-0.5 font-mono">
+                      <p className="text-[10.5px] text-slate-500 mt-0.5 font-mono truncate">
                         {item.category || 'General'} · Inv: {item.invoice_ref || 'None'} · Floor: {fmtCurrency(item.min_sell_price)}
                       </p>
                     </div>

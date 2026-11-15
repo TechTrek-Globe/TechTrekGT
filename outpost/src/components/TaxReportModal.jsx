@@ -112,28 +112,28 @@ export function TaxReportModal({ isOpen, onClose }) {
   const years = reportData?.availableYears || [String(new Date().getFullYear())];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="w-full max-w-5xl glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden my-auto animate-scale-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="w-full max-w-5xl glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden my-auto animate-scale-up flex flex-col max-h-[90dvh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800 bg-slate-900/90 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 flex-shrink-0">
               <Calculator className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-sm font-black text-slate-100 flex items-center gap-2">
-                Year-End Tax & Schedule C Inventory Valuation
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Year-End Tax &amp; Schedule C Inventory Valuation
+                <span className="hidden sm:inline px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                   IRS Ready
                 </span>
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-400 line-clamp-1 sm:line-clamp-none">
                 Official Form 1040 Schedule C workpaper with COGS, platform fee deductions, and ending inventory
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Year Selector */}
             <div className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -154,7 +154,7 @@ export function TaxReportModal({ isOpen, onClose }) {
             <button
               onClick={exportTaxCSV}
               disabled={!reportData}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors text-xs flex items-center gap-1.5 disabled:opacity-50"
+              className="p-2 min-h-[36px] sm:min-h-0 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors text-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               title="Export Schedule C CSV"
             >
               <Download className="w-3.5 h-3.5" />
@@ -163,7 +163,7 @@ export function TaxReportModal({ isOpen, onClose }) {
 
             <button
               onClick={handlePrint}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors text-xs flex items-center gap-1.5"
+              className="p-2 min-h-[36px] sm:min-h-0 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors text-xs flex items-center gap-1.5 cursor-pointer"
               title="Print Tax Summary"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -172,7 +172,7 @@ export function TaxReportModal({ isOpen, onClose }) {
 
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -180,7 +180,7 @@ export function TaxReportModal({ isOpen, onClose }) {
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6 max-h-[78vh] overflow-y-auto">
+        <div className="p-3.5 sm:p-6 space-y-6 max-h-[80dvh] overflow-y-auto">
           {error && (
             <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />

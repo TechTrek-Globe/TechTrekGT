@@ -327,12 +327,12 @@ export function SalesLogView() {
 
           {/* Search Box */}
           <div className="relative min-w-[130px] max-w-[190px]">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 z-10 pointer-events-none" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 z-10 pointer-events-none" />
             <input
               ref={searchInputRef}
               id="sales-search-input"
               type="text"
-              className="w-full bg-slate-950 border border-slate-700/80 rounded-lg pl-7 pr-5 py-0.5 text-[11px] text-slate-100 placeholder-slate-500 outline-none focus:border-amber-500 transition-colors h-7"
+              className="w-full bg-slate-950 border border-slate-700/80 rounded-lg pl-8 pr-6 py-1 sm:py-0.5 text-xs sm:text-[11px] text-slate-100 placeholder-slate-500 outline-none focus:border-amber-500 transition-colors h-8 sm:h-7"
               placeholder="Search (/)"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -340,7 +340,7 @@ export function SalesLogView() {
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1"
               >
                 <X className="w-2.5 h-2.5" />
               </button>
@@ -351,7 +351,7 @@ export function SalesLogView() {
           <select
             value={platformFilter}
             onChange={e => setPlatformFilter(e.target.value)}
-            className={`bg-slate-950 border rounded-lg py-0.5 px-2 text-[11px] outline-none transition-colors cursor-pointer flex-shrink-0 h-7 ${
+            className={`bg-slate-950 border rounded-lg py-1 sm:py-0.5 px-2 text-xs sm:text-[11px] outline-none transition-colors cursor-pointer flex-shrink-0 h-8 sm:h-7 ${
               platformFilter
                 ? 'border-amber-500/50 text-amber-400 font-semibold bg-amber-500/10'
                 : 'border-slate-700/80 text-slate-300 focus:border-amber-500'
@@ -824,37 +824,37 @@ export function SalesLogView() {
                         }}
                         className="py-1 px-2 whitespace-nowrap text-center overflow-hidden"
                       >
-                        <div className="flex items-center justify-center gap-0.5">
+                        <div className="flex items-center justify-center gap-1.5 sm:gap-0.5">
                           {isEbay && (
                             <button
                               onClick={() => setExpandedFeeRow(prev => prev === sale.id ? null : sale.id)}
-                              className={`w-5 h-5 rounded flex items-center justify-center transition-all ${
+                              className={`w-7 h-7 sm:w-5 sm:h-5 rounded flex items-center justify-center transition-all cursor-pointer ${
                                 expandedFeeRow === sale.id
                                   ? 'text-amber-400 bg-amber-500/20 border border-amber-500/40'
                                   : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
                               }`}
                               title="Reconcile eBay fees"
                             >
-                              <DollarSign className="w-2.5 h-2.5" />
+                              <DollarSign className="w-3.5 h-3.5 sm:w-2.5 sm:h-2.5" />
                             </button>
                           )}
                           <button
                             onClick={() => handleEditSale(sale)}
-                            className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-all"
+                            className="w-7 h-7 sm:w-5 sm:h-5 rounded flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-all cursor-pointer"
                             title="Edit sale details"
                           >
-                            <Pencil className="w-2.5 h-2.5" />
+                            <Pencil className="w-3.5 h-3.5 sm:w-2.5 sm:h-2.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteSale(sale.id)}
                             disabled={deletingId === sale.id}
-                            className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-all"
+                            className="w-7 h-7 sm:w-5 sm:h-5 rounded flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-all disabled:opacity-50 cursor-pointer"
                             title="Delete sale and revert item"
                           >
                             {deletingId === sale.id ? (
-                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              <Loader2 className="w-3.5 h-3.5 sm:w-2.5 sm:h-2.5 animate-spin" />
                             ) : (
-                              <Trash2 className="w-2.5 h-2.5" />
+                              <Trash2 className="w-3.5 h-3.5 sm:w-2.5 sm:h-2.5" />
                             )}
                           </button>
                         </div>

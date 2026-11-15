@@ -11,14 +11,14 @@ export function EditModalFooter({
   onOpenCopyModal
 }) {
   return (
-    <div className="border-t border-slate-800 bg-slate-950/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between gap-3 flex-shrink-0">
+    <div className="border-t border-slate-800 bg-slate-950/95 backdrop-blur-md px-3.5 py-3 sm:px-6 sm:py-3.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
       {/* Left side actions */}
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onClose}
           disabled={saving}
-          className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl transition-colors disabled:opacity-50"
+          className="px-3.5 sm:px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl transition-colors disabled:opacity-50"
         >
           Cancel
         </button>
@@ -27,7 +27,7 @@ export function EditModalFooter({
           <button
             type="button"
             onClick={onOpenCopyModal}
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-amber-400/90 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded-xl transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-amber-400/90 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded-xl transition-colors cursor-pointer"
             title="Generate AI & Template Listing Copy"
           >
             <Copy className="w-3.5 h-3.5" />
@@ -37,7 +37,7 @@ export function EditModalFooter({
       </div>
 
       {/* Center status / dirty warning indicator */}
-      <div className="flex-1 text-center px-2 min-w-0">
+      <div className="flex-1 text-center px-1 min-w-0 order-last sm:order-none w-full sm:w-auto mt-1 sm:mt-0">
         {error ? (
           <div className="text-xs text-red-400 flex items-center justify-center gap-1.5 truncate">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />

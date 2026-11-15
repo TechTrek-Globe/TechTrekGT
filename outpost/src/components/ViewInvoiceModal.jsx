@@ -60,10 +60,10 @@ export function ViewInvoiceModal({ isOpen, onClose, invoiceRef, invoiceId }) {
     (invoice?.invoice_ref && /^\d{6,8}$/.test(String(invoice.invoice_ref).trim()));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-slate-950 border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto animate-fade-in">
+      <div className="bg-slate-950 border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92dvh] flex flex-col overflow-hidden">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/60 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800 bg-slate-900/60 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
               <Receipt className="w-5 h-5" />
@@ -91,10 +91,11 @@ export function ViewInvoiceModal({ isOpen, onClose, invoiceRef, invoiceId }) {
                 href="https://www.pristineauction.com/my-account/invoices"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
               >
                 <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
-                <span>Pristine Dashboard ↗</span>
+                <span className="hidden sm:inline">Pristine Dashboard ↗</span>
+                <span className="sm:hidden">Pristine ↗</span>
               </a>
             )}
             <button

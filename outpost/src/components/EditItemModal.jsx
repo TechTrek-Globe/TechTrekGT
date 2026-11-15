@@ -896,11 +896,11 @@ export function EditItemModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={handleClose}
     >
       <div
-        className="w-full max-w-3xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] animate-in zoom-in-95 duration-150"
+        className="w-full max-w-3xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] animate-in zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
       >
         {/* Sticky Header */}
@@ -925,7 +925,7 @@ export function EditItemModal({
         <form
           id="edit-item-form"
           onSubmit={handleSubmit}
-          className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 scrollbar-thin scrollbar-thumb-slate-800"
+          className="p-3.5 sm:p-6 overflow-y-auto flex-1 space-y-4 scrollbar-thin scrollbar-thumb-slate-800"
         >
           {(activeTab === 'financial' || activeTab === 'listing_pricing') && (
             <EditTabFinancials

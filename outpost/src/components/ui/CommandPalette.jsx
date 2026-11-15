@@ -420,10 +420,10 @@ export function CommandPalette({
         id="global-command-palette"
         onClick={e => e.stopPropagation()}
         onKeyDown={handleKeyDown}
-        className="w-full h-full sm:h-auto sm:max-h-[85vh] sm:max-w-2xl bg-slate-900 border-0 sm:border border-slate-700/80 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200"
+        className="w-full h-full h-[100dvh] sm:h-auto sm:max-h-[85dvh] sm:max-w-2xl bg-slate-900 border-0 sm:border border-slate-700/80 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200"
       >
         {/* Search Input Bar */}
-        <div className="relative flex items-center px-4 py-3.5 border-b border-slate-800 bg-slate-950/60 flex-shrink-0">
+        <div className="relative flex items-center px-4 py-3.5 pt-safe px-safe border-b border-slate-800 bg-slate-950/60 flex-shrink-0">
           <Search className="w-5 h-5 text-amber-400/90 flex-shrink-0 mr-3" />
           <input
             ref={inputRef}
@@ -457,7 +457,7 @@ export function CommandPalette({
         <div
           ref={resultsContainerRef}
           id="command-palette-results"
-          className="flex-1 overflow-y-auto max-h-[calc(100vh-140px)] sm:max-h-[460px] p-2 space-y-1"
+          className="flex-1 overflow-y-auto max-h-[calc(100dvh-140px)] sm:max-h-[460px] p-2 pb-safe space-y-1"
         >
           {/* Loading remote SKU indicator */}
           {isSearchingSkus && (

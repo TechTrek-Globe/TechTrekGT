@@ -126,7 +126,7 @@ export function MarketAlertsPanel() {
                 
                 <button 
                   onClick={() => handleMarkRead(alert.id)}
-                  className="w-6 h-6 rounded-md bg-slate-800 text-slate-400 hover:text-amber-300 hover:bg-slate-700 flex items-center justify-center transition-colors absolute top-2 right-2 opacity-0 group-hover:opacity-100"
+                  className="w-7 h-7 sm:w-6 sm:h-6 rounded-md bg-slate-800 text-slate-400 hover:text-amber-300 hover:bg-slate-700 flex items-center justify-center transition-colors absolute top-2 right-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 cursor-pointer"
                   title="Dismiss alert"
                 >
                   <Check className="w-3.5 h-3.5" />

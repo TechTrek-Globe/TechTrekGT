@@ -584,7 +584,7 @@ export function SettingsView() {
       )}
 
       {/* Modern Top Segmented Tabs Navigation */}
-      <div className="bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800/80 flex flex-wrap gap-1.5 backdrop-blur-md shadow-xl flex-shrink-0">
+      <div className="bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800/80 flex flex-nowrap sm:flex-wrap overflow-x-auto gap-1.5 backdrop-blur-md shadow-xl flex-shrink-0">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -593,7 +593,7 @@ export function SettingsView() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 min-w-[130px] sm:min-w-[150px] py-2.5 px-3.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
+              className={`flex-shrink-0 sm:flex-1 min-w-[120px] sm:min-w-[150px] py-2.5 px-3.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer ${
                 isActive
                   ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20 scale-[1.01]'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
@@ -1367,7 +1367,7 @@ export function SettingsView() {
                       <RefreshCw className="w-3 h-3" /> Reset Widths
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
+                  <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
                     {DEFAULT_COLUMNS.map(col => {
                       const isVisible = userSettings.columnVisibility[col.key] !== false;
                       return (
@@ -1754,8 +1754,8 @@ function VineScoutSection({ token, hasToken, loading, rotating, copied, onLoad, 
           <label className="block text-[11px] font-bold text-slate-300 mb-1.5 uppercase tracking-wide">
             Outpost Tracker URL (Paste into VScout)
           </label>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-teal-300 overflow-hidden whitespace-nowrap">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+            <div className="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-teal-300 overflow-hidden whitespace-nowrap">
               {baseUrl}
             </div>
             <button
@@ -1785,9 +1785,9 @@ function VineScoutSection({ token, hasToken, loading, rotating, copied, onLoad, 
                 Shown Once Upon Generation
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
               <div
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-amber-300 overflow-hidden whitespace-nowrap overflow-ellipsis"
+                className="flex-1 min-w-[180px] bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-amber-300 overflow-hidden whitespace-nowrap overflow-ellipsis"
                 role="text"
                 aria-label={revealed ? "API Secret Key" : "Masked API Secret Key"}
               >

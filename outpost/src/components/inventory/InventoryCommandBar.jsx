@@ -75,13 +75,13 @@ export function InventoryCommandBar({
         </h1>
 
         {/* Search Box */}
-        <div className="relative min-w-[140px] max-w-[190px]">
+        <div className="relative w-full sm:w-auto sm:min-w-[140px] sm:max-w-[190px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 z-10 pointer-events-none" />
           <input
             ref={searchInputRef}
             id="inventory-search"
             type="text"
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-lg pl-8 pr-6 py-1 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-amber-500 transition-colors"
+            className="w-full bg-slate-950 border border-slate-700/80 rounded-lg pl-8 pr-6 py-1.5 sm:py-1 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-amber-500 transition-colors"
             placeholder="Search (/)"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -89,7 +89,7 @@ export function InventoryCommandBar({
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1"
             >
               <X className="w-3 h-3" />
             </button>
@@ -97,7 +97,7 @@ export function InventoryCommandBar({
         </div>
 
         {/* Segmented Status Tabs */}
-        <div className="flex items-center bg-slate-950/90 p-0.5 rounded-lg border border-slate-800/80 text-xs flex-shrink-0 overflow-x-auto">
+        <div className="flex items-center bg-slate-950/90 p-0.5 rounded-lg border border-slate-800/80 text-xs flex-shrink-0 overflow-x-auto max-w-full flex-nowrap">
           {STATUS_TABS.map(tab => {
             const isActive = statusFilter === tab.id;
             const count = tab.id === '' ? allCount : (statusCounts[tab.countKey] || 0);
@@ -107,7 +107,7 @@ export function InventoryCommandBar({
                 key={tab.label}
                 type="button"
                 onClick={() => setStatusFilter(tab.id)}
-                className={`px-2 py-0.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                className={`px-2.5 py-1 sm:py-0.5 min-h-[32px] sm:min-h-0 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                   isActive
                     ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/10'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
@@ -236,7 +236,7 @@ export function InventoryCommandBar({
 
         <button
           onClick={() => setShowMetrics(v => !v)}
-          className={`px-2 py-0.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1 ${
+          className={`px-2.5 py-1.5 sm:py-0.5 min-h-[32px] sm:min-h-0 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1 cursor-pointer ${
             showMetrics
               ? 'bg-slate-800 text-amber-400 border-amber-500/30'
               : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
@@ -248,7 +248,7 @@ export function InventoryCommandBar({
 
         <button
           onClick={onOpenImporter}
-          className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 flex items-center gap-1 transition-all"
+          className="px-2.5 py-1.5 sm:py-0.5 min-h-[32px] sm:min-h-0 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 flex items-center gap-1 transition-all cursor-pointer"
           title="Import Excel or CSV sheet"
         >
           <UploadCloud className="w-3.5 h-3.5 text-slate-400" />
@@ -257,7 +257,7 @@ export function InventoryCommandBar({
 
         <button
           onClick={onOpenAmazonModal}
-          className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 flex items-center gap-1 transition-all"
+          className="px-2.5 py-1.5 sm:py-0.5 min-h-[32px] sm:min-h-0 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 flex items-center gap-1 transition-all cursor-pointer"
           title="Import item directly via Amazon ASIN / Order ID"
         >
           <Tag className="w-3.5 h-3.5 text-[#ff9900]" />
@@ -268,7 +268,7 @@ export function InventoryCommandBar({
           id="sync-ebay-sales-btn"
           onClick={onSyncEbay}
           disabled={syncing || loading}
-          className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 flex items-center gap-1 transition-all disabled:opacity-50"
+          className="px-2.5 py-1.5 sm:py-0.5 min-h-[32px] sm:min-h-0 rounded-lg text-xs font-semibold bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 flex items-center gap-1 transition-all disabled:opacity-50 cursor-pointer"
           title="Pull latest eBay sales and reconcile inventory"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
@@ -279,7 +279,7 @@ export function InventoryCommandBar({
           <button
             id="match-sold-ebay-btn"
             onClick={onOpenSoldMatcher}
-            className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 transition-all"
+            className="px-2.5 py-1.5 sm:py-0.5 min-h-[32px] sm:min-h-0 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 transition-all cursor-pointer"
             title="Match sold eBay orders to Vine Scout items"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -291,7 +291,7 @@ export function InventoryCommandBar({
           <button
             id="reprice-markdown-btn"
             onClick={onOpenAgingMarkdown}
-            className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 transition-all"
+            className="px-2.5 py-1.5 sm:py-0.5 min-h-[32px] sm:min-h-0 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 transition-all cursor-pointer"
             title="Automated Repricing & Aging Inventory Decay Engine"
           >
             <TrendingDown className="w-3.5 h-3.5 text-amber-400" />
@@ -301,7 +301,7 @@ export function InventoryCommandBar({
 
         <button
           onClick={onOpenAddInvoice}
-          className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1 shadow-sm transition-all"
+          className="px-3 py-1.5 sm:py-0.5 min-h-[32px] sm:min-h-0 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1 shadow-sm transition-all cursor-pointer"
           title="Add a manual purchase or wholesale invoice"
         >
           <Package className="w-3.5 h-3.5" />
@@ -311,7 +311,7 @@ export function InventoryCommandBar({
         <button
           id="refresh-btn"
           onClick={onRefresh}
-          className="w-6 h-6 rounded-lg border border-slate-700 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition-all flex-shrink-0"
+          className="w-8 h-8 sm:w-6 sm:h-6 rounded-lg border border-slate-700 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition-all flex-shrink-0 cursor-pointer"
           title="Refresh inventory"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />

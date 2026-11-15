@@ -30,14 +30,6 @@ import { FormatTime } from './Formatters';
 export function ItineraryView() {
   const { isAuthenticated, setIsAuthModalOpen } = useAuth();
   const { itinerary: privateItems = [], accommodations = [], documents = [] } = useWayfinder();
-  const [selectedCity, setSelectedCity] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const p = new URLSearchParams(window.location.search);
-      if (p.get('day')) return 'all';
-      return p.get('city') || 'all';
-    }
-    return 'all';
-  });
   const [selectedDay, setSelectedDay] = useState(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search).get('day');
@@ -150,6 +142,47 @@ export function ItineraryView() {
     return () => window.removeEventListener('keydown', handleSlashShortcut);
   }, []);
 
+  const [scrollSpyDay, setScrollSpyDay] = useState(null);
+  const cityBarRef = useRef(null);
+  const dayBarRef = useRef(null);
+  const programmaticScrollRef = useRef(null);
+  const pendingScrollDayRef = useRef(null);
+  const publicDays = polandJourney.itinerary || [];
+
+  const findFirstDayForCity = (cityId) => {
+    if (!cityId || cityId === 'all') return null;
+    if (cityId === 'gdansk') {
+      return publicDays.find((d) => d.cityId === 'gdansk') || null;
+    }
+    return publicDays.find(
+      (d) => d.cityId === cityId || d.cityIds?.includes(cityId) || (cityId === 'torun' && d.cityName.includes('Toruń'))
+    ) || null;
+  };
+
+  const scrollToDayElement = (dayNumber) => {
+    const el = document.getElementById(`day-${dayNumber}`);
+    if (!el) return false;
+    const headerOffset = window.innerWidth >= 768 ? 228 : 132;
+    const targetTop = Math.max(0, el.getBoundingClientRect().top + window.scrollY - headerOffset);
+    window.scrollTo({ top: targetTop, behavior: 'smooth' });
+    return true;
+  };
+
+  const handleCityPillClick = (cityId) => {
+    const targetDay = findFirstDayForCity(cityId);
+    setSelectedDay('all');
+    if (typeof window !== 'undefined' && window.location.search) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (!targetDay) return;
+
+    setScrollSpyDay(targetDay.day);
+    programmaticScrollRef.current = { targetDay: targetDay.day, expiresAt: Date.now() + 1100 };
+    if (selectedDay !== 'all' || !scrollToDayElement(targetDay.day)) {
+      pendingScrollDayRef.current = targetDay.day;
+    }
+  };
+
   useEffect(() => {
     let scrollTimer = null;
     const handleUrlChange = () => {
@@ -158,19 +191,20 @@ export function ItineraryView() {
       const cityParam = params.get('city');
       setSelectedDay(dayParam || 'all');
       if (dayParam) {
-        setSelectedCity('all');
         if (!didInitialDayScrollRef.current) {
           didInitialDayScrollRef.current = true;
           clearTimeout(scrollTimer);
           scrollTimer = setTimeout(() => {
-            const el = document.getElementById(`day-${dayParam}`);
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            scrollToDayElement(dayParam);
           }, 150);
         }
-      } else {
-        setSelectedCity(cityParam || 'all');
+      } else if (cityParam && cityParam !== 'all') {
+        const targetDay = findFirstDayForCity(cityParam);
+        if (targetDay) {
+          setScrollSpyDay(targetDay.day);
+          programmaticScrollRef.current = { targetDay: targetDay.day, expiresAt: Date.now() + 1100 };
+          pendingScrollDayRef.current = targetDay.day;
+        }
       }
     };
 
@@ -182,13 +216,19 @@ export function ItineraryView() {
     };
   }, []);
 
-  const [scrollSpyDay, setScrollSpyDay] = useState(null);
-  const cityBarRef = useRef(null);
-  const dayBarRef = useRef(null);
-  const publicDays = polandJourney.itinerary || [];
+  useEffect(() => {
+    if (pendingScrollDayRef.current == null || selectedDay !== 'all') return;
+    const targetDay = pendingScrollDayRef.current;
+    pendingScrollDayRef.current = null;
+    const rafId = window.requestAnimationFrame(() => {
+      scrollToDayElement(targetDay);
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [selectedDay]);
 
   useEffect(() => {
     if (selectedDay !== 'all') {
+      programmaticScrollRef.current = null;
       setScrollSpyDay(null);
       return;
     }
@@ -196,6 +236,21 @@ export function ItineraryView() {
     let rafId = null;
     const updateScrollSpy = () => {
       rafId = null;
+      const anchor = window.innerWidth >= 768 ? 245 : 145;
+      const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24;
+
+      if (programmaticScrollRef.current) {
+        const { targetDay, expiresAt } = programmaticScrollRef.current;
+        const targetEl = document.getElementById(`day-${targetDay}`);
+        const headerOffset = window.innerWidth >= 768 ? 228 : 132;
+        const arrived = targetEl && Math.abs(targetEl.getBoundingClientRect().top - headerOffset) < 24;
+        if (Date.now() >= expiresAt || arrived || nearBottom) {
+          programmaticScrollRef.current = null;
+        } else {
+          return;
+        }
+      }
+
       const visibleSections = [];
       for (const dayItem of publicDays) {
         const el = document.getElementById(`day-${dayItem.day}`);
@@ -209,7 +264,6 @@ export function ItineraryView() {
         return;
       }
 
-      const anchor = window.innerWidth >= 768 ? 245 : 145;
       if (visibleSections[0].rect.top > anchor + 80) {
         setScrollSpyDay((prev) => (prev === null ? prev : null));
         return;
@@ -224,7 +278,6 @@ export function ItineraryView() {
         }
       }
 
-      const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24;
       if (nearBottom) {
         const lastSec = visibleSections[visibleSections.length - 1];
         if (lastSec.rect.top < window.innerHeight * 0.75) {
@@ -240,21 +293,29 @@ export function ItineraryView() {
       rafId = window.requestAnimationFrame(updateScrollSpy);
     };
 
+    const cancelProgrammaticScroll = () => {
+      programmaticScrollRef.current = null;
+    };
+
     updateScrollSpy();
     rafId = window.requestAnimationFrame(updateScrollSpy);
     window.addEventListener('scroll', handleScrollOrResize, { passive: true });
     window.addEventListener('resize', handleScrollOrResize, { passive: true });
+    window.addEventListener('wheel', cancelProgrammaticScroll, { passive: true });
+    window.addEventListener('touchstart', cancelProgrammaticScroll, { passive: true });
 
     return () => {
       if (rafId !== null) window.cancelAnimationFrame(rafId);
       window.removeEventListener('scroll', handleScrollOrResize);
       window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('wheel', cancelProgrammaticScroll);
+      window.removeEventListener('touchstart', cancelProgrammaticScroll);
     };
-  }, [selectedCity, selectedDay, selectedType, deferredSearchQuery]);
+  }, [selectedDay, selectedType, deferredSearchQuery]);
 
   const highlightedDay = selectedDay !== 'all' ? Number(selectedDay) : scrollSpyDay;
   const activeScrollDayObj = highlightedDay != null ? publicDays.find((d) => d.day === highlightedDay) : null;
-  const highlightedCityId = selectedCity !== 'all' ? selectedCity : (activeScrollDayObj?.cityId || null);
+  const highlightedCityId = activeScrollDayObj?.cityId || null;
 
   useEffect(() => {
     const scrollPillIntoBar = (barEl, selector) => {
@@ -284,17 +345,17 @@ export function ItineraryView() {
   };
 
   const filteredDays = publicDays.filter((dayItem) => {
-    const matchesCity = selectedCity === 'all' || dayItem.cityId === selectedCity || dayItem.cityIds?.includes(selectedCity) || (selectedCity === 'torun' && dayItem.cityName.includes('Toruń'));
-    const matchesDay = selectedDay === 'all' || dayItem.day.toString() === selectedDay.toString();
-    return matchesCity && matchesDay;
+    return selectedDay === 'all' || dayItem.day.toString() === selectedDay.toString();
   });
 
-  const hasActiveFilters = selectedCity !== 'all' || selectedDay !== 'all' || selectedType !== 'all' || Boolean(searchQuery.trim());
+  const hasActiveFilters = selectedDay !== 'all' || selectedType !== 'all' || Boolean(searchQuery.trim());
   const resetFilters = () => {
-    setSelectedCity('all');
     setSelectedDay('all');
     setSelectedType('all');
     setSearchQuery('');
+    if (typeof window !== 'undefined' && window.location.search) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   };
 
   const getIconForType = (type) => {
@@ -416,8 +477,8 @@ export function ItineraryView() {
             <span>Rail Map</span>
           </a>
           <a
-            href={`/wayfinder/poland-christmas-2026/cities/${selectedCity !== 'all' ? selectedCity : 'krakow'}/markets`}
-            onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${selectedCity !== 'all' ? selectedCity : 'krakow'}/markets`)}
+            href={`/wayfinder/poland-christmas-2026/cities/${highlightedCityId || 'krakow'}/markets`}
+            onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${highlightedCityId || 'krakow'}/markets`)}
             className="px-3.5 py-2 rounded-xl bg-wf-navy-mid border border-white/10 hover:border-amber-400/50 text-white text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-sm"
           >
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
@@ -444,8 +505,8 @@ export function ItineraryView() {
 
         <div className="flex flex-wrap gap-2 shrink-0">
           <a
-            href={`/wayfinder/poland-christmas-2026/cities/${selectedCity !== 'all' ? selectedCity : 'krakow'}/hotels`}
-            onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${selectedCity !== 'all' ? selectedCity : 'krakow'}/hotels`)}
+            href={`/wayfinder/poland-christmas-2026/cities/${highlightedCityId || 'krakow'}/hotels`}
+            onClick={(e) => pushRoute(e, `/wayfinder/poland-christmas-2026/cities/${highlightedCityId || 'krakow'}/hotels`)}
             className="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 hover:border-amber-400/40 text-slate-200 text-xs font-bold transition-colors flex items-center space-x-1"
           >
             <Building className="w-3.5 h-3.5 text-emerald-400" />
@@ -531,18 +592,17 @@ export function ItineraryView() {
         <div ref={cityBarRef} className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
           <button
             onClick={() => {
-              if (selectedCity === 'all' && scrollSpyDay !== null) {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              } else {
-                setSelectedCity('all');
+              programmaticScrollRef.current = null;
+              setSelectedDay('all');
+              if (typeof window !== 'undefined' && window.location.search) {
+                window.history.replaceState({}, '', window.location.pathname);
               }
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               highlightedCityId === null
                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
-                : selectedCity === 'all'
-                  ? 'bg-slate-900/90 text-amber-300 border border-amber-500/40 hover:border-amber-400/60'
-                  : 'bg-slate-900/80 text-slate-300 border border-white/10 hover:border-white/20'
+                : 'bg-slate-900/90 text-amber-300 border border-amber-500/40 hover:border-amber-400/60'
             }`}
           >
             All Cities (Dec 3-13)
@@ -553,7 +613,7 @@ export function ItineraryView() {
               <button
                 key={c.id}
                 data-city-pill={c.id}
-                onClick={() => setSelectedCity(c.id)}
+                onClick={() => handleCityPillClick(c.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 whitespace-nowrap shrink-0 ${
                   isCityHighlighted
                     ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
@@ -572,6 +632,10 @@ export function ItineraryView() {
           <span className="text-[10px] uppercase font-black tracking-wider text-slate-400 mr-1 shrink-0">Day:</span>
           <button
             onClick={() => {
+              programmaticScrollRef.current = null;
+              if (typeof window !== 'undefined' && window.location.search) {
+                window.history.replaceState({}, '', window.location.pathname);
+              }
               if (selectedDay === 'all' && scrollSpyDay !== null) {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               } else {
@@ -706,7 +770,7 @@ export function ItineraryView() {
             const hasHotelBooked = isAuthenticated && hasConfirmedHotelForDay(dayItem, accommodations, privateItems, polandJourney?.cities || []);
 
             return (
-            <div key={dayItem.day} id={`day-${dayItem.day}`} className="relative scroll-mt-24">
+            <div key={dayItem.day} id={`day-${dayItem.day}`} className="relative scroll-mt-32 md:scroll-mt-[228px]">
               {/* Day Header */}
               <div className="relative z-10 bg-slate-950/95 py-3 border-b border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-lg mb-6 rounded-t-2xl px-2">
                 <div className="flex items-center space-x-3">

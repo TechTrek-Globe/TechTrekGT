@@ -5,6 +5,7 @@ import {
   SUPPORTED_PLATFORMS,
   HARD_EMOJI_BLOCKLIST,
   computeUtf16Length,
+  buildPlatformTitle,
   buildPlatformPayload,
   validatePlatformPayload,
   buildPlatformSystemPrompt
@@ -269,5 +270,113 @@ test('Beckett verification URL resolves to /get-data/{certNumber}', () => {
 
   const url3 = getCertVerificationUrl('BGS', '0012345');
   assert.equal(url3, 'https://www.beckett-authentication.com/get-data/0012345');
+});
+
+test('Title builder eliminates Signed+Autographed duplication, strips redundant sport nouns, and places wearable Size before authenticator', () => {
+  // Case 1: Full structured fields with messy item_name
+  const joeStructured = buildPlatformTitle('ebay', {
+    item_name: 'Joe Johnson Signed Atlanta Hawks Custom Jersey PSA Autographed Basketball XL',
+    athlete_person: 'Joe Johnson',
+    team_or_band: 'Atlanta Hawks',
+    sport_genre: 'Basketball',
+    authenticator: 'PSA',
+    size: 'XL',
+    is_wearable: true,
+    is_custom_jersey: true
+  });
+  assert.equal(/\bSigned\b/i.test(joeStructured), true);
+  assert.equal(/\bAutographed\b/i.test(joeStructured), false, `Must not contain both Signed and Autographed: "${joeStructured}"`);
+  assert.equal(/\bBasketball\b/i.test(joeStructured), false, `Must not append redundant Basketball noun: "${joeStructured}"`);
+  assert.match(joeStructured, /Custom Jersey XL PSA\/DNA 🏀$/);
+
+  // Case 2: Raw item_name only (without separate athlete/team/authenticator/size fields)
+  const joeRaw = buildPlatformTitle('ebay', {
+    item_name: 'Joe Johnson Signed Atlanta Hawks Custom Jersey PSA Autographed Basketball XL'
+  });
+  assert.equal(/\bSigned\b/i.test(joeRaw), true);
+  assert.equal(/\bAutographed\b/i.test(joeRaw), false, `Raw title must not duplicate Signed+Autographed: "${joeRaw}"`);
+  assert.equal(/\bBasketball\b/i.test(joeRaw), false, `Raw title must not retain redundant Basketball: "${joeRaw}"`);
+  assert.match(joeRaw, /Custom Jersey XL PSA 🏀$/);
+
+  // Case 3: generateEbayCopy without enforcePlatformRules also cleans duplicate verbs & ordering
+  const legacyClean = generateEbayCopy({
+    item_name: 'Joe Johnson Signed Atlanta Hawks Custom Jersey PSA Autographed Basketball XL'
+  });
+  assert.equal(/\bAutographed\b/i.test(legacyClean.title), false);
+  assert.equal(/\bBasketball\b/i.test(legacyClean.title), false);
+  assert.match(legacyClean.title, /Custom Jersey XL PSA$/);
+
+  // Case 4: Strict Slot 6 (Inscription in quotes, no "Inscribed" filler) BEFORE Slot 7 (Authenticator COA)
+  const acunaStructured = buildPlatformTitle('ebay', {
+    item_name: 'Ronald Acuna Jr. Signed Braves Jersey XL JSA Cert Inscribed El Abusador',
+    athlete_person: 'Ronald Acuna Jr.',
+    team_or_band: 'Braves',
+    sport_genre: 'Baseball',
+    product_type: 'Custom Jersey',
+    authenticator: 'JSA',
+    inscription: 'El Abusador',
+    size: 'XL',
+    is_wearable: true,
+    is_custom_jersey: true
+  });
+  assert.equal(/\bInscribed\b/i.test(acunaStructured), false, `Must strip filler word Inscribed: "${acunaStructured}"`);
+  assert.equal(acunaStructured, 'Ronald Acuna Jr. Signed Braves Custom Jersey XL "El Abusador" JSA COA ⚾');
+
+  // Case 5: Raw item_name only with JSA Cert Inscribed El Abusador
+  const acunaRaw = buildPlatformTitle('ebay', {
+    item_name: 'Ronald Acuna Jr. Signed Braves Custom Jersey XL JSA Cert Inscribed El Abusador',
+    sport_genre: 'Baseball'
+  });
+  assert.equal(/\bInscribed\b/i.test(acunaRaw), false);
+  assert.equal(acunaRaw, 'Ronald Acuna Jr. Signed Braves Custom Jersey XL "El Abusador" JSA COA ⚾');
+});
+
+test('eBay HTML template and Schema.org summary adapt dynamically across electronics, tools, vintage glass, apparel, and memorabilia', () => {
+  const electronics = generateEbayCopy({
+    item_name: 'Sony WH-1000XM5 Wireless Noise Canceling Headphones',
+    brand: 'Sony',
+    model: 'WH-1000XM5',
+    category: 'Electronics',
+    condition: 'Brand New',
+    features: ['30-hour battery life', 'Multipoint Bluetooth connection']
+  }, { enforcePlatformRules: true });
+
+  assert.equal(electronics.validation.passed, true, `Electronics validation errors: ${electronics.validation.errors.join('; ')}`);
+  assert.equal(electronics.payload.item_specifics.Signed, undefined, 'Non-signed electronics must not emit Signed: Yes');
+  assert.ok(electronics.htmlBody.includes('vocab="https://schema.org/" typeof="Product"'));
+  assert.ok(electronics.htmlBody.includes('alt=""'));
+  assert.ok(electronics.htmlBody.includes('Brand: Sony | Model: WH-1000XM5 | Condition: Brand New'));
+  assert.ok(electronics.htmlBody.includes('<strong>Brand:</strong> Sony'));
+  assert.ok(electronics.htmlBody.includes('<strong>Model:</strong> WH-1000XM5'));
+  assert.ok(electronics.htmlBody.includes('>Key Features</h3>'));
+  assert.equal(electronics.htmlBody.includes('>Authentication</h3>'), false);
+  assert.equal(/custom stitched display jersey|insert pickguard/i.test(electronics.htmlBody), false);
+
+  const descMatch = electronics.htmlBody.match(/<span property="description">([\s\S]*?)<\/span>/);
+  assert.ok(descMatch && descMatch[1].length > 20 && descMatch[1].length < 800, 'Schema description span must be populated and < 800 chars');
+
+  const tool = generateEbayCopy({
+    item_name: 'DeWalt 20V MAX Brushless 1/4" Impact Driver DCF887B',
+    brand: 'DeWalt',
+    model: 'DCF887B',
+    category: 'Tools',
+    condition: 'New Open Box'
+  }, { enforcePlatformRules: true });
+  assert.equal(tool.validation.passed, true, `Tool validation errors: ${tool.validation.errors.join('; ')}`);
+  assert.ok(tool.title.includes('1/4"'), `Must preserve fractional size 1/4": "${tool.title}"`);
+  assert.ok(tool.title.endsWith('🛠️'));
+  assert.equal(tool.payload.item_specifics.Signed, undefined);
+
+  const glass = generateEbayCopy({
+    item_name: 'Vintage Fenton Milk Glass Hobnail Ruffled Vase',
+    brand: 'Fenton',
+    category: 'Vintage Glass',
+    material: 'Milk Glass',
+    size: '8 in',
+    condition: 'Excellent'
+  }, { enforcePlatformRules: true });
+  assert.equal(glass.validation.passed, true, `Glass validation errors: ${glass.validation.errors.join('; ')}`);
+  assert.ok(glass.htmlBody.includes('Individually bubble-wrapped and double-boxed'));
+  assert.equal(/custom stitched display jersey|insert pickguard/i.test(glass.htmlBody), false);
 });
 

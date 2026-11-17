@@ -173,8 +173,8 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
         />
       </div>
 
-      {/* 2. SKU & Category & Quantity */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* 2. SKU, Category, Brand & Quantity */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
@@ -251,6 +251,20 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
 
         <div>
           <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
+            <Tag className="w-3.5 h-3.5 text-slate-400" />
+            <span>Brand</span>
+          </label>
+          <input
+            type="text"
+            value={form.brand || ''}
+            onChange={e => updateField('brand', e.target.value)}
+            className="input-field text-xs text-slate-200"
+            placeholder="e.g. Nike, Kemimoto, Gibson"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-slate-400" />
             <span>Quantity</span>
           </label>
@@ -294,6 +308,169 @@ export function EditTabDetails({ form, updateField, allCategories = [], item }) 
             className="input-field text-xs"
             placeholder="e.g. Patrick Mahomes, Michael Jordan"
           />
+        </div>
+      </div>
+
+      {/* 3b. Memorabilia, Sizing & Platform Guardrails Card */}
+      <div className="p-4 rounded-xl bg-slate-900/80 border border-amber-500/30 space-y-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">
+              Memorabilia, Sizing &amp; Platform Guardrails
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-400">
+            Feeds all 5 platform rule engines (80-char UTF-16 budget, Size token, COA check, Pricing math)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Athlete / Signer / Subject
+            </label>
+            <input
+              type="text"
+              value={form.athlete_person || ''}
+              onChange={e => updateField('athlete_person', e.target.value)}
+              className="input-field text-xs"
+              placeholder="e.g. Brock Bowers, Taylor Swift"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Team / Band / Franchise
+            </label>
+            <input
+              type="text"
+              value={form.team_or_band || ''}
+              onChange={e => updateField('team_or_band', e.target.value)}
+              className="input-field text-xs"
+              placeholder="e.g. Georgia Bulldogs"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Sport / Music Genre
+            </label>
+            <input
+              type="text"
+              value={form.sport_genre || ''}
+              onChange={e => updateField('sport_genre', e.target.value)}
+              className="input-field text-xs"
+              placeholder="e.g. Football, Country Guitar"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Inscription (Exact)
+            </label>
+            <input
+              type="text"
+              value={form.inscription || ''}
+              onChange={e => updateField('inscription', e.target.value)}
+              className="input-field text-xs"
+              placeholder="e.g. Go Dawgs, HOF 20"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Wearable Size (XL, 52...)
+            </label>
+            <input
+              type="text"
+              value={form.size || ''}
+              onChange={e => updateField('size', e.target.value)}
+              className="input-field text-xs font-mono"
+              placeholder="Apparel only (e.g. XL, 52)"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Target Net Payout ($)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={form.target_net ?? ''}
+              onChange={e => updateField('target_net', e.target.value)}
+              className="input-field text-xs font-mono tabular-nums text-amber-300 font-bold"
+              placeholder="e.g. 200"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Authenticator (COA)
+            </label>
+            <input
+              type="text"
+              value={form.authenticator || ''}
+              onChange={e => {
+                const newAuth = e.target.value;
+                updateField('authenticator', newAuth);
+                const generated = getCertVerificationUrl(newAuth, form.cert_number);
+                if (generated) updateField('cert_verification_url', generated);
+              }}
+              className="input-field text-xs text-amber-300"
+              placeholder="e.g. JSA, PSA/DNA, Beckett"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Cert / Hologram #
+            </label>
+            <input
+              type="text"
+              value={form.cert_number || ''}
+              onChange={e => {
+                const newCert = e.target.value;
+                updateField('cert_number', newCert);
+                const generated = getCertVerificationUrl(form.authenticator, newCert);
+                if (generated) updateField('cert_verification_url', generated);
+              }}
+              className="input-field text-xs font-mono text-cyan-300 font-bold"
+              placeholder="e.g. AB12345"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-slate-800 text-xs text-slate-300">
+          <label className="inline-flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(form.is_wearable)}
+              onChange={e => updateField('is_wearable', e.target.checked)}
+              className="rounded border-slate-700 bg-slate-950 text-amber-400 focus:ring-amber-500"
+            />
+            <span>Wearable Apparel / Jersey (injects standalone Size token)</span>
+          </label>
+          <label className="inline-flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(form.is_custom_jersey)}
+              onChange={e => updateField('is_custom_jersey', e.target.checked)}
+              className="rounded border-slate-700 bg-slate-950 text-amber-400 focus:ring-amber-500"
+            />
+            <span>Custom Stitched Jersey (strips Nike/NFL/OEM spoofing)</span>
+          </label>
+          <label className="inline-flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(form.is_pickguard_guitar)}
+              onChange={e => updateField('is_pickguard_guitar', e.target.checked)}
+              className="rounded border-slate-700 bg-slate-950 text-amber-400 focus:ring-amber-500"
+            />
+            <span>Signed Pickguard Display Guitar (strips Fender/Gibson spoofing)</span>
+          </label>
         </div>
       </div>
 

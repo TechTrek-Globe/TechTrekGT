@@ -5,7 +5,7 @@ import {
   Globe, Loader2, AlertCircle, CheckCircle2,
   SlidersHorizontal, RefreshCw, ExternalLink, ClipboardPaste,
   RotateCcw, ShieldCheck, ShieldAlert, DollarSign,
-  MapPin, Tag, Package, Music, Camera
+  MapPin, Tag, Package, Music, Camera, Save
 } from 'lucide-react';
 import {
   generateEbayCopy,
@@ -29,7 +29,8 @@ import {
   fetchAmazonProduct,
   generateAiEbayDetails,
   generateAiPlatformListingApi,
-  createEbayListingApi
+  createEbayListingApi,
+  updateItem
 } from '../utils/auctionApi';
 
 /**
@@ -43,11 +44,17 @@ function extractAsinFromItem(item) {
   return '';
 }
 
-export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
+export function ListingCopyModal({ isOpen, onClose, item, onListingCreated, onItemUpdated }) {
   const [platform, setPlatform] = useState('ebay');
   const [format, setFormat] = useState('html_preview'); // 'text' | 'html_preview' | 'html_code'
   const [copiedField, setCopiedField] = useState('');
   const [showEditor, setShowEditor] = useState(true);
+  const [showAmazonAssist, setShowAmazonAssist] = useState(false);
+
+  // Persistence State
+  const [savingItem, setSavingItem] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Form Fields State
   const [title, setTitle] = useState('');
@@ -104,7 +111,14 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
   // Initialize fields when item changes or modal opens
   useEffect(() => {
     if (!item) return;
-    const initialAsin = extractAsinFromItem(item);
+    let parsedAttrs = {};
+    if (item.attributes) {
+      try {
+        parsedAttrs = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : item.attributes;
+      } catch (_) {}
+    }
+
+    const initialAsin = item.asin || parsedAttrs.asin || extractAsinFromItem(item);
     const combinedText = `${item.item_name || ''} ${item.category || ''} ${item.notes || ''}`.toLowerCase();
     const detectedWearable = /\b(jersey|shirt|t-shirt|hoodie|jacket|hat|cap)\b/.test(combinedText);
     const detectedCustomJersey = /\bcustom\b/.test(combinedText) && /\bjersey\b/.test(combinedText);
@@ -113,28 +127,28 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
     setAsinInput(initialAsin);
 
     setTitle(item.item_name || '');
-    setBrand(item.brand || '');
-    setProductType(item.category && item.category !== 'General' ? item.category : '');
-    setSubtitle('');
-    setCondition(item.condition || 'Brand New / Excellent');
-    setConditionHeader(item.condition?.toLowerCase().includes('new') ? 'BRAND NEW IN ORIGINAL UNOPENED BOX' : '');
-    setConditionSubheader(item.condition?.toLowerCase().includes('new') ? 'Never installed or used' : '');
-    setFeatures('');
-    setSpecs('');
-    setCompatibility('');
+    setBrand(item.brand || parsedAttrs.brand || '');
+    setProductType(item.category && item.category !== 'General' ? item.category : (parsedAttrs.category || ''));
+    setSubtitle(parsedAttrs.model || '');
+    setCondition(item.condition || parsedAttrs.condition || 'Brand New / Excellent');
+    setConditionHeader(parsedAttrs.condition_header || (item.condition?.toLowerCase().includes('new') ? 'BRAND NEW IN ORIGINAL UNOPENED BOX' : ''));
+    setConditionSubheader(parsedAttrs.condition_subheader || (item.condition?.toLowerCase().includes('new') ? 'Never installed or used' : ''));
+    setFeatures(Array.isArray(parsedAttrs.features) ? parsedAttrs.features.join('\n') : (parsedAttrs.features || ''));
+    setSpecs(typeof parsedAttrs.specs === 'object' && parsedAttrs.specs ? Object.entries(parsedAttrs.specs).map(([k, v]) => `${k}: ${v}`).join('\n') : (parsedAttrs.specs || ''));
+    setCompatibility(parsedAttrs.compatibility || '');
     setDescription(stripInternalTrackingNotes(item.notes || ''));
-    setIncludedInSale('');
-    setAthlete(item.athlete_person || '');
-    setTeamOrBand(item.team_or_band || '');
-    setSportOrGenre(item.sport_genre || (item.category && item.category !== 'General' ? item.category : ''));
-    setAuthenticator(item.authenticator || '');
-    setCertNumber(item.cert_number || '');
-    setInscription(item.inscription || '');
-    setSize(item.size || '');
-    setIsWearable(Boolean(item.is_wearable ?? detectedWearable));
-    setIsCustomJersey(Boolean(item.is_custom_jersey ?? detectedCustomJersey));
-    setIsPickguardSignedGuitar(Boolean(item.is_pickguard_guitar ?? detectedPickguard));
-    const seedPrice = item.min_sell_price || item.suggested_list_price || item.current_list_price || item.unit_price || '';
+    setIncludedInSale(parsedAttrs.included_in_sale || '');
+    setAthlete(item.athlete_person || parsedAttrs.athlete_person || '');
+    setTeamOrBand(item.team_or_band || parsedAttrs.team_or_band || '');
+    setSportOrGenre(item.sport_genre || parsedAttrs.sport_genre || (item.category && item.category !== 'General' ? item.category : ''));
+    setAuthenticator(item.authenticator || parsedAttrs.authenticator || '');
+    setCertNumber(item.cert_number || parsedAttrs.cert_number || '');
+    setInscription(item.inscription || parsedAttrs.inscription || '');
+    setSize(item.size || parsedAttrs.size || '');
+    setIsWearable(Boolean(item.is_wearable ?? parsedAttrs.is_wearable ?? detectedWearable));
+    setIsCustomJersey(Boolean(item.is_custom_jersey ?? parsedAttrs.is_custom_jersey ?? detectedCustomJersey));
+    setIsPickguardSignedGuitar(Boolean(item.is_pickguard_guitar ?? parsedAttrs.is_pickguard_guitar ?? detectedPickguard));
+    const seedPrice = item.target_net ?? parsedAttrs.target_net ?? item.min_sell_price ?? item.suggested_list_price ?? item.current_list_price ?? item.unit_price ?? '';
     setTargetNet(seedPrice ? String(seedPrice) : '');
     setAiPlatformPayloads({});
     setGeneratingPlatformAi(false);
@@ -143,12 +157,66 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
     setConditionMsg(null);
     setSmartPasteText('');
     setShowSmartPaste(false);
-    setAiGeneratedMiddleSection('');
+    setAiGeneratedMiddleSection(parsedAttrs.ai_middle_section || '');
     setGeneratingAiDetails(false);
     setAiDetailsMsg(null);
     setPublishingEbay(false);
     setPublishResult(null);
+    setSavingItem(false);
+    setSaveSuccess(false);
+    setSaveError('');
   }, [item, isOpen]);
+
+  // Persist all user-edited listing fields directly to the item in SQLite D1
+  const handleSaveItem = async () => {
+    if (!item?.id) return;
+    setSavingItem(true);
+    setSaveError('');
+    setSaveSuccess(false);
+
+    try {
+      const payload = {
+        item_name: title?.trim() || item.item_name,
+        brand: brand?.trim() || null,
+        athlete_person: athlete?.trim() || null,
+        team_or_band: teamOrBand?.trim() || null,
+        sport_genre: sportOrGenre?.trim() || null,
+        authenticator: authenticator?.trim() || null,
+        cert_number: certNumber?.trim() || null,
+        inscription: inscription?.trim() || null,
+        size: size?.trim() || null,
+        is_wearable: Boolean(isWearable),
+        is_custom_jersey: Boolean(isCustomJersey),
+        is_pickguard_guitar: Boolean(isPickguardSignedGuitar),
+        target_net: (targetNet !== '' && targetNet != null && !isNaN(Number(targetNet))) ? parseFloat(targetNet) : null,
+        asin: asinInput?.trim() || null,
+        condition_header: conditionHeader?.trim() || null,
+        condition_subheader: conditionSubheader?.trim() || null,
+        features: features?.trim() || null,
+        specs: specs?.trim() || null,
+        model: subtitle?.trim() || null,
+        included_in_sale: includedInSale?.trim() || null,
+        ai_middle_section: aiGeneratedMiddleSection?.trim() || null,
+        notes: description?.trim() || item.notes || null
+      };
+
+      const res = await updateItem(item.id, payload);
+      setSaveSuccess(true);
+      const updatedItem = {
+        ...item,
+        ...payload,
+        ...(res?.item || res || {})
+      };
+      if (onItemUpdated) {
+        onItemUpdated(updatedItem);
+      }
+      setTimeout(() => setSaveSuccess(false), 3500);
+    } catch (err) {
+      setSaveError(err.message || 'Failed to save item details.');
+    } finally {
+      setSavingItem(false);
+    }
+  };
 
   // Apply parsed product content to form fields
   const applyParsedDetails = (parsed) => {
@@ -511,6 +579,7 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
       title: p.title || base.title,
       price: p.pricing_guidance?.suggested_list_price ? `$${p.pricing_guidance.suggested_list_price}` : base.price,
       htmlBody: p.description_html || base.htmlBody,
+      insertHtml: p.insert_html || base.insertHtml,
       textBody: p.description_plain_text || base.textBody,
       notes: p.description_plain_text || base.notes,
       description: p.description_plain_text || base.description,
@@ -625,6 +694,17 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
+              type="button"
+              onClick={handleSaveItem}
+              disabled={savingItem}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 disabled:opacity-50"
+              title="Save all changes to item in database"
+            >
+              {savingItem ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saveSuccess ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Save className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{savingItem ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Item'}</span>
+              <span className="sm:hidden">{savingItem ? '...' : saveSuccess ? 'Saved' : 'Save'}</span>
+            </button>
+            <button
               onClick={() => setShowEditor(!showEditor)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
                 showEditor
@@ -646,6 +726,23 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
           </div>
         </div>
 
+        {/* Global Save Feedback Banner */}
+        {saveError && (
+          <div className="mx-4 mt-2 p-2.5 rounded-xl bg-rose-950/70 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 shrink-0">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span className="flex-1 font-medium">{saveError}</span>
+            <button type="button" onClick={() => setSaveError('')} className="text-slate-400 hover:text-white">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {saveSuccess && (
+          <div className="mx-4 mt-2 p-2 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 shrink-0">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span className="flex-1 font-medium">Item details, guardrails, and specifications successfully saved to database!</span>
+          </div>
+        )}
+
         {/* Scrollable Container */}
         <div className="overflow-y-auto flex-1 p-3.5 sm:p-6 space-y-4 sm:space-y-6">
           {/* Collapsible Item Details / Amazon Lookup Form */}
@@ -655,7 +752,7 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
                 <div className="flex items-center gap-2">
                   <Globe className="w-4 h-4 text-amber-400" />
                   <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    Item Details &amp; Amazon Import
+                    Item Details &amp; Specifications
                   </h3>
                 </div>
                 <span className="text-[11px] text-slate-400">
@@ -663,114 +760,148 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
                 </span>
               </div>
 
-              {/* Amazon ASIN / URL Fetcher Row */}
-              <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-amber-400/90 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Amazon Product Lookup &amp; Smart Assist
-                  </label>
-                  <div className="flex items-center gap-2">
+              {/* De-emphasized Collapsible Amazon Product Lookup & Smart Assist */}
+              <div className="rounded-xl border border-slate-800 bg-slate-950/40 overflow-hidden">
+                <div
+                  onClick={() => setShowAmazonAssist(!showAmazonAssist)}
+                  className="flex items-center justify-between p-2.5 sm:px-3.5 bg-slate-950/70 hover:bg-slate-900/60 transition-colors cursor-pointer select-none"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Sparkles className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="text-xs font-semibold text-slate-300 truncate">
+                      Amazon Product Lookup &amp; Smart Assist
+                    </span>
+                    {asinInput.trim() && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                        ASIN: {asinInput.trim()}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
                     {asinInput.trim() && (
                       <a
                         href={asinInput.startsWith('http') ? asinInput : `https://www.amazon.com/dp/${asinInput.trim()}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 transition-colors"
+                        onClick={e => e.stopPropagation()}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 transition-colors"
                       >
-                        <span>Open on Amazon</span>
-                        <ExternalLink className="w-3 h-3" />
+                        <span>Amazon ↗</span>
                       </a>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setShowSmartPaste(!showSmartPaste)}
-                      className={`text-[11px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 border transition-colors ${
-                        showSmartPaste
-                          ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                      }`}
-                    >
-                      <ClipboardPaste className="w-3 h-3" />
-                      <span>{showSmartPaste ? 'Hide Smart Paste' : 'Smart Paste'}</span>
-                    </button>
+                    <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                      {showAmazonAssist ? (
+                        <>
+                          <span className="hidden sm:inline">Collapse</span>
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </>
+                      ) : (
+                        <>
+                          <span className="hidden sm:inline text-slate-500">Expand</span>
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                        </>
+                      )}
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    value={asinInput}
-                    onChange={e => setAsinInput(e.target.value)}
-                    placeholder="Paste Amazon Product URL, ASIN (e.g. B08N5WRWNW), or Order ID"
-                    className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                  />
-                  <button
-                    onClick={() => handleFetchAmazon()}
-                    disabled={fetchingAmazon || !asinInput.trim()}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shrink-0 shadow-md shadow-amber-500/10"
-                  >
-                    {fetchingAmazon ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Fetching...</span>
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Fetch from Amazon</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Smart Paste Drawer */}
-                {showSmartPaste && (
-                  <div className="p-3 rounded-xl bg-slate-900 border border-blue-900/40 space-y-2 animate-in fade-in-0 duration-150">
+                {showAmazonAssist && (
+                  <div className="p-3.5 border-t border-slate-800/80 space-y-2.5 bg-slate-950/70 animate-in fade-in-0 duration-150">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-blue-300 flex items-center gap-1">
-                        <ClipboardPaste className="w-3.5 h-3.5 text-blue-400" />
-                        1-Click Smart Paste (Bypasses Bot Checks)
+                      <span className="text-[11px] text-slate-400">
+                        Fetch specs, features and bullets using an ASIN, Order ID, or direct URL.
                       </span>
-                      <span className="text-[10px] text-slate-400">
-                        Paste copied text or HTML from Amazon to auto-extract details
-                      </span>
-                    </div>
-                    <textarea
-                      rows={3}
-                      value={smartPasteText}
-                      onChange={e => setSmartPasteText(e.target.value)}
-                      placeholder="Paste any text, specifications, bullet points, or page HTML copied from Amazon here..."
-                      className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
-                    />
-                    <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        onClick={() => handleExtractFromSmartPaste()}
-                        disabled={!smartPasteText.trim()}
-                        className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-blue-400 hover:bg-blue-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        onClick={() => setShowSmartPaste(!showSmartPaste)}
+                        className={`text-[11px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 border transition-colors ${
+                          showSmartPaste
+                            ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        }`}
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Extract &amp; Apply Details</span>
+                        <ClipboardPaste className="w-3 h-3" />
+                        <span>{showSmartPaste ? 'Hide Smart Paste' : 'Smart Paste'}</span>
                       </button>
                     </div>
-                  </div>
-                )}
 
-                {amazonMsg && (
-                  <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 border ${
-                    amazonMsg.type === 'success'
-                      ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800'
-                      : amazonMsg.type === 'warning'
-                        ? 'bg-amber-950/40 text-amber-300 border-amber-800'
-                        : 'bg-rose-950/40 text-rose-300 border-rose-800'
-                  }`}>
-                    {amazonMsg.type === 'success' ? (
-                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 shrink-0" />
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={asinInput}
+                        onChange={e => setAsinInput(e.target.value)}
+                        placeholder="Paste Amazon Product URL, ASIN (e.g. B08N5WRWNW), or Order ID"
+                        className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                      />
+                      <button
+                        onClick={() => handleFetchAmazon()}
+                        disabled={fetchingAmazon || !asinInput.trim()}
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shrink-0 shadow-md shadow-amber-500/10 cursor-pointer"
+                      >
+                        {fetchingAmazon ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Fetching...</span>
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Fetch from Amazon</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Smart Paste Drawer */}
+                    {showSmartPaste && (
+                      <div className="p-3 rounded-xl bg-slate-900 border border-blue-900/40 space-y-2 animate-in fade-in-0 duration-150">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-blue-300 flex items-center gap-1">
+                            <ClipboardPaste className="w-3.5 h-3.5 text-blue-400" />
+                            1-Click Smart Paste (Bypasses Bot Checks)
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            Paste copied text or HTML from Amazon to auto-extract details
+                          </span>
+                        </div>
+                        <textarea
+                          rows={3}
+                          value={smartPasteText}
+                          onChange={e => setSmartPasteText(e.target.value)}
+                          placeholder="Paste any text, specifications, bullet points, or page HTML copied from Amazon here..."
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleExtractFromSmartPaste()}
+                            disabled={!smartPasteText.trim()}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-blue-400 hover:bg-blue-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Extract &amp; Apply Details</span>
+                          </button>
+                        </div>
+                      </div>
                     )}
-                    <span className="flex-1">{amazonMsg.text}</span>
+
+                    {amazonMsg && (
+                      <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 border ${
+                        amazonMsg.type === 'success'
+                          ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800'
+                          : amazonMsg.type === 'warning'
+                            ? 'bg-amber-950/40 text-amber-300 border-amber-800'
+                            : 'bg-rose-950/40 text-rose-300 border-rose-800'
+                      }`}>
+                        {amazonMsg.type === 'success' ? (
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                        )}
+                        <span className="flex-1">{amazonMsg.text}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1113,6 +1244,22 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
                     placeholder="e.g. One unopened KEMIMOTO UTV Flip Windshield package in its original box."
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
                   />
+                </div>
+
+                {/* Save Details Row */}
+                <div className="md:col-span-2 pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[11px] text-slate-400">
+                    Saves all attributes, guardrails, notes, and specs to this item in the database.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSaveItem}
+                    disabled={savingItem}
+                    className="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 disabled:opacity-50"
+                  >
+                    {savingItem ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saveSuccess ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Save className="w-3.5 h-3.5" />}
+                    <span>{savingItem ? 'Saving Changes...' : saveSuccess ? 'Saved to Database!' : 'Save Item Details'}</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1963,12 +2110,24 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated }) {
             </a>
           </div>
 
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSaveItem}
+              disabled={savingItem}
+              className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 disabled:opacity-50"
+              title="Save all changes to item in database"
+            >
+              {savingItem ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saveSuccess ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Save className="w-3.5 h-3.5" />}
+              <span>{savingItem ? 'Saving Changes...' : saveSuccess ? 'Saved to Item!' : 'Save Item Details'}</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

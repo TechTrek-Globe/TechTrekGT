@@ -78,6 +78,15 @@ const EMPTY_FORM = {
   cert_verification_url: '',
   cert_verified: false,
   ebay_listing_id: '',
+  // Memorabilia, Sizing & Platform Guardrails
+  brand: '',
+  team_or_band: '',
+  inscription: '',
+  size: '',
+  is_wearable: false,
+  is_custom_jersey: false,
+  is_pickguard_guitar: false,
+  target_net: '',
   // VineScout / Amazon Vine Link
   is_vinescout: false,
   asin: '',
@@ -208,12 +217,24 @@ export function EditItemModal({
     if (item.id !== lastItemIdRef.current) {
       lastItemIdRef.current = item.id;
 
+      let parsedAttrs = {};
+      if (item.attributes) {
+        try {
+          parsedAttrs = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : (item.attributes || {});
+        } catch (_) {}
+      }
+
+      const combinedText = `${item.item_name || ''} ${item.category || ''} ${item.notes || ''}`.toLowerCase();
+      const detectedWearable = /\b(jersey|shirt|t-shirt|hoodie|jacket|hat|cap)\b/.test(combinedText);
+      const detectedCustomJersey = /\bcustom\b/.test(combinedText) && /\bjersey\b/.test(combinedText);
+      const detectedPickguard = /\b(pickguard|pick guard)\b/.test(combinedText) && /\bguitar\b/.test(combinedText);
+
       const populated = {
         item_name: item.item_name || '',
         sku: item.sku || '',
         category: item.category || '',
-        sport_genre: item.sport_genre || '',
-        athlete_person: item.athlete_person || '',
+        sport_genre: item.sport_genre || parsedAttrs.sport_genre || '',
+        athlete_person: item.athlete_person || parsedAttrs.athlete_person || '',
         quantity: item.quantity != null ? item.quantity : 1,
         best_listing_window: item.best_listing_window || '',
         notes: item.notes || '',
@@ -244,11 +265,6 @@ export function EditItemModal({
         actual_sell_price: item.actual_sell_price != null ? Number(item.actual_sell_price).toFixed(2) : '',
         target_margin_pct: item.target_margin_pct != null
           ? String(parseFloat((Number(item.target_margin_pct) * 100).toFixed(2)))
-          // T-10 item 4: this used to be a hardcoded '30'. Opening the modal on
-          // an item with a null margin showed 30%, and saving without touching
-          // the field persisted 30% - silently changing the item's pricing
-          // assumption merely by viewing it. Same constant as EMPTY_FORM and the
-          // submit branch.
           : String(DEFAULT_TARGET_MARGIN_PCT * 100),
         ebay_promoted_rate: (item.ebay_promoted_rate != null && Number(item.ebay_promoted_rate) > 0)
           ? String(item.ebay_promoted_rate)
@@ -259,11 +275,21 @@ export function EditItemModal({
         date_listed: item.date_listed || '',
         date_sold: item.date_sold || '',
 
-        authenticator: item.authenticator ? item.authenticator.replace(/#.*$/, '').trim() : '',
-        cert_number: item.cert_number || '',
-        cert_verification_url: item.cert_verification_url || '',
+        authenticator: (item.authenticator || parsedAttrs.authenticator) ? String(item.authenticator || parsedAttrs.authenticator).replace(/#.*$/, '').trim() : '',
+        cert_number: item.cert_number || parsedAttrs.cert_number || '',
+        cert_verification_url: item.cert_verification_url || parsedAttrs.cert_verification_url || '',
         cert_verified: Boolean(item.cert_verified || (item.attributes && (typeof item.attributes === 'string' ? item.attributes.includes('"cert_verified":true') : item.attributes?.cert_verified))),
         ebay_listing_id: item.ebay_listing_id || '',
+
+        // Memorabilia, Sizing & Platform Guardrails
+        brand: item.brand || parsedAttrs.brand || '',
+        team_or_band: item.team_or_band || parsedAttrs.team_or_band || '',
+        inscription: item.inscription || parsedAttrs.inscription || '',
+        size: item.size || parsedAttrs.size || '',
+        is_wearable: Boolean(item.is_wearable ?? parsedAttrs.is_wearable ?? detectedWearable),
+        is_custom_jersey: Boolean(item.is_custom_jersey ?? parsedAttrs.is_custom_jersey ?? detectedCustomJersey),
+        is_pickguard_guitar: Boolean(item.is_pickguard_guitar ?? parsedAttrs.is_pickguard_guitar ?? detectedPickguard),
+        target_net: item.target_net != null ? String(item.target_net) : (parsedAttrs.target_net != null ? String(parsedAttrs.target_net) : ''),
 
         // VineScout / Amazon Vine
         is_vinescout: Boolean(item.is_vinescout || item.is_amazon || (item.invoice_ref && item.invoice_ref.startsWith('AMAZON-')) || item.asin),
@@ -819,6 +845,16 @@ export function EditItemModal({
         cert_verification_url: form.cert_verification_url || null,
         cert_verified: Boolean(form.cert_verified),
         ebay_listing_id: form.ebay_listing_id?.trim() || null,
+
+        // Platform Guardrails & Memorabilia metadata
+        brand: form.brand?.trim() || null,
+        team_or_band: form.team_or_band?.trim() || null,
+        inscription: form.inscription?.trim() || null,
+        size: form.size?.trim() || null,
+        is_wearable: Boolean(form.is_wearable),
+        is_custom_jersey: Boolean(form.is_custom_jersey),
+        is_pickguard_guitar: Boolean(form.is_pickguard_guitar),
+        target_net: (form.target_net !== '' && form.target_net != null) ? parseFloat(form.target_net) : null,
 
         // VineScout / Amazon Vine fields
         is_vinescout: Boolean(form.is_vinescout),

@@ -1,6 +1,6 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
 import { fetchWithTimeout } from '../ebay/tokenHelper.js';
-import { stripInternalTrackingNotes, sanitizeListingHtml } from '../../../src/utils/ebayTemplate.js';
+import { generateEbayListingHtml, wrapEbayFullTemplate, scrubCustomJerseyClaims, escapeHtml, stripInternalTrackingNotes, sanitizeListingHtml } from '../../../src/utils/ebayTemplate.js';
 import {
   SUPPORTED_PLATFORMS,
   PLATFORM_RULES_REGISTRY,
@@ -10,7 +10,8 @@ import {
   detectItemVariantFlags,
   buildPlatformPayload,
   validatePlatformPayload,
-  buildPlatformSystemPrompt
+  buildPlatformSystemPrompt,
+  normalizeListingTitleTokens
 } from '../../../src/utils/platformListingRules.js';
 
 /**
@@ -188,21 +189,20 @@ export async function generateAiListingDetails(env, itemData = {}) {
   }
 
   // Construct prompt for Gemini API
+  const flags = detectItemVariantFlags(itemData, itemData);
   const systemInstruction = [
-    'You are a professional, high-volume eBay copywriter for TechTrek Outpost.',
-    'Your task is to generate a clean, modern HTML block consisting of exactly two cards: "Condition" and "Key Details".',
+    'You are a professional, high-volume eBay copywriter for TechTrek Outpost covering all item types (sports memorabilia, music/entertainment collectibles, electronics, tools, vintage glass, apparel, and general goods).',
+    'Your task is to generate ONLY the Block 2 Clean White Specifications Card ("Item Details & Specifications") HTML.',
     'Rules:',
-    '1. Match the exact dark-theme inline styling of our listing template:',
-    '   - Each card MUST be wrapped in: <div style="background-color:rgb(17,17,17); border:1px solid rgb(51,51,51); padding:18px; margin-bottom:15px; border-radius:6px;">',
-    '   - The Condition card heading MUST be: <h3 style="color:rgb(241,193,91); margin-top:0;">Condition</h3>',
-    '   - The Key Details card heading MUST be: <h3 style="color:rgb(241,193,91); margin-top:0;">Key Details</h3>',
-    '   - Body paragraphs MUST use: <p style="margin-bottom:0; color:#e0e0e0;">...</p>',
-    '   - Bullet lists in Key Details MUST use: <ul style="margin:0; padding-left:20px; color:#e0e0e0;"><li>...</li></ul>',
-    '2. In the Condition card, provide an accurate, reassuring description based on the provided condition, headline, and notes. Highlight that photos depict the exact item.',
-    '3. In the Key Details card, provide 4 to 6 strong, bulleted specifications or features relevant to buyers based on the provided title, brand, specs, and features.',
-    '4. Strict Punctuation Rule: NEVER use em dashes anywhere. Use standard hyphens (-), colons (:), or parentheses exclusively.',
-    '5. Output ONLY the raw HTML code for the two card <div> elements. Do NOT output markdown code fences (no ```html), do not output outer page wrappers or commentary.',
-    '6. Strict Privacy Rule: NEVER include internal warehouse, auction, or inventory tracking references (such as "Inventory tracked:", "Lot #", "Item #", "Order ID", "ASIN", invoice numbers, or internal stock identifiers) anywhere in the output.'
+    '1. Match the exact high-contrast inline styling of Block 2 (NEVER output dark #111111 wrappers, NEVER include <span property="description">, and NEVER output a duplicate Authentication section):',
+    '   - Wrap the card in: <div style="background-color: #ffffff; border: 1px solid #dddddd; color: #111111; padding: 18px; margin-bottom: 15px; border-radius: 6px;">',
+    '   - Heading MUST be: <h3 style="color: #111111; margin: 0 0 10px 0; padding-bottom: 6px; border-bottom: 2px solid #b37a16;">Item Details &amp; Specifications</h3>',
+    '   - Bullet list MUST use: <ul style="margin: 0; padding-left: 20px; color: #111111; line-height: 1.7;"><li><strong>Label:</strong> Value</li></ul> (omit empty or N/A rows).',
+    '   - If adding a brief condition/feature paragraph inside the white card, use: <p style="margin: 0 0 10px 0; color: #111111;">...</p>',
+    '2. Custom Jersey Anti-Spoofing Rule: NEVER claim "official [Team] jersey", "authentic jersey", or mention Nike, Adidas, Mitchell & Ness, Reebok, Fanatics, NFL, MLB, NBA, NHL, or NCAA unless the item is explicitly marked as an official licensed retail/on-field brand. Describe custom jerseys strictly as custom stitched collectible display jerseys.',
+    '3. Strict Punctuation Rule: NEVER use em dashes or en dashes anywhere. Use standard hyphens (-), colons (:), or parentheses () exclusively.',
+    '4. Output ONLY the raw HTML code for the single Block 2 <div> element. Do NOT output markdown code fences (no ```html), do not output outer page wrappers or commentary.',
+    '5. Strict Privacy Rule: NEVER include internal warehouse, auction, or inventory tracking references (such as "Inventory tracked:", "Lot #", "Item #", "Order ID", "ASIN", invoice numbers, or internal stock identifiers) anywhere in the output.'
   ].join('\n');
 
   const cleanNotes = stripInternalTrackingNotes(trimmedNotes);
@@ -215,6 +215,7 @@ export async function generateAiListingDetails(env, itemData = {}) {
     (conditionHeader.trim() || conditionSubheader.trim())
       ? `Condition Notes: ${[conditionHeader.trim(), conditionSubheader.trim()].filter(Boolean).join(' : ')}`
       : null,
+    flags.isCustomJersey ? 'Variant Flag: Custom Stitched Collectible Jersey (never use official/authentic jersey or pro brand names)' : null,
     specsText ? `Technical Specifications:\n${specsText}` : null,
     featuresText ? `Features / Highlights:\n${featuresText}` : null,
     cleanNotes ? `Seller Notes / Raw Description:\n${cleanNotes}` : null
@@ -229,6 +230,9 @@ export async function generateAiListingDetails(env, itemData = {}) {
 
   // Strip any leaked internal tracking or warehouse lot metadata
   sanitizedHtml = stripInternalTrackingNotes(sanitizedHtml);
+  if (flags.isCustomJersey) {
+    sanitizedHtml = scrubCustomJerseyClaims(sanitizedHtml);
+  }
 
   return {
     success: true,
@@ -307,13 +311,20 @@ export async function generateAiPlatformListing(env, itemData = {}) {
     merged.brand = null;
   }
 
-  merged.title = sanitizeNoEmDash(stripInternalTrackingNotes(String(merged.title || baseline.title)));
+  merged.title = normalizeListingTitleTokens(
+    sanitizeNoEmDash(stripInternalTrackingNotes(String(merged.title || baseline.title))),
+    itemData
+  );
   if (computeUtf16Length(merged.title) > 80 || !merged.title) {
     merged.title = baseline.title;
   }
 
   if (normPlatform === 'facebook') {
-    merged.relist_title = sanitizeNoEmDash(stripInternalTrackingNotes(String(merged.relist_title || baseline.relist_title)));
+    merged.relist_title = normalizeListingTitleTokens(
+      sanitizeNoEmDash(stripInternalTrackingNotes(String(merged.relist_title || baseline.relist_title))),
+      itemData,
+      { authVerb: 'Autographed' }
+    );
     if (computeUtf16Length(merged.relist_title) > 80 || !merged.relist_title) {
       merged.relist_title = baseline.relist_title;
     }
@@ -324,11 +335,46 @@ export async function generateAiPlatformListing(env, itemData = {}) {
     merged.title_char_count = computeUtf16Length(merged.title);
   }
 
-  if (merged.description_html) {
+  if (normPlatform === 'ebay') {
+    if (aiJson && typeof aiJson.description_html === 'string' && aiJson.description_html.trim()) {
+      const rawAiDesc = aiJson.description_html.trim();
+      let middleHtml = rawAiDesc;
+      const startMarker = 'ADD LISTING INFO HERE';
+      const endMarker = 'END LISTING INFO HERE';
+      if (rawAiDesc.includes(startMarker) && rawAiDesc.includes(endMarker)) {
+        const startIdx = rawAiDesc.indexOf('-->', rawAiDesc.indexOf(startMarker));
+        const endIdx = rawAiDesc.lastIndexOf('<!--', rawAiDesc.indexOf(endMarker));
+        if (startIdx !== -1 && endIdx > startIdx) {
+          middleHtml = rawAiDesc.slice(startIdx + 3, endIdx).trim();
+        }
+      }
+      let cleanMiddle = sanitizeNoEmDash(stripInternalTrackingNotes(sanitizeListingHtml(middleHtml)));
+      if (flags.isCustomJersey) {
+        cleanMiddle = scrubCustomJerseyClaims(cleanMiddle);
+      }
+      const wrappedInsert = generateEbayListingHtml({
+        ...itemData,
+        title: merged.title,
+        aiGeneratedMiddleSection: cleanMiddle
+      });
+      merged.insert_html = wrappedInsert;
+      merged.description_html = wrapEbayFullTemplate(wrappedInsert, itemData);
+    } else {
+      merged.description_html = baseline.description_html;
+      merged.insert_html = baseline.insert_html;
+    }
+  } else if (merged.description_html) {
     merged.description_html = sanitizeNoEmDash(stripInternalTrackingNotes(sanitizeListingHtml(merged.description_html)));
+    if (flags.isCustomJersey) {
+      merged.description_html = scrubCustomJerseyClaims(merged.description_html);
+    }
   }
+
   if (merged.description_plain_text) {
     merged.description_plain_text = sanitizeNoEmDash(stripInternalTrackingNotes(String(merged.description_plain_text).replace(/<[^>]+>/g, ' ')));
+    if (flags.isCustomJersey) {
+      merged.description_plain_text = scrubCustomJerseyClaims(merged.description_plain_text);
+    }
     if (normPlatform === 'mercari' && merged.description_plain_text.length > 1000) {
       merged.description_plain_text = baseline.description_plain_text;
     }

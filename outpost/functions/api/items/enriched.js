@@ -301,33 +301,35 @@ export async function onRequestGet(context) {
       let certVerifiedAt = row.cert_verified_at || null;
       let imageUrl = row.image_url ? normalizeHttps(row.image_url) : parseImageFromNotes(row.notes);
 
-      // Fallback: parse attributes JSON if explicit columns were empty
-      if (row.attributes && (!asin || !orderId || !imageUrl || !etv)) {
+      let parsedAttrs = {};
+      if (row.attributes) {
         try {
-          const parsed = typeof row.attributes === 'string' ? JSON.parse(row.attributes) : row.attributes;
-          if (parsed && typeof parsed === 'object') {
-            if (!asin && parsed.asin) asin = String(parsed.asin).trim().toUpperCase();
-            if (!orderId && parsed.order_id) orderId = String(parsed.order_id).trim();
-            if (!isVineScout && (parsed.source === 'amazon_vinescout' || parsed.is_vinescout)) isVineScout = true;
-            if (etv == null && parsed.etv != null) etv = Number(parsed.etv);
-            if (taxCost == null && parsed.tax_cost != null) taxCost = Number(parsed.tax_cost);
-            if (!certVerified && parsed.cert_verified) certVerified = true;
-            if (!certVerifiedAt && parsed.cert_verified_at) certVerifiedAt = parsed.cert_verified_at;
-
-            if (!imageUrl) {
-              if (parsed.ebay_image_url) {
-                imageUrl = normalizeHttps(parsed.ebay_image_url);
-              } else if (parsed.image_url) {
-                imageUrl = normalizeHttps(parsed.image_url);
-              } else if (parsed.image_urls) {
-                const imgs = Array.isArray(parsed.image_urls)
-                  ? parsed.image_urls
-                  : (() => { try { return JSON.parse(parsed.image_urls); } catch (_) { return []; } })();
-                if (Array.isArray(imgs) && imgs[0]) imageUrl = normalizeHttps(imgs[0]);
-              }
-            }
-          }
+          parsedAttrs = typeof row.attributes === 'string' ? JSON.parse(row.attributes) : (row.attributes || {});
         } catch (_) {}
+      }
+
+      // Fallback: parse attributes JSON if explicit columns were empty
+      if (parsedAttrs && typeof parsedAttrs === 'object') {
+        if (!asin && parsedAttrs.asin) asin = String(parsedAttrs.asin).trim().toUpperCase();
+        if (!orderId && parsedAttrs.order_id) orderId = String(parsedAttrs.order_id).trim();
+        if (!isVineScout && (parsedAttrs.source === 'amazon_vinescout' || parsedAttrs.is_vinescout)) isVineScout = true;
+        if (etv == null && parsedAttrs.etv != null) etv = Number(parsedAttrs.etv);
+        if (taxCost == null && parsedAttrs.tax_cost != null) taxCost = Number(parsedAttrs.tax_cost);
+        if (!certVerified && parsedAttrs.cert_verified) certVerified = true;
+        if (!certVerifiedAt && parsedAttrs.cert_verified_at) certVerifiedAt = parsedAttrs.cert_verified_at;
+
+        if (!imageUrl) {
+          if (parsedAttrs.ebay_image_url) {
+            imageUrl = normalizeHttps(parsedAttrs.ebay_image_url);
+          } else if (parsedAttrs.image_url) {
+            imageUrl = normalizeHttps(parsedAttrs.image_url);
+          } else if (parsedAttrs.image_urls) {
+            const imgs = Array.isArray(parsedAttrs.image_urls)
+              ? parsedAttrs.image_urls
+              : (() => { try { return JSON.parse(parsedAttrs.image_urls); } catch (_) { return []; } })();
+            if (Array.isArray(imgs) && imgs[0]) imageUrl = normalizeHttps(imgs[0]);
+          }
+        }
       }
 
       if (!asin && row.notes) {
@@ -348,9 +350,26 @@ export async function onRequestGet(context) {
       }
 
       return {
+        ...parsedAttrs,
         ...row,
         item_name: cleanItemName(row.item_name),
-        athlete_person: cleanAthleteName(row.athlete_person),
+        athlete_person: cleanAthleteName(row.athlete_person || parsedAttrs.athlete_person),
+        sport_genre: row.sport_genre || parsedAttrs.sport_genre || null,
+        authenticator: row.authenticator || parsedAttrs.authenticator || null,
+        cert_number: row.cert_number || parsedAttrs.cert_number || null,
+        brand: row.brand || parsedAttrs.brand || null,
+        team_or_band: row.team_or_band || parsedAttrs.team_or_band || null,
+        inscription: row.inscription || parsedAttrs.inscription || null,
+        size: row.size || parsedAttrs.size || null,
+        is_wearable: Boolean(row.is_wearable ?? parsedAttrs.is_wearable),
+        is_custom_jersey: Boolean(row.is_custom_jersey ?? parsedAttrs.is_custom_jersey),
+        is_pickguard_guitar: Boolean(row.is_pickguard_guitar ?? parsedAttrs.is_pickguard_guitar),
+        target_net: row.target_net ?? parsedAttrs.target_net ?? null,
+        condition_header: row.condition_header || parsedAttrs.condition_header || null,
+        condition_subheader: row.condition_subheader || parsedAttrs.condition_subheader || null,
+        features: row.features || parsedAttrs.features || null,
+        specs: row.specs || parsedAttrs.specs || null,
+        included_in_sale: row.included_in_sale || parsedAttrs.included_in_sale || null,
         ebay_search_url: searchUrl,
         image_url: normalizeHttps(imageUrl),
         user_note: userNote,

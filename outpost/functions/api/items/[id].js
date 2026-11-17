@@ -26,7 +26,22 @@ export const CLIENT_SETTABLE_ATTR_KEYS = Object.freeze([
   'tax_cost',
   'cert_verified',
   'is_vinescout',
-  'cert_verified_at'
+  'cert_verified_at',
+  'brand',
+  'team_or_band',
+  'inscription',
+  'size',
+  'is_wearable',
+  'is_custom_jersey',
+  'is_pickguard_guitar',
+  'target_net',
+  'condition_header',
+  'condition_subheader',
+  'features',
+  'specs',
+  'model',
+  'included_in_sale',
+  'ai_middle_section'
 ]);
 
 export async function onRequestGet(context) {
@@ -66,6 +81,32 @@ export async function onRequestGet(context) {
 
     if (!item) return err('Item not found', 404);
 
+    let unpackedItem = { ...item };
+    if (item.attributes) {
+      try {
+        const parsed = typeof item.attributes === 'string' ? JSON.parse(item.attributes) : item.attributes;
+        if (parsed && typeof parsed === 'object') {
+          unpackedItem = {
+            ...parsed,
+            ...unpackedItem,
+            brand: unpackedItem.brand || parsed.brand || null,
+            team_or_band: unpackedItem.team_or_band || parsed.team_or_band || null,
+            inscription: unpackedItem.inscription || parsed.inscription || null,
+            size: unpackedItem.size || parsed.size || null,
+            is_wearable: unpackedItem.is_wearable ?? parsed.is_wearable ?? false,
+            is_custom_jersey: unpackedItem.is_custom_jersey ?? parsed.is_custom_jersey ?? false,
+            is_pickguard_guitar: unpackedItem.is_pickguard_guitar ?? parsed.is_pickguard_guitar ?? false,
+            target_net: unpackedItem.target_net ?? parsed.target_net ?? null,
+            condition_header: unpackedItem.condition_header || parsed.condition_header || null,
+            condition_subheader: unpackedItem.condition_subheader || parsed.condition_subheader || null,
+            features: unpackedItem.features || parsed.features || null,
+            specs: unpackedItem.specs || parsed.specs || null,
+            included_in_sale: unpackedItem.included_in_sale || parsed.included_in_sale || null
+          };
+        }
+      } catch (_) {}
+    }
+
     let sale = null;
     let reconciliation = null;
     if (item.status === 'Sold') {
@@ -79,7 +120,7 @@ export async function onRequestGet(context) {
       }
     }
 
-    return ok({ item, sale, reconciliation });
+    return ok({ item: unpackedItem, sale, reconciliation });
   });
 }
 
@@ -345,6 +386,48 @@ export async function onRequestPut(context) {
         nextAttrs.cert_verified_at = null;
       }
     }
+    if (body.brand !== undefined) {
+      nextAttrs.brand = body.brand ? String(body.brand).trim() : null;
+    }
+    if (body.team_or_band !== undefined) {
+      nextAttrs.team_or_band = body.team_or_band ? String(body.team_or_band).trim() : null;
+    }
+    if (body.inscription !== undefined) {
+      nextAttrs.inscription = body.inscription ? String(body.inscription).trim() : null;
+    }
+    if (body.size !== undefined) {
+      nextAttrs.size = body.size ? String(body.size).trim() : null;
+    }
+    if (body.is_wearable !== undefined) {
+      nextAttrs.is_wearable = Boolean(body.is_wearable);
+    }
+    if (body.is_custom_jersey !== undefined) {
+      nextAttrs.is_custom_jersey = Boolean(body.is_custom_jersey);
+    }
+    if (body.is_pickguard_guitar !== undefined) {
+      nextAttrs.is_pickguard_guitar = Boolean(body.is_pickguard_guitar);
+    }
+    if (body.target_net !== undefined) {
+      nextAttrs.target_net = (body.target_net !== '' && body.target_net != null) ? Number(body.target_net) : null;
+    }
+    if (body.condition_header !== undefined) {
+      nextAttrs.condition_header = body.condition_header ? String(body.condition_header).trim() : null;
+    }
+    if (body.condition_subheader !== undefined) {
+      nextAttrs.condition_subheader = body.condition_subheader ? String(body.condition_subheader).trim() : null;
+    }
+    if (body.features !== undefined) {
+      nextAttrs.features = body.features ? (typeof body.features === 'string' ? body.features.trim() : body.features) : null;
+    }
+    if (body.specs !== undefined) {
+      nextAttrs.specs = body.specs ? (typeof body.specs === 'string' ? body.specs.trim() : body.specs) : null;
+    }
+    if (body.included_in_sale !== undefined) {
+      nextAttrs.included_in_sale = body.included_in_sale ? String(body.included_in_sale).trim() : null;
+    }
+    if (body.ai_middle_section !== undefined) {
+      nextAttrs.ai_middle_section = body.ai_middle_section ? String(body.ai_middle_section).trim() : null;
+    }
     if (body.attributes !== undefined) {
       if (!body.attributes || typeof body.attributes !== 'object' || Array.isArray(body.attributes)) {
         return err('Invalid attributes object', 400);
@@ -507,13 +590,16 @@ export async function onRequestPut(context) {
     return ok({
       success: true,
       item: {
+        ...nextAttrs,
         ...item,
         ...updated,
+        attributes: attributesJson,
         min_sell_price: pricing.min_sell_price,
         suggested_list_price: pricing.suggested_list_price,
         days_on_market
       },
       ...updated,
+      ...nextAttrs,
       min_sell_price: pricing.min_sell_price,
       suggested_list_price: pricing.suggested_list_price,
       days_on_market

@@ -1,12 +1,13 @@
 import { getCertVerificationUrl } from './certLookup.js';
-import { generateEbayListingHtml, stripInternalTrackingNotes, escapeHtml, sanitizeListingHtml } from './ebayTemplate.js';
+import { generateEbayListingHtml, wrapEbayFullTemplate, stripInternalTrackingNotes, escapeHtml, sanitizeListingHtml } from './ebayTemplate.js';
 import {
   SUPPORTED_PLATFORMS,
   PLATFORM_RULES_REGISTRY,
   getPlatformRules,
   computeUtf16Length,
   buildPlatformPayload,
-  validatePlatformPayload
+  validatePlatformPayload,
+  normalizeListingTitleTokens
 } from './platformListingRules.js';
 
 export {
@@ -27,23 +28,12 @@ export {
  */
 
 export function generateEbayCopy(item = {}, options = {}) {
+  let platformPayload = null;
+  let platformValidation = null;
   if (options.enforcePlatformRules) {
-    const { payload, validation } = buildPlatformPayload('ebay', item, options);
-    const insertHtml = generateEbayListingHtml({
-      ...item,
-      ...options,
-      title: payload.title,
-      description: options.description || item.notes || '',
-      aiGeneratedMiddleSection: options.aiGeneratedMiddleSection || item.aiGeneratedMiddleSection || ''
-    });
-    return {
-      title: payload.title,
-      textBody: payload.description_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
-      htmlBody: payload.description_html,
-      insertHtml,
-      payload,
-      validation
-    };
+    const built = buildPlatformPayload('ebay', item, options);
+    platformPayload = built.payload;
+    platformValidation = built.validation;
   }
   const athlete = (options.athlete || item.athlete_person || '').trim();
   const category = (options.category || item.category || 'General').trim();
@@ -94,17 +84,20 @@ export function generateEbayCopy(item = {}, options = {}) {
   }
 
   // Optimized eBay Title (80 character max)
-  let title = titleInput;
-  if (isCertified && authenticator && !title.includes(authenticator)) {
-    title += ` ${authenticator}`;
-  }
-  if (certNumber && !title.includes(certNumber)) {
-    title += ` #${certNumber}`;
-  }
-  if (title.length > 80) {
-    const truncated = title.substring(0, 80);
-    const lastSpace = truncated.lastIndexOf(' ');
-    title = (lastSpace > 40 ? truncated.substring(0, lastSpace) : truncated).trim();
+  let title = platformPayload?.title || normalizeListingTitleTokens(titleInput, item, options);
+  if (!platformPayload) {
+    if (isCertified && authenticator && !title.toLowerCase().includes(authenticator.toLowerCase())) {
+      title += ` ${authenticator}`;
+    }
+    if (certNumber && !title.includes(certNumber)) {
+      title += ` #${certNumber}`;
+    }
+    title = normalizeListingTitleTokens(title, item, options);
+    if (title.length > 80) {
+      const truncated = title.substring(0, 80);
+      const lastSpace = truncated.lastIndexOf(' ');
+      title = (lastSpace > 40 ? truncated.substring(0, lastSpace) : truncated).trim();
+    }
   }
 
   // Plain Text Version
@@ -219,71 +212,66 @@ export function generateEbayCopy(item = {}, options = {}) {
         </td>
       </tr>`).join('\n');
 
-  // Generate modular dark-theme card layout (between delimiters)
-  const insertHtml = generateEbayListingHtml({
-    title: titleInput,
+  // Generate modular card layout (between delimiters), reusing platformPayload HTML when enforced
+  const insertHtml = platformPayload?.insert_html || generateEbayListingHtml({
+    ...item,
+    title,
     description: cleanDescription || additionalDescription,
+    condition,
+    conditionHeader: options.conditionHeader,
+    conditionSubheader: options.conditionSubheader,
     conditionDetails: options.conditionHeader && options.conditionSubheader
       ? `${options.conditionHeader}: ${options.conditionSubheader}`
       : (condition ? `${condition}. Please review all photos carefully for the exact condition, quality, and details.` : undefined),
-    brand,
-    model: options.model || (specs.find(s => s.label.toLowerCase() === 'model')?.value || ''),
+    brand: (options.isCustomJersey || item.is_custom_jersey || platformPayload?.item_specifics?.Brand === 'Unbranded') ? 'Unbranded' : brand,
+    model: options.model || (specs.find(s => s.label.toLowerCase() === 'model')?.value || item.model || ''),
+    productType: productType || item.product_type || category,
+    category,
+    sportOrGenre: options.sportOrGenre || item.sport_genre || '',
+    athlete,
+    teamOrBand: options.teamOrBand || item.team_or_band || '',
+    inscription,
+    size: options.size || item.size || '',
+    isWearable: options.isWearable ?? item.is_wearable,
+    isCustomJersey: options.isCustomJersey ?? item.is_custom_jersey,
+    isPickguardSignedGuitar: options.isPickguardSignedGuitar ?? item.is_pickguard_guitar,
+    specs,
     features,
     authentication: (isCertified && certNumber) ? {
       provider: authenticator,
       certNumber,
-      type: authType || (athlete ? `Witnessed (${athlete})` : 'Witnessed')
+      type: authType || (athlete ? `Witnessed (${athlete})` : 'Witnessed'),
+      verificationUrl: certUrl
     } : null,
     includedItems: options.includedInSale ? [options.includedInSale] : [],
     aiGeneratedMiddleSection: options.aiGeneratedMiddleSection || item.aiGeneratedMiddleSection || ''
   });
 
-  const storeBanner = options.storeBannerUrl || 'https://i.ebayimg.com/images/g/fe4AAeSwSO1q8G1~/s-l1600.webp';
-  const storeName = options.storeName || 'TechTrek Outpost';
-  const storeUrl = options.storeUrl || 'https://www.ebay.com/usr/tt_globetrotter';
+  // Full HTML Preview (includes Schema.org Product wrapper, header banner, delimiters, middle insertHtml, and compact footer)
+  const htmlBody = platformPayload?.description_html || wrapEbayFullTemplate(insertHtml, options);
 
-  // Full HTML Preview (includes header banner, delimiters, middle insertHtml, and compact footer)
-  const htmlBody = `<div style="max-width: 900px; margin: 0 auto; font-family: Arial, Helvetica, sans-serif; color: #222222; box-sizing: border-box; line-height: 1.5;">
+  if (platformPayload) {
+    platformPayload.description_html = htmlBody;
+    platformPayload.insert_html = insertHtml;
+    platformPayload.description_plain_text = textBody;
+  }
 
-  <!-- Header Banner -->
-  <div style="width: 100%; margin-bottom: 20px; border-bottom: 2px solid #e5e5e5; padding-bottom: 12px; box-sizing: border-box;">
-    <img src="${escapeHtml(storeBanner)}" alt="${escapeHtml(storeName)}" width="950" height="100" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;">
-  </div>
+  const rawPrice = options.price ?? item.current_list_price ?? item.suggested_list_price ?? item.min_sell_price ?? item.unit_price ?? 0;
+  const numPrice = Number(rawPrice) || 0;
+  const priceFormatted = numPrice > 0 ? `$${numPrice.toFixed(2)}` : '';
 
-  <!-- Content Container -->
-  <div style="font-size: 15px; color: #333333; margin-bottom: 20px; box-sizing: border-box;">
-
-<!-- =======================================================
-       ADD LISTING INFO HERE
-====================================================== -->
-
-${insertHtml}
-
-<!-- =======================================================
-       END LISTING INFO HERE
-======================================================= -->
-
-  </div>
-
-  <!-- Compact Dark Footer Strip -->
-  <table role="presentation" style="width: 100%; background-color: #111111; border-radius: 6px; padding: 12px 16px; margin-top: 24px; border-collapse: collapse; box-sizing: border-box;">
-    <tbody>
-      <tr>
-        <td style="color: #ffffff; font-size: 13px; font-family: Arial, Helvetica, sans-serif; text-align: left; vertical-align: middle;">
-          <strong style="color: #f1c15b;">${escapeHtml(storeName)}</strong> &nbsp;|&nbsp; Clear Item Details &nbsp;•&nbsp; Exact Photos &nbsp;•&nbsp; Carefully Packed
-        </td>
-        <td style="text-align: right; vertical-align: middle;">
-          <a href="${escapeHtml(storeUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 7px 15px; background-color: #b37a16; color: #ffffff !important; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 4px; white-space: nowrap; font-family: Arial, Helvetica, sans-serif;">
-            Browse All Listings
-          </a>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-
-</div>`.trim();
-
-  return { title, textBody, htmlBody, insertHtml };
+  return {
+    title,
+    subtitle,
+    price: priceFormatted,
+    textBody,
+    htmlBody,
+    insertHtml,
+    itemDetailsRows,
+    tableRowsHtml,
+    payload: platformPayload,
+    validation: platformValidation
+  };
 }
 
 export function generateFacebookCopy(item = {}, options = {}) {

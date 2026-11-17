@@ -5,7 +5,7 @@
  */
 
 import { getCertVerificationUrl } from './certLookup.js';
-import { stripInternalTrackingNotes, escapeHtml, sanitizeListingHtml } from './ebayTemplate.js';
+import { generateEbayListingHtml, wrapEbayFullTemplate, stripInternalTrackingNotes, escapeHtml, sanitizeListingHtml } from './ebayTemplate.js';
 
 export const SUPPORTED_PLATFORMS = Object.freeze([
   'ebay',
@@ -61,6 +61,148 @@ export const PROTECTED_GUITAR_BRANDS = Object.freeze([
 export const VALID_WEARABLE_SIZES = Object.freeze([
   'S', 'M', 'L', 'XL', '2XL', '3XL', '48', '50', '52', '54', '56'
 ]);
+
+export const TEAM_MASCOT_MAP = Object.freeze({
+  // MLB
+  'Arizona Diamondbacks': 'Diamondbacks',
+  'Atlanta Braves': 'Braves',
+  'Baltimore Orioles': 'Orioles',
+  'Boston Red Sox': 'Red Sox',
+  'Chicago Cubs': 'Cubs',
+  'Chicago White Sox': 'White Sox',
+  'Cincinnati Reds': 'Reds',
+  'Cleveland Guardians': 'Guardians',
+  'Colorado Rockies': 'Rockies',
+  'Detroit Tigers': 'Tigers',
+  'Houston Astros': 'Astros',
+  'Kansas City Royals': 'Royals',
+  'Los Angeles Angels': 'Angels',
+  'Los Angeles Dodgers': 'Dodgers',
+  'Miami Marlins': 'Marlins',
+  'Milwaukee Brewers': 'Brewers',
+  'Minnesota Twins': 'Twins',
+  'New York Mets': 'Mets',
+  'New York Yankees': 'Yankees',
+  'Oakland Athletics': 'Athletics',
+  'Philadelphia Phillies': 'Phillies',
+  'Pittsburgh Pirates': 'Pirates',
+  'San Diego Padres': 'Padres',
+  'San Francisco Giants': 'Giants',
+  'Seattle Mariners': 'Mariners',
+  'St. Louis Cardinals': 'Cardinals',
+  'Tampa Bay Rays': 'Rays',
+  'Texas Rangers': 'Rangers',
+  'Toronto Blue Jays': 'Blue Jays',
+  'Washington Nationals': 'Nationals',
+  // NFL
+  'Arizona Cardinals': 'Cardinals',
+  'Atlanta Falcons': 'Falcons',
+  'Baltimore Ravens': 'Ravens',
+  'Buffalo Bills': 'Bills',
+  'Carolina Panthers': 'Panthers',
+  'Chicago Bears': 'Bears',
+  'Cincinnati Bengals': 'Bengals',
+  'Cleveland Browns': 'Browns',
+  'Dallas Cowboys': 'Cowboys',
+  'Denver Broncos': 'Broncos',
+  'Detroit Lions': 'Lions',
+  'Green Bay Packers': 'Packers',
+  'Houston Texans': 'Texans',
+  'Indianapolis Colts': 'Colts',
+  'Jacksonville Jaguars': 'Jaguars',
+  'Kansas City Chiefs': 'Chiefs',
+  'Las Vegas Raiders': 'Raiders',
+  'Los Angeles Chargers': 'Chargers',
+  'Los Angeles Rams': 'Rams',
+  'Miami Dolphins': 'Dolphins',
+  'Minnesota Vikings': 'Vikings',
+  'New England Patriots': 'Patriots',
+  'New Orleans Saints': 'Saints',
+  'New York Giants': 'Giants',
+  'New York Jets': 'Jets',
+  'Philadelphia Eagles': 'Eagles',
+  'Pittsburgh Steelers': 'Steelers',
+  'San Francisco 49ers': '49ers',
+  'Seattle Seahawks': 'Seahawks',
+  'Tampa Bay Buccaneers': 'Buccaneers',
+  'Tennessee Titans': 'Titans',
+  'Washington Commanders': 'Commanders',
+  // NBA
+  'Atlanta Hawks': 'Hawks',
+  'Boston Celtics': 'Celtics',
+  'Brooklyn Nets': 'Nets',
+  'Charlotte Hornets': 'Hornets',
+  'Chicago Bulls': 'Bulls',
+  'Cleveland Cavaliers': 'Cavaliers',
+  'Dallas Mavericks': 'Mavericks',
+  'Denver Nuggets': 'Nuggets',
+  'Detroit Pistons': 'Pistons',
+  'Golden State Warriors': 'Warriors',
+  'Houston Rockets': 'Rockets',
+  'Indiana Pacers': 'Pacers',
+  'Los Angeles Clippers': 'Clippers',
+  'Los Angeles Lakers': 'Lakers',
+  'Memphis Grizzlies': 'Grizzlies',
+  'Miami Heat': 'Heat',
+  'Milwaukee Bucks': 'Bucks',
+  'Minnesota Timberwolves': 'Timberwolves',
+  'New Orleans Pelicans': 'Pelicans',
+  'New York Knicks': 'Knicks',
+  'Oklahoma City Thunder': 'Thunder',
+  'Orlando Magic': 'Magic',
+  'Philadelphia 76ers': '76ers',
+  'Phoenix Suns': 'Suns',
+  'Portland Trail Blazers': 'Trail Blazers',
+  'Sacramento Kings': 'Kings',
+  'San Antonio Spurs': 'Spurs',
+  'Toronto Raptors': 'Raptors',
+  'Utah Jazz': 'Jazz',
+  'Washington Wizards': 'Wizards',
+  // NHL
+  'Anaheim Ducks': 'Ducks',
+  'Boston Bruins': 'Bruins',
+  'Buffalo Sabres': 'Sabres',
+  'Calgary Flames': 'Flames',
+  'Carolina Hurricanes': 'Hurricanes',
+  'Chicago Blackhawks': 'Blackhawks',
+  'Colorado Avalanche': 'Avalanche',
+  'Columbus Blue Jackets': 'Blue Jackets',
+  'Dallas Stars': 'Stars',
+  'Detroit Red Wings': 'Red Wings',
+  'Edmonton Oilers': 'Oilers',
+  'Florida Panthers': 'Panthers',
+  'Los Angeles Kings': 'Kings',
+  'Minnesota Wild': 'Wild',
+  'Montreal Canadiens': 'Canadiens',
+  'Nashville Predators': 'Predators',
+  'New Jersey Devils': 'Devils',
+  'New York Islanders': 'Islanders',
+  'New York Rangers': 'Rangers',
+  'Ottawa Senators': 'Senators',
+  'Philadelphia Flyers': 'Flyers',
+  'Pittsburgh Penguins': 'Penguins',
+  'San Jose Sharks': 'Sharks',
+  'Seattle Kraken': 'Kraken',
+  'St. Louis Blues': 'Blues',
+  'Tampa Bay Lightning': 'Lightning',
+  'Toronto Maple Leafs': 'Maple Leafs',
+  'Utah Hockey Club': 'Utah HC',
+  'Vancouver Canucks': 'Canucks',
+  'Vegas Golden Knights': 'Golden Knights',
+  'Washington Capitals': 'Capitals',
+  'Winnipeg Jets': 'Jets',
+  // College
+  'Alabama Crimson Tide': 'Crimson Tide',
+  'Georgia Bulldogs': 'Bulldogs',
+  'Michigan Wolverines': 'Wolverines',
+  'Ohio State Buckeyes': 'Buckeyes',
+  'Texas Longhorns': 'Longhorns',
+  'Notre Dame Fighting Irish': 'Fighting Irish',
+  'Penn State Nittany Lions': 'Nittany Lions',
+  'Florida State Seminoles': 'Seminoles',
+  'North Carolina Tar Heels': 'Tar Heels',
+  'Duke Blue Devils': 'Blue Devils'
+});
 
 export const CATEGORY_EMOJI_LOOKUP = Object.freeze({
   football: '🏈',
@@ -275,6 +417,7 @@ export function evaluateAuthenticator(rawAuth) {
  */
 export function isWearableItem(itemData = {}) {
   if (typeof itemData.isWearable === 'boolean') return itemData.isWearable;
+  if (typeof itemData.is_wearable === 'boolean') return itemData.is_wearable;
   const text = `${itemData.productType || ''} ${itemData.category || ''} ${itemData.title || ''} ${itemData.item_name || ''}`.toLowerCase();
   const nonWearableHints = [
     'baseball', 'football', 'basketball', 'puck', 'helmet', 'mini helmet',
@@ -367,8 +510,20 @@ export function resolveCategoryEmoji(itemData = {}, platform = 'ebay') {
   if (/\b(billiards|pool cue)\b/.test(text)) return '🎱';
   if (/\b(bowling)\b/.test(text)) return '🎳';
   if (/\b(broadway|theater|theatre|playbill)\b/.test(text)) return '🎭';
+  if (/\b(drill|driver|saw|wrench|tool|dewalt|milwaukee|makita|ryobi|bosch|utv|atv|windshield|automotive|hardware)\b/.test(text)) return '🛠️';
+  if (/\b(headphone|earbud|speaker|bluetooth|audio|stereo|amplifier)\b/.test(text)) return '🎧';
+  if (/\b(camera|lens|camcorder|canon|nikon|gopro)\b/.test(text)) return '📷';
+  if (/\b(laptop|tablet|monitor|keyboard|mouse|router|computer|electronics|apple|sony|samsung)\b/.test(text)) return '💻';
+  if (/\b(glass|vase|crystal|milk glass|fenton|pyrex|ceramic|porcelain|pottery)\b/.test(text)) return '🏺';
+  if (/\b(home decor|valet|organizer|furniture|kitchen|lamp|clock)\b/.test(text)) return '🏡';
+  if (/\b(shirt|t-shirt|hoodie|jacket|sweatshirt|pullover|apparel|vest|coat)\b/.test(text) && !/\b(signed|autograph)\b/.test(text)) return '👕';
 
-  return '✒️';
+  const hasAutographSignal = Boolean(
+    itemData.athlete || itemData.athlete_person || itemData.signer ||
+    itemData.authenticator || itemData.inscription ||
+    /\b(signed|autograph|autographed)\b/.test(text)
+  );
+  return hasAutographSignal ? '✒️' : '📦';
 }
 
 /**
@@ -378,9 +533,9 @@ export function cleanTitleFragment(text, options = {}) {
   if (!text) return '';
   let out = sanitizeNoEmDash(String(text));
 
-  // Remove punctuation spam (* ! ? ~ @ # $ | /) except inside PSA/DNA or 1/1
+  // Remove punctuation spam (* ! ? ~ @ # $ | /) except inside PSA/DNA or numeric fractions (1/1, 1/4, 3/8)
   out = out.replace(/[*!?~@#$|]/g, ' ');
-  out = out.replace(/(?<!PSA)\/(?!DNA\b|1\b)/gi, ' ');
+  out = out.replace(/(?<!PSA|\d)\/(?!DNA\b|\d)/gi, ' ');
 
   // Remove banned hype tokens (case-insensitive whole words)
   for (const word of BANNED_HYPE_WORDS) {
@@ -421,6 +576,12 @@ export function normalizeUnauthorizedAllCaps(text) {
       if (!bare || bare.length < 2) return token;
       if (bare === bare.toUpperCase() && /[A-Z]{2,}/.test(bare)) {
         if (ALLOWED_UPPERCASE_ACRONYMS.has(bare)) return token;
+        if (token.includes('/')) {
+          const parts = token.split('/').map(p => p.replace(/[^A-Za-z0-9]/g, '')).filter(Boolean);
+          if (parts.length > 0 && parts.every(p => ALLOWED_UPPERCASE_ACRONYMS.has(p))) {
+            return token;
+          }
+        }
         return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
       }
       return token;
@@ -447,12 +608,14 @@ export function detectItemVariantFlags(itemData = {}, options = {}) {
   const isCustomJersey = Boolean(
     options.isCustomJersey ??
     itemData.isCustomJersey ??
+    itemData.is_custom_jersey ??
     (/\bcustom\b/.test(combined) && /\bjersey\b/.test(combined))
   );
 
   const isPickguardSignedGuitar = Boolean(
     options.isPickguardSignedGuitar ??
     itemData.isPickguardSignedGuitar ??
+    itemData.is_pickguard_guitar ??
     (/\bpickguard\b/.test(combined) && /\bguitar\b/.test(combined))
   );
 
@@ -463,6 +626,95 @@ export function detectItemVariantFlags(itemData = {}, options = {}) {
   );
 
   return { isCustomJersey, isPickguardSignedGuitar, isUnbrandedGuitar };
+}
+
+/**
+ * Strips redundant duplicate Signed/Autographed verbs, redundant trailing sport nouns
+ * when a non-ball item + sport context already establish the sport, and ensures wearable
+ * size tokens sit before authenticator tokens (right after base item type).
+ */
+export function normalizeListingTitleTokens(rawTitle, itemData = {}, options = {}) {
+  let text = sanitizeNoEmDash(String(rawTitle || '')).replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+
+  // Mask quoted inscriptions so exact verbatim text inside quotes is never mutated
+  const quoted = [];
+  text = text.replace(/"[^"]*"/g, (m) => {
+    const idx = quoted.length;
+    quoted.push(m);
+    return `__QUOTED_INSCRIPTION_${idx}__`;
+  });
+
+  // 1. Deduplicate Signed / Autographed verbs (keep at most one)
+  const preferredVerb = options.authVerb === 'Autographed' ? 'Autographed' : 'Signed';
+  let seenAuthVerb = false;
+  text = text.replace(/\b(signed|autographed)\b/gi, (match) => {
+    if (!seenAuthVerb) {
+      seenAuthVerb = true;
+      return options.authVerb ? preferredVerb : match;
+    }
+    return '';
+  }).replace(/\s+/g, ' ').trim();
+
+  // 2. Strip redundant sport nouns when non-ball item + sport context already establish the sport
+  const nonBallMatch = text.match(/\b(jersey|helmet|photo|8x10|11x14|16x20|card|bat|puck|glove|pylon|bobblehead|poster|ticket|magazine|shirt|hoodie|jacket|hat|cap)\b/i);
+  const hasBallNoun = /\b(football|baseball|basketball|golf ball|soccer ball|tennis ball)\b/i.test(text) && !nonBallMatch;
+  if (nonBallMatch && !hasBallNoun) {
+    const isJersey = /\bjersey\b/i.test(text);
+    const hasTeamOrSportContext = Boolean(
+      options.teamOrBand ||
+      itemData.team_or_band ||
+      itemData.team ||
+      options.sportOrGenre ||
+      itemData.sport_genre ||
+      isJersey
+    );
+    if (hasTeamOrSportContext) {
+      // Remove standalone sport words that do not directly modify Helmet/Bat/Card/Puck/Glove/Ball
+      const nonBallPos = nonBallMatch.index ?? 0;
+      text = text.replace(
+        /\b(Basketball|Football|Baseball|Hockey|Soccer|Golf)\b(?!\s+(?:Helmet|Bat|Card|Puck|Glove|Ball)\b)/gi,
+        (match, _word, offset) => {
+          if (isJersey) return '';
+          return offset > nonBallPos ? '' : match;
+        }
+      ).replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  // 3. Ensure wearable Size token sits before authenticator tokens (right after base item type)
+  if (isWearableItem({ ...itemData, ...options, title: text })) {
+    const authClauseRe = /\b((?:PSA\/DNA|PSA(?:\s+(?:COA|LOA|DNA|Cert))?|JSA(?:\s+(?:COA|LOA|Cert))?|Beckett(?:\s+BAS(?:\s+Witness)?)?|BAS(?:\s+Witness)?|SWAU(?:\s+(?:COA|Cert))?|Fanatics|Steiner|UDA|MLB\s+Authenticated|NFL\s+Authenticated|NBA\s+Authenticated)(?:\s+#?[A-Z0-9-]+)?)\s+(S|M|L|XL|2XL|3XL|4XL|48|50|52|54|56)\b/i;
+    const swapMatch = text.match(authClauseRe);
+    if (swapMatch) {
+      const authPart = swapMatch[1].trim();
+      const sizePart = swapMatch[2].toUpperCase();
+      text = text.replace(swapMatch[0], `${sizePart} ${authPart}`).replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  // 4. Enforce Slot 6 (Verbatim Inscription in quotes, no "Inscribed" filler) BEFORE Slot 7 (Authenticator + COA)
+  text = text.replace(/\bInscribed\s+(__QUOTED_INSCRIPTION_\d+__)/gi, '$1');
+  const authBeforeInscRe = /\b(PSA\/DNA|PSA(?:\s+(?:COA|LOA|DNA|Cert))?|JSA(?:\s+(?:COA|LOA|Cert))?|Beckett(?:\s+BAS(?:\s+Witness)?)?|BAS(?:\s+Witness)?|SWAU(?:\s+(?:COA|Cert))?|Fanatics|Steiner|UDA)\s+(?:(Inscribed)\s+(__QUOTED_INSCRIPTION_\d+__|[A-Z0-9][A-Za-z0-9'. -]{1,35})|(__QUOTED_INSCRIPTION_\d+__))$/i;
+  const inscSwap = text.match(authBeforeInscRe);
+  if (inscSwap) {
+    let authPart = inscSwap[1].trim();
+    authPart = authPart
+      .replace(/^JSA\s+Cert$/i, 'JSA COA')
+      .replace(/^PSA\s+Cert$/i, 'PSA/DNA')
+      .replace(/^SWAU\s+Cert$/i, 'SWAU COA');
+    const rawInscPart = (inscSwap[3] || inscSwap[4] || '').trim();
+    if (rawInscPart && !/^(COA|LOA|Cert|DNA|BAS|Witness)$/i.test(rawInscPart)) {
+      const formattedInsc = rawInscPart.startsWith('__QUOTED_INSCRIPTION_')
+        ? rawInscPart
+        : `"${rawInscPart.replace(/^"+|"+$/g, '')}"`;
+      text = text.replace(inscSwap[0], `${formattedInsc} ${authPart}`).replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  // Restore quoted inscriptions
+  text = text.replace(/__QUOTED_INSCRIPTION_(\d+)__/g, (_, i) => quoted[Number(i)] || '');
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -497,6 +749,113 @@ function truncateOnWordBoundary(text, maxChars) {
     return slice.slice(0, lastSpace).trim();
   }
   return slice.trim();
+}
+
+/**
+ * Shortens full city+mascot team names to primary mascot / short name (e.g. Atlanta Braves -> Braves).
+ */
+export function shortenTeamInText(text, teamOrBand = '') {
+  let out = String(text || '');
+  if (!out) return '';
+
+  // 1. Check known multi-word team mapping sorted by length descending
+  const sortedEntries = Object.entries(TEAM_MASCOT_MAP).sort((a, b) => b[0].length - a[0].length);
+  for (const [fullTeam, shortMascot] of sortedEntries) {
+    const escaped = fullTeam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
+    if (regex.test(out)) {
+      out = out.replace(regex, shortMascot);
+      return out.replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  // 2. If teamOrBand is explicitly provided and contains multiple words (e.g. City Mascot)
+  const cleanTeam = String(teamOrBand || '').trim();
+  if (cleanTeam && cleanTeam.includes(' ')) {
+    const words = cleanTeam.split(/\s+/);
+    if (words.length >= 2) {
+      const shortMascot = words.slice(1).join(' ');
+      if (shortMascot.length >= 3) {
+        const escaped = cleanTeam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
+        if (regex.test(out)) {
+          out = out.replace(regex, shortMascot);
+        }
+      }
+    }
+  }
+
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Shortens long authenticator tokens (e.g. JSA COA -> JSA, Beckett BAS -> BAS, PSA/DNA COA -> PSA/DNA).
+ */
+export function shortenAuthInText(text) {
+  let out = String(text || '');
+  if (!out) return '';
+
+  out = out
+    .replace(/\bBeckett\s+BAS\s+Witness\b/gi, 'BAS Witness')
+    .replace(/\bBeckett\s+BAS\b/gi, 'BAS')
+    .replace(/\bJSA\s+COA\b/gi, 'JSA')
+    .replace(/\bJSA\s+LOA\b/gi, 'JSA')
+    .replace(/\bPSA\/DNA\s+COA\b/gi, 'PSA/DNA')
+    .replace(/\bPSA\/DNA\s+LOA\b/gi, 'PSA/DNA')
+    .replace(/\bPSA\s+COA\b/gi, 'PSA')
+    .replace(/\bSWAU\s+COA\b/gi, 'SWAU');
+
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Truncates non-quoted tokens cleanly without splitting quotes and never dropping emoji.
+ */
+export function truncateSafeWithoutSplittingQuotes(text, maxChars, context = {}) {
+  let clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (computeUtf16Length(clean) <= maxChars) return clean;
+
+  // Mask quoted inscription so it cannot be split mid-quote
+  const quoted = [];
+  const masked = clean.replace(/"[^"]*"/g, (m) => {
+    const idx = quoted.length;
+    quoted.push(m);
+    return `__SAFE_QUOTED_${idx}__`;
+  });
+
+  // Preserve tail tokens (sizeToken, authToken) if possible
+  const { sizeToken, authToken } = context;
+  const tailTokens = [sizeToken, authToken].filter(t => t && masked.includes(t));
+  const tailText = tailTokens.join(' ').trim();
+
+  let truncatedMasked = masked;
+  if (tailText && tailText.length + 12 < maxChars) {
+    let head = masked;
+    for (const t of tailTokens) {
+      head = head.replace(t, ' ');
+    }
+    head = head.replace(/\s+/g, ' ').trim();
+    const headBudget = maxChars - tailText.length - 1;
+    truncatedMasked = `${truncateOnWordBoundary(head, headBudget)} ${tailText}`.trim();
+  } else {
+    truncatedMasked = truncateOnWordBoundary(masked, maxChars);
+  }
+
+  // Restore quotes
+  let restored = truncatedMasked.replace(/__SAFE_QUOTED_(\d+)__/g, (_, i) => quoted[Number(i)] || '');
+
+  // If restored exceeds maxChars because placeholder was shorter than actual quote:
+  if (computeUtf16Length(restored) > maxChars) {
+    for (let i = 0; i < quoted.length; i++) {
+      if (computeUtf16Length(restored) <= maxChars) break;
+      restored = restored.replace(quoted[i], '').replace(/\s+/g, ' ').trim();
+    }
+    if (computeUtf16Length(restored) > maxChars) {
+      restored = truncateOnWordBoundary(restored, maxChars);
+    }
+  }
+
+  return restored.replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -541,29 +900,46 @@ export function buildPlatformTitle(platform, itemData = {}, options = {}) {
     : '';
 
   const slots = [];
+  const stripEmbeddedTokens = (text) => {
+    let out = String(text || '');
+    if (signer) {
+      out = out.replace(new RegExp(signer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), ' ');
+    }
+    if (teamOrBand) {
+      out = out.replace(new RegExp(teamOrBand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), ' ');
+    }
+    out = out.replace(/\b(signed|autographed)\b/gi, ' ');
+    if (sizeToken) {
+      out = out.replace(new RegExp(`\\b${sizeToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'), ' ');
+    }
+    if (rawInscription) {
+      out = out.replace(new RegExp(`\\bInscribed\\b\\s*${rawInscription.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'ig'), ' ');
+      out = out.replace(new RegExp(rawInscription.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), ' ');
+    }
+    out = out.replace(/\bInscribed\b/gi, ' ');
+    if (authToken) {
+      const authEscaped = authEval.authenticator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      out = out.replace(new RegExp(`\\b${authEscaped}(?:\\s+(?:COA|LOA|BAS|DNA|Witness|Cert))?\\b`, 'gi'), ' ');
+      out = out.replace(/\b(?:PSA\/DNA|PSA|JSA(?:\s+(?:COA|LOA|Cert))?|Beckett(?:\s+BAS(?:\s+Witness)?)?|BAS|SWAU(?:\s+(?:COA|Cert))?|COA|LOA|Cert)\b/gi, ' ');
+    }
+    return out.replace(/\s+/g, ' ').trim();
+  };
+
   if (signer) {
     slots.push(signer);
     if (authEval.isCertified || signer || rawInscription) {
       slots.push(authVerb);
     }
     if (normPlatform === 'reverb') {
-      if (baseItem && !baseItem.toLowerCase().includes(signer.toLowerCase())) {
-        slots.push(baseItem);
-      } else if (rawBaseTitle) {
-        slots.push(rawBaseTitle);
-      }
+      const reverbCandidate = (baseItem && !baseItem.toLowerCase().includes(signer.toLowerCase()))
+        ? baseItem
+        : (rawBaseTitle || baseItem);
+      const cleanedReverb = stripEmbeddedTokens(reverbCandidate) || reverbCandidate.replace(/\b(signed|autographed)\b/gi, '').replace(/\s+/g, ' ').trim();
+      if (cleanedReverb) slots.push(cleanedReverb);
     } else {
       if (teamOrBand) slots.push(teamOrBand);
       if (baseItem) {
-        // Avoid repeating signer or team if user typed full phrase into product title
-        let strippedBase = baseItem;
-        if (signer) {
-          strippedBase = strippedBase.replace(new RegExp(signer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), '').trim();
-        }
-        if (teamOrBand) {
-          strippedBase = strippedBase.replace(new RegExp(teamOrBand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), '').trim();
-        }
-        strippedBase = strippedBase.replace(/\b(signed|autographed)\b/ig, '').replace(/\s+/g, ' ').trim();
+        const strippedBase = stripEmbeddedTokens(baseItem);
         if (strippedBase) {
           slots.push(strippedBase);
         } else if (!teamOrBand) {
@@ -572,10 +948,23 @@ export function buildPlatformTitle(platform, itemData = {}, options = {}) {
       }
     }
   } else {
+    const rawBrand = cleanTitleFragment(options.brand || itemData.brand || '', flags);
+    if (rawBrand && !flags.isCustomJersey && !flags.isPickguardSignedGuitar && !flags.isUnbrandedGuitar) {
+      if (!rawBaseTitle.toLowerCase().includes(rawBrand.toLowerCase())) {
+        slots.push(rawBrand);
+      }
+    }
     if (teamOrBand && !rawBaseTitle.toLowerCase().includes(teamOrBand.toLowerCase())) {
       slots.push(teamOrBand);
     }
-    if (rawBaseTitle) slots.push(rawBaseTitle);
+    const baseWithoutSizeAndAuth = sizeToken || authToken
+      ? stripEmbeddedTokens(rawBaseTitle)
+      : rawBaseTitle;
+    if (baseWithoutSizeAndAuth) {
+      slots.push(baseWithoutSizeAndAuth);
+    } else if (rawBaseTitle) {
+      slots.push(rawBaseTitle);
+    }
   }
 
   if (sizeToken && !slots.some(s => new RegExp(`\\b${sizeToken}\\b`, 'i').test(s))) {
@@ -589,31 +978,28 @@ export function buildPlatformTitle(platform, itemData = {}, options = {}) {
   }
 
   let preEmojiText = slots.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-  if (!preEmojiText) preEmojiText = 'Autographed Collectible';
+  preEmojiText = normalizeListingTitleTokens(preEmojiText, itemData, { ...options, authVerb });
+  if (!preEmojiText) preEmojiText = 'Collectible Item';
 
-  // Drop or shorten optional inscription if exceeding pre-emoji cap while preserving signer, base, size, and auth
-  if (computeUtf16Length(preEmojiText) > maxPreEmoji && inscriptionToken) {
-    const withoutInscription = slots.filter(s => s !== inscriptionToken).join(' ').replace(/\s+/g, ' ').trim();
-    if (computeUtf16Length(withoutInscription) <= maxPreEmoji) {
-      preEmojiText = withoutInscription;
-    }
+  // Progressive <= 80 Title Compression Fallback Cascade
+  if (computeUtf16Length(preEmojiText) > maxPreEmoji) {
+    // Stage a: Shorten full city+mascot team names to primary mascot / short name (e.g. Atlanta Braves -> Braves)
+    preEmojiText = shortenTeamInText(preEmojiText, teamOrBand);
   }
 
   if (computeUtf16Length(preEmojiText) > maxPreEmoji) {
-    // Preserve authToken and sizeToken at the tail if possible
-    const tailTokens = [sizeToken, authToken].filter(t => t && preEmojiText.includes(t));
-    const tailText = tailTokens.join(' ').trim();
-    if (tailText && tailText.length + 12 < maxPreEmoji) {
-      let headText = preEmojiText;
-      for (const t of tailTokens) {
-        headText = headText.replace(t, ' ');
-      }
-      headText = headText.replace(/\s+/g, ' ').trim();
-      const headBudget = maxPreEmoji - tailText.length - 1;
-      preEmojiText = `${truncateOnWordBoundary(headText, headBudget)} ${tailText}`.trim();
-    } else {
-      preEmojiText = truncateOnWordBoundary(preEmojiText, maxPreEmoji);
-    }
+    // Stage b: Shorten auth tokens (e.g. JSA COA -> JSA, Beckett BAS -> BAS, PSA/DNA COA -> PSA/DNA)
+    preEmojiText = shortenAuthInText(preEmojiText);
+  }
+
+  if (computeUtf16Length(preEmojiText) > maxPreEmoji) {
+    // Stage c: Compress custom jersey token (Custom Stitched -> Custom)
+    preEmojiText = preEmojiText.replace(/\bCustom\s+Stitched\b/gi, 'Custom').replace(/\s+/g, ' ').trim();
+  }
+
+  if (computeUtf16Length(preEmojiText) > maxPreEmoji) {
+    // Stage d: Truncate non-quoted tokens cleanly without splitting quotes and never dropping emoji
+    preEmojiText = truncateSafeWithoutSplittingQuotes(preEmojiText, maxPreEmoji, { sizeToken, authToken });
   }
 
   if (normPlatform === 'ebay') {
@@ -790,11 +1176,22 @@ export function resolvePlatformLogistics(platform, itemData = {}, options = {}) 
     };
   }
 
+  let ebayPackaging = 'Packed securely in a padded parcel with protective fill and tracking';
+  if (/\b(guitar)\b/.test(text)) {
+    ebayPackaging = 'Double-boxed with corner protection, internal cushioning, and full neck support';
+  } else if (/\b(glass|vase|crystal|milk glass|fenton|pyrex|ceramic|porcelain|pottery)\b/.test(text)) {
+    ebayPackaging = 'Individually bubble-wrapped and double-boxed with protective cushioning fill';
+  } else if (/\b(jersey|shirt|t-shirt|hoodie|jacket|sweatshirt|apparel|vest)\b/.test(text)) {
+    ebayPackaging = 'Poly-bagged and sealed inside a sturdy weather-resistant shipping box';
+  } else if (/\b(baseball|puck)\b/.test(text)) {
+    ebayPackaging = 'UV-protected display cube inside a bubble-wrapped shipping box';
+  } else if (/\b(photo|8x10|11x14|16x20|cd|vinyl|card|sheet music|ticket|book)\b/.test(text)) {
+    ebayPackaging = 'Rigid protective mailer with sleeve and corner protectors';
+  }
+
   return {
     handling_days: 1,
-    packaging_method: /\b(guitar)\b/.test(text)
-      ? 'Double-boxed with corner protection and neck support'
-      : 'UV-protected display cube or poly-bagged sturdy box with corner protection'
+    packaging_method: ebayPackaging
   };
 }
 
@@ -1242,50 +1639,139 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
     return { payload, validation };
   }
 
-  // eBay payload
-  const isEnt = /\b(guitar|music|cd|vinyl|drum|movie|tv|actor|comic|book|concert|band)\b/i.test(`${sportOrGenre} ${title}`);
-  const categoryPath = isEnt
-    ? 'Entertainment Memorabilia > Autographs-Original'
-    : 'Sports Mem, Cards & Fan Shop > Autographs-Original';
-  const metaHook = `${signer ? `${signer} signed ` : ''}${teamOrBand ? `${teamOrBand} ` : ''}${options.productType || itemData.item_name || 'collectible'}${inscription ? ` "${inscription}"` : ''}${authEval.isCertified ? ` authenticated by ${authEval.authenticator}${certNumber ? ` Cert #${certNumber}` : ''}` : ''}.`.slice(0, 160);
-  const ebayHtml = sanitizeListingHtml([
-    `<p><strong>${escapeHtml(metaHook)}</strong></p>`,
-    '<ul>',
-    `<li><strong>Signer &amp; Accolades:</strong> ${escapeHtml(signer || 'Featured Signer')}${teamOrBand ? ` - ${escapeHtml(teamOrBand)}` : ''}</li>`,
-    `<li><strong>Authentication &amp; Verification:</strong> ${escapeHtml(authEval.authenticator || 'Certified')}${certNumber ? ` (Cert #${escapeHtml(certNumber)})` : ''}${certUrl ? ` - Verify online at ${escapeHtml(certUrl)}` : ''}</li>`,
-    `<li><strong>Autograph Details:</strong> Hand-signed${inscription ? ` with inscription "${escapeHtml(inscription)}"` : ''}. Exact placement shown in photos.</li>`,
-    `<li><strong>Item &amp; Condition Details:</strong> ${escapeHtml(options.condition || itemData.condition || 'Brand New / Excellent')}${size ? `, Size ${escapeHtml(size)}` : ''}${cleanNotes ? `. ${escapeHtml(cleanNotes)}` : ''}</li>`,
-    '</ul>',
-    flags.isCustomJersey ? '<p><em>Note: This is a custom-made jersey featuring stitched name and numbers. It is not affiliated with, licensed by, or manufactured by any professional sports league or apparel brand.</em></p>' : '',
-    flags.isPickguardSignedGuitar ? '<p><em>Note: The autograph is on the custom pickguard mounted to a brand-new, non-stage-played display guitar.</em></p>' : '',
-    `<p><strong>Packaging &amp; Shipping Confidence:</strong> ${escapeHtml(logistics.packaging_method)}. Ships with tracking within ${logistics.handling_days} business day.</p>`
-  ].filter(Boolean).join('\n'));
+  // eBay payload (supports autographed memorabilia + all general/electronics/tools/glass/apparel categories)
+  const isAutographed = Boolean(
+    signer ||
+    authEval.isCertified ||
+    inscription ||
+    /\b(signed|autograph|autographed)\b/i.test(title)
+  );
+  const fullItemText = `${sportOrGenre} ${itemData.category || ''} ${options.productType || ''} ${title}`.toLowerCase();
+  const isEnt = /\b(guitar|music|cd|vinyl|drum|movie|tv|actor|comic|book|concert|band)\b/i.test(fullItemText);
+
+  let categoryPath = 'Collectibles & General Merchandise';
+  if (isAutographed) {
+    categoryPath = isEnt
+      ? 'Entertainment Memorabilia > Autographs-Original'
+      : 'Sports Mem, Cards & Fan Shop > Autographs-Original';
+  } else if (/\b(headphone|earbud|speaker|camera|lens|laptop|tablet|monitor|router|keyboard|mouse|electronics|sony|apple|samsung|bose|canon|nikon|gopro)\b/i.test(fullItemText)) {
+    categoryPath = 'Consumer Electronics';
+  } else if (/\b(drill|driver|saw|wrench|tool|dewalt|milwaukee|makita|ryobi|bosch|hardware)\b/i.test(fullItemText)) {
+    categoryPath = 'Home & Garden > Tools & Workshop Equipment';
+  } else if (/\b(utv|atv|windshield|automotive|vehicle|car|truck)\b/i.test(fullItemText)) {
+    categoryPath = 'eBay Motors > Parts & Accessories';
+  } else if (/\b(glass|vase|crystal|milk glass|fenton|pyrex|ceramic|porcelain|pottery)\b/i.test(fullItemText)) {
+    categoryPath = 'Pottery & Glass > Glassware';
+  } else if (flags.isWearable || /\b(shirt|hoodie|jacket|vest|apparel|clothing)\b/i.test(fullItemText)) {
+    categoryPath = 'Clothing, Shoes & Accessories';
+  } else if (isEnt) {
+    categoryPath = 'Musical Instruments & Gear';
+  } else if (itemData.category && itemData.category !== 'General') {
+    categoryPath = itemData.category;
+  }
+
+  const featuresList = [];
+  const rawFeaturesInput = options.features ?? itemData.features;
+  if (Array.isArray(rawFeaturesInput)) {
+    featuresList.push(...rawFeaturesInput.filter(Boolean));
+  } else if (typeof rawFeaturesInput === 'string' && rawFeaturesInput.trim()) {
+    featuresList.push(...rawFeaturesInput.split('\n').map(s => s.trim().replace(/^[-•*]\s*/, '')).filter(Boolean));
+  }
+  if (featuresList.length === 0 && isAutographed) {
+    if (signer) featuresList.push(`Hand-signed by ${signer}${teamOrBand ? ` (${teamOrBand})` : ''}`);
+    if (inscription) featuresList.push(`Features inscription: "${inscription}"`);
+    if (authEval.isCertified && certNumber) featuresList.push(`Authenticated by ${authEval.authenticator} (Cert #${certNumber})`);
+    if (size && flags.isWearable) featuresList.push(`Size: ${size}`);
+    if (flags.isCustomJersey) {
+      featuresList.push('Custom stitched name and numbers (unbranded collectible jersey)');
+    }
+    if (flags.isPickguardSignedGuitar) {
+      featuresList.push('Autograph on custom pickguard mounted to brand-new display guitar');
+    }
+    featuresList.push(`Packaged securely with care (${logistics.packaging_method})`);
+    featuresList.push(`Ships within ${logistics.handling_days} business day with tracking`);
+  }
+
+  const resolvedEbayBrand = (flags.isCustomJersey || flags.isPickguardSignedGuitar || flags.isUnbrandedGuitar)
+    ? 'Unbranded'
+    : (resolvedBrand || 'Unbranded');
+  const resolvedModel = String(options.model || itemData.model || '').trim();
+  const resolvedCondition = options.condition || itemData.condition || 'Brand New / Excellent';
+
+  const insertHtml = generateEbayListingHtml({
+    ...itemData,
+    title,
+    description: cleanNotes,
+    condition: resolvedCondition,
+    conditionHeader: options.conditionHeader,
+    conditionSubheader: options.conditionSubheader,
+    conditionDetails: options.conditionHeader && options.conditionSubheader
+      ? `${options.conditionHeader}: ${options.conditionSubheader}`
+      : `${resolvedCondition}. Please review all photos carefully for the exact condition, quality, and details.`,
+    brand: resolvedEbayBrand,
+    model: resolvedModel,
+    productType: options.productType || itemData.product_type || itemData.category || '',
+    category: options.category || itemData.category || '',
+    sportOrGenre,
+    athlete: signer,
+    teamOrBand,
+    inscription,
+    size,
+    isWearable: isWearableItem({ ...itemData, ...options }),
+    isCustomJersey: flags.isCustomJersey,
+    isPickguardSignedGuitar: flags.isPickguardSignedGuitar,
+    material: options.material || options.finish || itemData.material || itemData.finish || '',
+    specs: options.specs || itemData.specs,
+    features: featuresList,
+    packagingMethod: logistics.packaging_method,
+    authentication: (authEval.isCertified && certNumber) ? {
+      provider: authEval.authenticator,
+      certNumber,
+      type: options.authType || itemData.auth_type || (signer ? `Witnessed (${signer})` : 'Witnessed'),
+      verificationUrl: certUrl
+    } : null,
+    includedItems: options.includedInSale ? [options.includedInSale] : (itemData.included_items ? [itemData.included_items] : []),
+    aiGeneratedMiddleSection: options.aiGeneratedMiddleSection || itemData.aiGeneratedMiddleSection || ''
+  });
+
+  const fullStyledHtml = wrapEbayFullTemplate(insertHtml, options);
+
+  const itemSpecifics = isAutographed
+    ? {
+        'Original/Reprint': 'Original',
+        Signed: 'Yes',
+        Player_or_Signer: signer || 'N/A',
+        Team_or_Band: teamOrBand || 'N/A',
+        Sport_or_Genre: sportOrGenre || 'Memorabilia',
+        Product: options.productType || itemData.category || 'Collectible',
+        Autograph_Authentication: authEval.authenticator || 'N/A',
+        Authentication_Number: certNumber || 'N/A',
+        Brand: resolvedEbayBrand,
+        Size: size,
+        Additional_Keywords_Specifics: [
+          flags.isCustomJersey ? 'Jersey Type: Custom' : null,
+          inscription ? `Inscription: ${inscription}` : null
+        ].filter(Boolean)
+      }
+    : {
+        Brand: resolvedEbayBrand,
+        ...(resolvedModel ? { Model: resolvedModel } : {}),
+        Product: options.productType || itemData.category || 'General Merchandise',
+        Condition: resolvedCondition,
+        ...(size ? { Size: size } : {})
+      };
 
   const payload = {
     title,
     ebay_char_count: titleUtf16Count,
     category_path: categoryPath,
-    item_specifics: {
-      'Original/Reprint': 'Original',
-      Signed: 'Yes',
-      Player_or_Signer: signer || 'N/A',
-      Team_or_Band: teamOrBand || 'N/A',
-      Sport_or_Genre: sportOrGenre || 'Memorabilia',
-      Product: options.productType || itemData.category || 'Collectible',
-      Autograph_Authentication: authEval.authenticator || 'N/A',
-      Authentication_Number: certNumber || 'N/A',
-      Brand: flags.isCustomJersey ? 'Unbranded' : (resolvedBrand || 'Unbranded'),
-      Size: size,
-      Additional_Keywords_Specifics: [
-        flags.isCustomJersey ? 'Jersey Type: Custom' : null,
-        inscription ? `Inscription: ${inscription}` : null
-      ].filter(Boolean)
-    },
+    item_specifics: itemSpecifics,
     pricing_guidance: {
       suggested_list_price: pricing.suggested_list_price,
       minimum_acceptable_price: pricing.minimum_acceptable_price
     },
-    description_html: ebayHtml,
+    description_html: fullStyledHtml,
+    insert_html: insertHtml,
     recommended_photo_order: rules.photoOrder,
     validation_passed: true
   };
@@ -1429,11 +1915,25 @@ export function validatePlatformPayload(platform, payload = {}, itemData = {}) {
       detail: !hasHtml && !hasUrl ? 'Plain text bullet format verified' : 'Remove HTML tags or external URLs'
     });
   } else {
+    const isAutographedEbay = Boolean(
+      itemData.athlete_person ||
+      itemData.athlete ||
+      itemData.signer ||
+      authEval.isCertified ||
+      payload?.item_specifics?.Signed === 'Yes' ||
+      /\b(signed|autograph|autographed)\b/i.test(title)
+    );
+    const hasSemanticHtml = /<p\b|<ul\b|<li\b|<div\b/i.test(descText);
+    const specificsOk = isAutographedEbay
+      ? payload?.item_specifics?.['Original/Reprint'] === 'Original' && hasSemanticHtml
+      : Boolean(payload?.item_specifics?.Brand || payload?.item_specifics?.Condition) && hasSemanticHtml;
     checks.push({
       id: 'ebay_specifics',
-      label: 'eBay Original/Signed specifics & HTML',
-      passed: payload?.item_specifics?.['Original/Reprint'] === 'Original' && /<p>|<ul/i.test(descText),
-      detail: 'Original=Yes & clean semantic HTML verified'
+      label: isAutographedEbay ? 'eBay Original/Signed specifics & HTML' : 'eBay Item Specifics & HTML',
+      passed: specificsOk,
+      detail: isAutographedEbay
+        ? 'Original=Yes & clean semantic HTML verified'
+        : 'Brand/Condition specifics & clean semantic HTML verified'
     });
   }
 
@@ -1511,11 +2011,11 @@ export function buildPlatformSystemPrompt(platform) {
   }
 
   return [
-    'You are an expert eBay Autographed Memorabilia Listing Optimization Agent.',
-    'Title budget: <= 80 eBay UTF-16 chars (target 68-80). Front-load first 55-60 chars.',
-    'Zero marketing clickbait (LOOK, WOW, RARE, HTF, MUST SEE, MINT, NICE, INVEST, NR), zero unauthorized ALL-CAPS, zero brand-spoofing on custom jerseys.',
-    'Category lock: Sports Mem, Cards & Fan Shop > Autographs-Original or Entertainment Memorabilia > Autographs-Original. Reject banned COA issuers.',
-    'Description: clean semantic HTML (<p>, <ul>, <li>, <strong>) with Google Meta-Description Hook in first 150-160 chars, specs, disclosures, and packaging confidence.',
+    'You are an expert eBay Listing Optimization Agent for TechTrek Outpost covering all item types (sports memorabilia, music/entertainment collectibles, electronics, tools, vintage glass, apparel, and general merchandise).',
+    'Title budget: <= 80 eBay UTF-16 chars (target 68-80). Enforce exact slot order: [1. Signer] [2. Signed] [3. Team/Band] [4. Base Item Type] [5. Wearable Size] [6. Verbatim Inscription in quotes or Milestone] [7. Authenticator + COA] [8. Single Emoji]. NEVER use both Signed and Autographed, never write the filler word Inscribed, and never append redundant sport nouns (Basketball, Football, Baseball).',
+    'Zero marketing clickbait (LOOK, WOW, RARE, HTF, MUST SEE, MINT, NICE, INVEST, NR), zero unauthorized ALL-CAPS, zero brand-spoofing on custom jerseys or unbranded display guitars. NEVER claim "official [Team] jersey" or "authentic jersey" on custom jerseys unless explicitly marked as an official licensed retail/on-field brand.',
+    'Category routing: Sports Mem, Cards & Fan Shop > Autographs-Original or Entertainment Memorabilia > Autographs-Original for signed memorabilia; accurate eBay category for non-signed electronics, tools, glass, apparel, and general goods. Reject banned COA issuers.',
+    'Description HTML: clean semantic HTML (<p>, <ul>, <li>, <strong>) for Block 2 Item Details & Specifications using white background (#ffffff) and dark text (#111111). NEVER include <span property="description">, dark #111111 wrappers, or duplicate Authentication blocks (Block 1 and Block 3 are rendered automatically by the template). NEVER include heading tags like <h3>Item Details & Specifications</h3> in description_html. If including a lead paragraph, use format-neutral phrasing: "This listing features a custom..." (NEVER use "auction" or "an custom"). NEVER include custom jersey disclosures in Block 2 (Block 4 renders the collector disclosure automatically).',
     baseHeader,
     'Respond ONLY with a valid JSON object matching keys: title, ebay_char_count, category_path, item_specifics, description_html, recommended_photo_order, validation_passed.'
   ].join('\n\n');

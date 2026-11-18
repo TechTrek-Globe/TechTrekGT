@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createEbayListing, xmlEscape } from '../functions/api/ebay/tokenHelper.js';
+import { createEbayListing, reviseEbayListing, xmlEscape } from '../functions/api/ebay/tokenHelper.js';
 import { onRequestPost as ebayCreateListingHandler } from '../functions/api/ebay/create-listing.js';
 import { createToken } from '../functions/utils/auth.js';
 import { encryptToken } from '../functions/utils/tokenCrypto.js';
@@ -393,6 +393,206 @@ describe('1-Click eBay Listing Creation Engine', () => {
         assert.equal(platformListing.external_listing_id, '160987654321');
         assert.equal(platformListing.listing_url, 'https://www.ebay.com/itm/160987654321');
         assert.equal(platformListing.status, 'Listed');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('uses SellerProfiles and omits inline ShippingDetails when Business Policies are active', async () => {
+      let interceptedXml = '';
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async (url, opts) => {
+        const u = String(url);
+        if (u.includes('/sell/account/v1/fulfillment_policy')) {
+          return new Response(JSON.stringify({
+            fulfillmentPolicies: [
+              {
+                fulfillmentPolicyId: 'FP_FREE',
+                name: 'Free Shipping',
+                categoryTypes: [{ name: 'ALL_EXCLUDING_MOTORS_VEHICLES', default: true }],
+                shippingOptions: [{ optionType: 'DOMESTIC', costType: 'FLAT_RATE', shippingServices: [{ freeShipping: true, shippingCost: { value: '0.00' } }] }]
+              },
+              {
+                fulfillmentPolicyId: 'FP_FLAT_995',
+                name: 'Flat Rate $9.95',
+                categoryTypes: [{ name: 'ALL_EXCLUDING_MOTORS_VEHICLES', default: false }],
+                shippingOptions: [{ optionType: 'DOMESTIC', costType: 'FLAT_RATE', shippingServices: [{ freeShipping: false, shippingCost: { value: '9.95' } }] }]
+              }
+            ]
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        if (u.includes('/sell/account/v1/return_policy')) {
+          return new Response(JSON.stringify({
+            returnPolicies: [
+              { returnPolicyId: 'RP_30', name: '30 Day Returns', categoryTypes: [{ name: 'ALL_EXCLUDING_MOTORS_VEHICLES', default: true }] }
+            ]
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        if (u.includes('/sell/account/v1/payment_policy')) {
+          return new Response(JSON.stringify({
+            paymentPolicies: [
+              { paymentPolicyId: 'PP_MP', name: 'eBay Managed Payments', categoryTypes: [{ name: 'ALL_EXCLUDING_MOTORS_VEHICLES', default: true }] }
+            ]
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        interceptedXml = opts.body;
+        return new Response(`<?xml version="1.0" encoding="UTF-8"?>
+<AddFixedPriceItemResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Ack>Success</Ack>
+  <ItemID>160987659999</ItemID>
+</AddFixedPriceItemResponse>`, { status: 200, headers: { 'Content-Type': 'text/xml' } });
+      };
+
+      try {
+        const result = await createEbayListing(mockEnv, 'ebay-test-token', {
+          title: 'Ronald Acuna Jr. Signed Braves Custom Jersey XL JSA COA',
+          price: 199.99,
+          buyerShippingCost: 9.95,
+          isFreeShipping: false
+        });
+        assert.equal(result.success, true);
+        assert.equal(result.listing_id, '160987659999');
+        assert.ok(interceptedXml.includes('<SellerProfiles>'), 'Must include SellerProfiles when Business Policies exist');
+        assert.ok(interceptedXml.includes('<ShippingProfileID>FP_FLAT_995</ShippingProfileID>'), 'Must select matching $9.95 policy');
+        assert.ok(interceptedXml.includes('<ReturnProfileID>RP_30</ReturnProfileID>'));
+        assert.ok(interceptedXml.includes('<PaymentProfileID>PP_MP</PaymentProfileID>'));
+        assert.equal(interceptedXml.includes('<ShippingDetails>'), false, 'Must omit inline ShippingDetails when SellerProfiles is used');
+        assert.equal(interceptedXml.includes('<ReturnPolicy>'), false, 'Must omit inline ReturnPolicy when SellerProfiles is used');
+        assert.equal(interceptedXml.includes('<DispatchTimeMax>'), false, 'Must omit DispatchTimeMax when SellerProfiles is used');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('never sends invalid USPSGroundAdvantage token and retries via GeteBayDetails on Error 37', async () => {
+      const tradingCalls = [];
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async (url, opts) => {
+        const u = String(url);
+        if (u.includes('/sell/account/v1/')) {
+          return new Response(JSON.stringify({ errors: [{ errorId: 20403, message: 'Not opted in' }] }), { status: 400 });
+        }
+        const callName = opts?.headers?.['X-EBAY-API-CALL-NAME'];
+        tradingCalls.push({ callName, body: opts.body });
+        if (callName === 'AddFixedPriceItem' && opts.body.includes('<ShippingService>ShippingMethodStandard</ShippingService>')) {
+          return new Response(`<?xml version="1.0" encoding="UTF-8"?>
+<AddFixedPriceItemResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Ack>Failure</Ack>
+  <Errors>
+    <LongMessage>Input data for tag &lt;Item.ShippingDetails&gt; is invalid or missing. Please check API documentation.</LongMessage>
+    <ErrorCode>37</ErrorCode>
+    <SeverityCode>Error</SeverityCode>
+  </Errors>
+</AddFixedPriceItemResponse>`, { status: 200 });
+        }
+        if (callName === 'GeteBayDetails') {
+          return new Response(`<?xml version="1.0" encoding="UTF-8"?>
+<GeteBayDetailsResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Ack>Success</Ack>
+  <ShippingServiceDetails>
+    <ShippingService>USPSPriority</ShippingService>
+    <Description>USPS Priority Mail</Description>
+    <ServiceType>Flat</ServiceType>
+    <ValidForSellingFlow>true</ValidForSellingFlow>
+  </ShippingServiceDetails>
+</GeteBayDetailsResponse>`, { status: 200 });
+        }
+        return new Response(`<?xml version="1.0" encoding="UTF-8"?>
+<AddFixedPriceItemResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Ack>Success</Ack>
+  <ItemID>160987658888</ItemID>
+</AddFixedPriceItemResponse>`, { status: 200 });
+      };
+
+      try {
+        const result = await createEbayListing(mockEnv, 'ebay-test-token', {
+          title: 'Fallback Shipping Test Item',
+          price: 49.99,
+          isFreeShipping: true
+        });
+        assert.equal(result.success, true);
+        assert.equal(result.listing_id, '160987658888');
+        assert.equal(tradingCalls.some(c => c.body.includes('USPSGroundAdvantage')), false, 'Must never send invalid USPSGroundAdvantage');
+        assert.equal(tradingCalls.map(c => c.callName).join(','), 'AddFixedPriceItem,GeteBayDetails,AddFixedPriceItem');
+        assert.ok(tradingCalls[2].body.includes('<ShippingService>USPSPriority</ShippingService>'));
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('revises existing active listing via ReviseFixedPriceItem and falls back to AddFixedPriceItem when ended', async () => {
+      mockEnv.DB._raw.prepare('UPDATE auction_items SET ebay_listing_id = ? WHERE id = ?').run('110999888777', ITEM_ID);
+
+      // 1. Active listing revision test
+      const calls1 = [];
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async (url, opts) => {
+        const callName = opts?.headers?.['X-EBAY-API-CALL-NAME'];
+        calls1.push({ callName, body: opts.body });
+        return new Response(`<?xml version="1.0" encoding="UTF-8"?>
+<ReviseFixedPriceItemResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Ack>Success</Ack>
+  <ItemID>110999888777</ItemID>
+</ReviseFixedPriceItemResponse>`, { status: 200 });
+      };
+
+      try {
+        const req1 = new Request('http://localhost:3001/api/ebay/create-listing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Cookie': `auth_token=${authToken}` },
+          body: JSON.stringify({ item_id: ITEM_ID, price: 159.99, use_ai: false })
+        });
+        const res1 = await ebayCreateListingHandler({ request: req1, env: mockEnv });
+        assert.equal(res1.status, 200);
+        const data1 = await res1.json();
+        assert.equal(data1.action, 'revised');
+        assert.equal(data1.listing_id, '110999888777');
+        assert.equal(calls1[0].callName, 'ReviseFixedPriceItem');
+        assert.equal(calls1[0].body.includes('<ShippingDetails>'), false, 'ReviseFixedPriceItem must not inject ShippingDetails');
+        assert.equal(calls1[0].body.includes('<PictureDetails>'), false, 'ReviseFixedPriceItem must not overwrite photos');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+
+      // 2. Ended listing automatic republish fallback test
+      const calls2 = [];
+      globalThis.fetch = async (url, opts) => {
+        const u = String(url);
+        if (u.includes('/sell/account/v1/')) {
+          return new Response(JSON.stringify({ errors: [{ errorId: 20403 }] }), { status: 400 });
+        }
+        const callName = opts?.headers?.['X-EBAY-API-CALL-NAME'];
+        calls2.push({ callName, body: opts.body });
+        if (callName === 'ReviseFixedPriceItem') {
+          return new Response(`<?xml version="1.0" encoding="UTF-8"?>
+<ReviseFixedPriceItemResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Ack>Failure</Ack>
+  <Errors>
+    <LongMessage>This listing has ended and cannot be revised.</LongMessage>
+    <ErrorCode>291</ErrorCode>
+    <SeverityCode>Error</SeverityCode>
+  </Errors>
+</ReviseFixedPriceItemResponse>`, { status: 200 });
+        }
+        return new Response(`<?xml version="1.0" encoding="UTF-8"?>
+<AddFixedPriceItemResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Ack>Success</Ack>
+  <ItemID>110999888999</ItemID>
+</AddFixedPriceItemResponse>`, { status: 200 });
+      };
+
+      try {
+        const req2 = new Request('http://localhost:3001/api/ebay/create-listing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Cookie': `auth_token=${authToken}` },
+          body: JSON.stringify({ item_id: ITEM_ID, price: 159.99, use_ai: false })
+        });
+        const res2 = await ebayCreateListingHandler({ request: req2, env: mockEnv });
+        assert.equal(res2.status, 200);
+        const data2 = await res2.json();
+        assert.equal(data2.action, 'republished');
+        assert.equal(data2.listing_id, '110999888999');
+        assert.deepEqual(calls2.map(c => c.callName), ['ReviseFixedPriceItem', 'AddFixedPriceItem']);
       } finally {
         globalThis.fetch = originalFetch;
       }

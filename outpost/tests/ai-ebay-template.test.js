@@ -214,7 +214,8 @@ test('[AI-001] eBay Listing HTML Generator with AI Middle Section', async (t) =>
     assert.ok(copy.insertHtml.includes('>Item Details &amp; Specifications</h3>'), 'Includes Clean White Specifications section card');
     assert.ok(copy.insertHtml.includes('>Authentication</h3>'), 'Includes Authentication section card');
     assert.ok(copy.insertHtml.includes("What's Included &amp; Collector Notes</h3>"), 'Includes Block 4 Collector Notes card');
-    assert.ok(copy.insertHtml.includes('https://www.beckett-authentication.com/get-data/4W782426'), 'Includes Beckett verification URL in auth card');
+    assert.ok(copy.insertHtml.includes('Verify serial number 4W782426 directly in the Beckett online certification database.'), 'Includes plain text certification database verification instruction');
+    assert.equal(/<a\b[^>]*href=["']https?:\/\/(?!www\.ebay\.com)/i.test(copy.htmlBody), false, 'Must not contain external hyperlinks per eBay Links Policy');
     assert.ok(copy.textBody.includes('ITEM:'), 'Includes structured textBody');
     assert.ok(copy.payload, 'Includes platform payload');
     assert.equal(copy.validation.passed, true, 'Platform validation passed');
@@ -248,6 +249,46 @@ test('[AI-001] eBay Listing HTML Generator with AI Middle Section', async (t) =>
     assert.ok(copy.htmlBody.includes('>Item Details &amp; Specifications</h3>'), 'Block 2 uses Clean White Specifications heading');
     assert.equal(/\bofficial\b/i.test(copy.htmlBody), false, 'Must strip official jersey claim on custom jersey');
     assert.ok(copy.htmlBody.includes('Custom stitched display jersey'), 'Includes Block 4 custom jersey disclosure');
+  });
+
+  await t.test('Strips duplicate Item Details & Specifications heading, removes duplicate disclosure from Block 2, and fixes grammar', () => {
+    const aiWithDuplicateHeadingAndDisclosure = `<div>
+  <h3>Item Details &amp; Specifications</h3>
+  <p>This auction features an custom stitched Atlanta Braves jersey.</p>
+  <ul>
+    <li><strong>Player:</strong> Ronald Acuna Jr.</li>
+    <li><strong>Team:</strong> Atlanta Braves</li>
+  </ul>
+  <p><strong>Collectible Custom Jersey Disclosure:</strong> This is a custom jersey not affiliated with MLB.</p>
+</div>`;
+
+    const copy = generateEbayCopy({
+      item_name: 'Ronald Acuna Jr. Signed Braves Custom Jersey',
+      athlete_person: 'Ronald Acuna Jr.',
+      team_or_band: 'Braves',
+      authenticator: 'JSA',
+      cert_number: 'ABC123',
+      is_custom_jersey: true,
+      is_wearable: true,
+      size: 'XL'
+    }, {
+      enforcePlatformRules: true,
+      aiGeneratedMiddleSection: aiWithDuplicateHeadingAndDisclosure
+    });
+
+    // 1. Exactly ONE "Item Details & Specifications" heading in the entire template (Block 2)
+    const specHeadings = copy.htmlBody.match(/Item Details &amp; Specifications/gi) || [];
+    assert.equal(specHeadings.length, 1, 'Must have strictly ONE Item Details & Specifications heading in HTML');
+
+    // 2. Grammar and format-neutral phrasing fixed
+    assert.ok(copy.htmlBody.includes('This listing features a custom stitched'), 'Must replace "This auction features an custom" with "This listing features a custom"');
+    assert.equal(/\bThis auction features\b/i.test(copy.htmlBody), false, 'Must not contain "This auction features"');
+    assert.equal(/\ban custom\b/i.test(copy.htmlBody), false, 'Must not contain "an custom"');
+
+    // 3. Custom jersey disclosure removed from Block 2 and rendered cleanly once in Block 4
+    const disclosureMatches = copy.htmlBody.match(/Collector Disclosure: Custom stitched display jersey/g) || [];
+    assert.equal(disclosureMatches.length, 1, 'Must render collector disclosure strictly once in Block 4');
+    assert.equal(/Collectible Custom Jersey Disclosure/i.test(copy.htmlBody), false, 'Must strip duplicate Collectible Custom Jersey Disclosure from Block 2');
   });
 });
 

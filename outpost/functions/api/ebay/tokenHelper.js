@@ -116,7 +116,7 @@ export function normalizeHttps(url) {
  */
 export function extractXmlTag(xml, tag) {
   if (!xml || typeof xml !== 'string' || !tag) return null;
-  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+  const m = xml.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`));
   if (!m) return null;
   const val = m[1].trim();
   const cdata = val.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
@@ -1146,89 +1146,43 @@ export async function updateEbayListingPrice(env, accessToken, listingId, newPri
  *   - specifics?: Array<{ name: string, value: string }> | object
  * @returns {Promise<{ success: boolean, listing_id: string, ebay_url: string, price: string, title: string, ack: string }>}
  */
-export async function createEbayListing(env, accessToken, listingData = {}) {
-  if (!accessToken) throw new Error('eBay access token is required');
-
-  const rawTitle = String(listingData.title || '').trim();
-  if (!rawTitle) throw new Error('Listing title is required');
-
-  // eBay titles must be <= 80 chars without mid-word cuts if possible
-  let title = rawTitle;
+/**
+ * Truncates a raw listing title to eBay's 80-character limit at word boundaries.
+ */
+function normalizeTradingTitle(rawTitle) {
+  let title = String(rawTitle || '').trim();
   if (title.length > 80) {
     const truncated = title.substring(0, 80);
     const lastSpace = truncated.lastIndexOf(' ');
     title = (lastSpace > 40 ? truncated.substring(0, lastSpace) : truncated).trim();
   }
+  return title;
+}
 
-  const numPrice = Number(listingData.price);
-  if (isNaN(numPrice) || numPrice <= 0) {
-    throw new Error('Listing price must be a positive number');
+/**
+ * Resolves numeric eBay ConditionID from explicit ID or human-readable condition text.
+ */
+function resolveEbayConditionId(explicitId, conditionText) {
+  if (explicitId) return String(explicitId);
+  const c = String(conditionText || '').toLowerCase();
+  if (c.includes('brand new') || c === 'new' || c.includes('unopened') || c.includes('in box')) {
+    return '1000';
   }
-  const formattedPrice = numPrice.toFixed(2);
-
-  const cleanSku = String(listingData.sku || '').trim().slice(0, 50);
-
-  // Condition ID resolution (1000 = New, 2750 = Like New, 3000 = Used/Very Good)
-  let conditionId = listingData.conditionId ? String(listingData.conditionId) : null;
-  if (!conditionId) {
-    const c = String(listingData.condition || '').toLowerCase();
-    if (c.includes('brand new') || c === 'new' || c.includes('unopened') || c.includes('in box')) {
-      conditionId = '1000';
-    } else if (c.includes('like new') || c.includes('near mint') || c.includes('mint')) {
-      conditionId = '2750';
-    } else if (c.includes('open box')) {
-      conditionId = '1500';
-    } else if (c.includes('very good')) {
-      conditionId = '4000';
-    } else if (c.includes('good')) {
-      conditionId = '5000';
-    } else if (c.includes('acceptable')) {
-      conditionId = '6000';
-    } else if (c.includes('part') || c.includes('repair')) {
-      conditionId = '7000';
-    } else {
-      conditionId = c.includes('used') ? '3000' : '1000';
-    }
+  if (c.includes('like new') || c.includes('near mint') || c.includes('mint')) {
+    return '2750';
   }
+  if (c.includes('open box')) return '1500';
+  if (c.includes('very good')) return '4000';
+  if (c.includes('good')) return '5000';
+  if (c.includes('acceptable')) return '6000';
+  if (c.includes('part') || c.includes('repair')) return '7000';
+  return c.includes('used') ? '3000' : '1000';
+}
 
-  // Category ID resolution
-  let categoryId = String(listingData.categoryId || listingData.category_id || '').trim();
-  if (!categoryId) {
-    const cat = String(listingData.category || '').toLowerCase();
-    const ttl = title.toLowerCase();
-    if (cat.includes('card') || ttl.includes('card') || ttl.includes('psa') || ttl.includes('bgs') || ttl.includes('beckett')) {
-      categoryId = '213';
-    } else if (cat.includes('media') || cat.includes('book') || cat.includes('dvd')) {
-      categoryId = '267';
-    } else if (cat.includes('electronic') || cat.includes('computer')) {
-      categoryId = '9355';
-    } else {
-      categoryId = '212';
-    }
-  }
-
-  // Picture handling - eBay requires at least one PictureURL
-  let pictureUrls = [];
-  if (Array.isArray(listingData.pictureUrls) && listingData.pictureUrls.length > 0) {
-    pictureUrls = listingData.pictureUrls.map(u => String(u).trim()).filter(Boolean);
-  } else if (listingData.imageUrl || listingData.image_url) {
-    pictureUrls = [String(listingData.imageUrl || listingData.image_url).trim()];
-  }
-  if (pictureUrls.length === 0) {
-    pictureUrls = ['https://i.ebayimg.com/images/g/fe4AAeSwSO1q8G1~/s-l1600.webp'];
-  }
-
-  // Description handling - CDATA with safe closing tag escaping
-  let rawHtml = listingData.descriptionHtml || listingData.htmlBody || listingData.description || `<p>${xmlEscape(title)}</p>`;
-  const cleanCdataHtml = String(rawHtml).replace(/\]\]>/g, ']]&gt;');
-
-  // Shipping & Policies
-  const isFreeShipping = Boolean(listingData.isFreeShipping || Number(listingData.buyerShippingCost) === 0);
-  const shippingCost = isFreeShipping ? '0.00' : (Number(listingData.buyerShippingCost) || 4.95).toFixed(2);
-  const postalCode = listingData.postalCode || '95125';
-  const quantity = Math.max(1, parseInt(listingData.quantity, 10) || 1);
-
-  // Item Specifics
+/**
+ * Builds ItemSpecifics XML from core listing attributes and custom specifics pairs.
+ */
+function buildEbayItemSpecificsXml(listingData = {}, cleanSku = '') {
   const specificsList = [];
   const brandVal = listingData.brand || 'Unbranded';
   specificsList.push({ name: 'Brand', value: brandVal });
@@ -1259,6 +1213,379 @@ export async function createEbayListing(env, accessToken, listingData = {}) {
     }
   }
 
+  if (specificsList.length === 0) return '';
+  return `
+    <ItemSpecifics>
+      ${specificsList.map(s => `<NameValueList><Name>${xmlEscape(s.name)}</Name><Value>${xmlEscape(s.value)}</Value></NameValueList>`).join('\n      ')}
+    </ItemSpecifics>`;
+}
+
+/**
+ * Extracts the highest-severity Trading API ErrorCode and LongMessage from XML response.
+ */
+function extractTradingApiError(xmlText, fallbackMsg) {
+  const errBlocks = xmlText.match(/<Errors[\s>][\s\S]*?<\/Errors>/gi) || [];
+  let chosenBlock = errBlocks.find(b => /<SeverityCode>\s*Error\s*<\/SeverityCode>/i.test(b)) || errBlocks[0] || xmlText;
+  const errCode = extractXmlTag(chosenBlock, 'ErrorCode') || extractXmlTag(xmlText, 'ErrorCode');
+  const errMsg = extractXmlTag(chosenBlock, 'LongMessage') ||
+                 extractXmlTag(chosenBlock, 'ShortMessage') ||
+                 extractXmlTag(xmlText, 'LongMessage') ||
+                 extractXmlTag(xmlText, 'ShortMessage') ||
+                 fallbackMsg;
+  return { errCode, errMsg };
+}
+
+/**
+ * Resolves Business Policies (Shipping, Return, Payment) via eBay Sell Account API.
+ * Returns null if seller is not opted into Business Policies or policies are incomplete.
+ */
+async function resolveSellerBusinessProfiles(env, accessToken, { isFreeShipping, buyerShippingCost }) {
+  const restBase = getEbayApiBase(env);
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: 'application/json',
+    'Content-Type': 'application/json'
+  };
+
+  try {
+    const [fulfillRes, returnRes, paymentRes] = await Promise.allSettled([
+      fetchWithTimeout(`${restBase}/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_US`, { headers }, 6000),
+      fetchWithTimeout(`${restBase}/sell/account/v1/return_policy?marketplace_id=EBAY_US`, { headers }, 6000),
+      fetchWithTimeout(`${restBase}/sell/account/v1/payment_policy?marketplace_id=EBAY_US`, { headers }, 6000)
+    ]);
+
+    const parseJsonSafe = async (settled) => {
+      if (settled.status !== 'fulfilled' || !settled.value?.ok) return null;
+      const text = await settled.value.text().catch(() => '');
+      if (!text || text.trim().startsWith('<')) return null;
+      try { return JSON.parse(text); } catch (_) { return null; }
+    };
+
+    const [fulfillData, returnData, paymentData] = await Promise.all([
+      parseJsonSafe(fulfillRes),
+      parseJsonSafe(returnRes),
+      parseJsonSafe(paymentRes)
+    ]);
+
+    const excludeMotorsOnly = (list) => {
+      const filtered = (list || []).filter(p => !(p.categoryTypes || []).every(c => c.name === 'MOTORS_VEHICLES'));
+      return filtered.length > 0 ? filtered : (list || []);
+    };
+
+    const fulfillPolicies = excludeMotorsOnly(fulfillData?.fulfillmentPolicies);
+    const returnPolicies = excludeMotorsOnly(returnData?.returnPolicies);
+    const paymentPolicies = excludeMotorsOnly(paymentData?.paymentPolicies);
+
+    if (fulfillPolicies.length === 0 || returnPolicies.length === 0 || paymentPolicies.length === 0) {
+      return null;
+    }
+
+    // Filter out freight-only fulfillment policies and locate domestic option
+    const domesticPolicies = fulfillPolicies.filter(p =>
+      !p.freightShipping &&
+      (p.shippingOptions || []).some(o => o.optionType === 'DOMESTIC')
+    );
+    const candidateFulfill = domesticPolicies.length > 0 ? domesticPolicies : fulfillPolicies;
+
+    const getDomesticOption = (p) => (p.shippingOptions || []).find(o => o.optionType === 'DOMESTIC') || p.shippingOptions?.[0];
+    const getFirstServiceCost = (p) => {
+      const dom = getDomesticOption(p);
+      const svc = dom?.shippingServices?.[0];
+      if (!svc) return null;
+      if (svc.freeShipping === true) return 0;
+      const val = parseFloat(svc.shippingCost?.value);
+      return Number.isFinite(val) ? val : null;
+    };
+    const isFlatRate = (p) => getDomesticOption(p)?.costType === 'FLAT_RATE';
+
+    let chosenFulfill = null;
+    if (isFreeShipping) {
+      chosenFulfill = candidateFulfill.find(p => {
+        const dom = getDomesticOption(p);
+        const svc = dom?.shippingServices?.[0];
+        return svc?.freeShipping === true || getFirstServiceCost(p) === 0 || /\bfree\b/i.test(p.name || '');
+      });
+    } else if (buyerShippingCost > 0) {
+      const targetStr = `$${Number(buyerShippingCost).toFixed(2)}`;
+      chosenFulfill = candidateFulfill.find(p => {
+        const cost = getFirstServiceCost(p);
+        return isFlatRate(p) && ((cost != null && Math.abs(cost - buyerShippingCost) <= 0.05) || (p.name || '').includes(targetStr));
+      });
+    }
+
+    if (!chosenFulfill) {
+      chosenFulfill = candidateFulfill.find(p => isFlatRate(p) && (p.categoryTypes || []).some(c => c.default))
+        || candidateFulfill.find(p => isFlatRate(p))
+        || candidateFulfill.find(p => (p.categoryTypes || []).some(c => c.default))
+        || candidateFulfill[0];
+    }
+
+    const chosenReturn = returnPolicies.find(p => (p.categoryTypes || []).some(c => c.default)) || returnPolicies[0];
+    const chosenPayment = paymentPolicies.find(p => (p.categoryTypes || []).some(c => c.default)) || paymentPolicies[0];
+
+    if (!chosenFulfill?.fulfillmentPolicyId || !chosenReturn?.returnPolicyId || !chosenPayment?.paymentPolicyId) {
+      return null;
+    }
+
+    const domOpt = getDomesticOption(chosenFulfill);
+    return {
+      shipping: {
+        id: chosenFulfill.fulfillmentPolicyId,
+        name: chosenFulfill.name || 'Default Shipping',
+        isCalculated: domOpt?.costType === 'CALCULATED'
+      },
+      returnPolicy: {
+        id: chosenReturn.returnPolicyId,
+        name: chosenReturn.name || 'Default Returns'
+      },
+      payment: {
+        id: chosenPayment.paymentPolicyId,
+        name: chosenPayment.name || 'Default Payment'
+      }
+    };
+  } catch (e) {
+    console.warn('[tokenHelper] Business Policies lookup fallback:', e.message || e);
+    return null;
+  }
+}
+
+/**
+ * Queries eBay Trading API GeteBayDetails for a currently active domestic Flat-rate ShippingService.
+ */
+async function discoverTradingFlatShippingService(tradingEndpoint, accessToken) {
+  try {
+    const detailsXml = `<?xml version="1.0" encoding="utf-8"?>
+<GeteBayDetailsRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>${xmlEscape(accessToken)}</eBayAuthToken>
+  </RequesterCredentials>
+  <DetailName>ShippingServiceDetails</DetailName>
+</GeteBayDetailsRequest>`;
+
+    const res = await fetchWithTimeout(tradingEndpoint, {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-SITEID': '0',
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+        'X-EBAY-API-CALL-NAME': 'GeteBayDetails',
+        'X-EBAY-API-IAF-TOKEN': accessToken,
+        'Content-Type': 'text/xml'
+      },
+      body: detailsXml
+    }, 10000);
+
+    if (!res.ok) return null;
+    const xml = await res.text();
+    const blocks = xml.match(/<ShippingServiceDetails[\s>][\s\S]*?<\/ShippingServiceDetails>/gi) || [];
+    const candidates = [];
+    for (const b of blocks) {
+      const valid = /<ValidForSellingFlow>\s*true\s*<\/ValidForSellingFlow>/i.test(b);
+      const isIntl = /<InternationalService>\s*true\s*<\/InternationalService>/i.test(b);
+      const isFlat = /<ServiceType>\s*Flat\s*<\/ServiceType>/i.test(b);
+      if (!valid || isIntl || !isFlat) continue;
+      const code = extractXmlTag(b, 'ShippingService');
+      const desc = extractXmlTag(b, 'Description') || '';
+      if (code) candidates.push({ code, desc });
+    }
+    if (candidates.length === 0) return null;
+    const preferred =
+      candidates.find(c => /ground\s*advantage/i.test(c.desc) || c.code === 'USPSGroundAdvantage') ||
+      candidates.find(c => c.code === 'ShippingMethodStandard') ||
+      candidates.find(c => c.code === 'USPSPriority') ||
+      candidates.find(c => c.code === 'USPSParcel') ||
+      candidates[0];
+    return preferred.code;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Revises an existing active eBay listing via Trading API (ReviseFixedPriceItem / ReviseItem).
+ * Preserves existing live photos and shipping configuration unless explicitly requested.
+ *
+ * @param {object} env - Cloudflare Worker env
+ * @param {string} accessToken - eBay user OAuth access token
+ * @param {string} listingId - Existing 12-digit eBay ItemID
+ * @param {object} listingData - Updated listing fields
+ * @returns {Promise<{ success: boolean, action: string, listing_id: string, ebay_url: string, price: string, title: string, ack: string }>}
+ */
+export async function reviseEbayListing(env, accessToken, listingId, listingData = {}) {
+  if (!accessToken) throw new Error('eBay access token is required');
+  const cleanId = String(listingId || '').replace(/[^0-9]/g, '');
+  if (!cleanId) throw new Error('Invalid eBay Listing ID');
+
+  const title = listingData.title ? normalizeTradingTitle(listingData.title) : '';
+  const numPrice = listingData.price != null ? Number(listingData.price) : null;
+  if (numPrice !== null && (isNaN(numPrice) || numPrice <= 0)) {
+    throw new Error('Listing price must be a positive number');
+  }
+  const formattedPrice = numPrice !== null ? numPrice.toFixed(2) : null;
+  const cleanSku = String(listingData.sku || '').trim().slice(0, 50);
+
+  const rawHtml = listingData.descriptionHtml || listingData.htmlBody || listingData.description || '';
+  const cleanCdataHtml = rawHtml ? String(rawHtml).replace(/\]\]>/g, ']]&gt;') : '';
+
+  const titleXml = title ? `<Title>${xmlEscape(title)}</Title>` : '';
+  const descXml = cleanCdataHtml ? `<Description><![CDATA[${cleanCdataHtml}]]></Description>` : '';
+  const priceXml = formattedPrice ? `<StartPrice currencyID="USD">${formattedPrice}</StartPrice>` : '';
+  const conditionXml = (listingData.conditionId || listingData.condition)
+    ? `<ConditionID>${resolveEbayConditionId(listingData.conditionId, listingData.condition)}</ConditionID>`
+    : '';
+  const explicitCategoryId = String(listingData.categoryId || listingData.category_id || '').trim();
+  const categoryXml = explicitCategoryId
+    ? `<PrimaryCategory><CategoryID>${xmlEscape(explicitCategoryId)}</CategoryID></PrimaryCategory>`
+    : '';
+  const skuXml = cleanSku ? `<SKU>${xmlEscape(cleanSku)}</SKU>` : '';
+  const specificsXml = buildEbayItemSpecificsXml(listingData, cleanSku);
+
+  const isSandbox = isEbaySandbox(env);
+  const tradingEndpoint = isSandbox
+    ? 'https://api.sandbox.ebay.com/ws/api.dll'
+    : 'https://api.ebay.com/ws/api.dll';
+
+  const buildReviseXml = (callName) => `<?xml version="1.0" encoding="utf-8"?>
+<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>${xmlEscape(accessToken)}</eBayAuthToken>
+  </RequesterCredentials>
+  <ErrorLanguage>en_US</ErrorLanguage>
+  <WarningLevel>High</WarningLevel>
+  <Item>
+    <ItemID>${xmlEscape(cleanId)}</ItemID>
+    ${titleXml}
+    ${descXml}
+    ${priceXml}
+    ${conditionXml}
+    ${categoryXml}
+    ${skuXml}${specificsXml}
+  </Item>
+</${callName}Request>`;
+
+  let res = await fetchWithTimeout(tradingEndpoint, {
+    method: 'POST',
+    headers: {
+      'X-EBAY-API-SITEID': '0',
+      'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+      'X-EBAY-API-CALL-NAME': 'ReviseFixedPriceItem',
+      'X-EBAY-API-IAF-TOKEN': accessToken,
+      'Content-Type': 'text/xml'
+    },
+    body: buildReviseXml('ReviseFixedPriceItem')
+  }, 20000);
+
+  let text = await res.text();
+  let ack = extractXmlTag(text, 'Ack') || 'Failure';
+
+  // Fallback to ReviseItem if existing listing is an Auction-format item
+  if (ack !== 'Success' && ack !== 'Warning') {
+    const firstErr = extractTradingApiError(text, '');
+    if (/auction|fixed\s*price|ReviseItem/i.test(firstErr.errMsg || '')) {
+      res = await fetchWithTimeout(tradingEndpoint, {
+        method: 'POST',
+        headers: {
+          'X-EBAY-API-SITEID': '0',
+          'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+          'X-EBAY-API-CALL-NAME': 'ReviseItem',
+          'X-EBAY-API-IAF-TOKEN': accessToken,
+          'Content-Type': 'text/xml'
+        },
+        body: buildReviseXml('ReviseItem')
+      }, 20000);
+      text = await res.text();
+      ack = extractXmlTag(text, 'Ack') || 'Failure';
+    }
+  }
+
+  if (ack === 'Success' || ack === 'Warning') {
+    const returnedId = extractXmlTag(text, 'ItemID') || cleanId;
+    return {
+      success: true,
+      action: 'revised',
+      listing_id: returnedId,
+      ebay_url: `https://www.ebay.com/itm/${returnedId}`,
+      price: formattedPrice || '',
+      title: title,
+      ack
+    };
+  }
+
+  const { errCode, errMsg } = extractTradingApiError(text, 'eBay returned an unknown error revising listing');
+  const err = new Error(`[eBay ${errCode || 'Error'}] ${errMsg}`);
+  err.ebayErrorCode = errCode;
+  throw err;
+}
+
+/**
+ * Creates a new fixed-price Buy-It-Now listing on eBay via Trading API (AddFixedPriceItem).
+ * Automatically resolves seller Business Policies (SellerProfiles) when opted in, or uses
+ * compliant inline flat-rate shipping with GeteBayDetails fallback on Error 37.
+ *
+ * @param {object} env - Cloudflare Worker env
+ * @param {string} accessToken - eBay user OAuth access token
+ * @param {object} listingData - Listing parameters
+ * @returns {Promise<{ success: boolean, action: string, listing_id: string, ebay_url: string, price: string, title: string, ack: string }>}
+ */
+export async function createEbayListing(env, accessToken, listingData = {}) {
+  if (!accessToken) throw new Error('eBay access token is required');
+
+  const rawTitle = String(listingData.title || '').trim();
+  if (!rawTitle) throw new Error('Listing title is required');
+
+  const title = normalizeTradingTitle(rawTitle);
+
+  const numPrice = Number(listingData.price);
+  if (isNaN(numPrice) || numPrice <= 0) {
+    throw new Error('Listing price must be a positive number');
+  }
+  const formattedPrice = numPrice.toFixed(2);
+
+  const cleanSku = String(listingData.sku || '').trim().slice(0, 50);
+  const conditionId = resolveEbayConditionId(listingData.conditionId, listingData.condition);
+
+  // Category ID resolution
+  let categoryId = String(listingData.categoryId || listingData.category_id || '').trim();
+  if (!categoryId) {
+    const cat = String(listingData.category || '').toLowerCase();
+    const ttl = title.toLowerCase();
+    if (cat.includes('card') || ttl.includes('card') || ttl.includes('psa') || ttl.includes('bgs') || ttl.includes('beckett')) {
+      categoryId = '213';
+    } else if (cat.includes('media') || cat.includes('book') || cat.includes('dvd')) {
+      categoryId = '267';
+    } else if (cat.includes('electronic') || cat.includes('computer')) {
+      categoryId = '9355';
+    } else {
+      categoryId = '212';
+    }
+  }
+
+  // Picture handling - eBay requires at least one PictureURL
+  let pictureUrls = [];
+  if (Array.isArray(listingData.pictureUrls) && listingData.pictureUrls.length > 0) {
+    pictureUrls = listingData.pictureUrls.map(u => String(u).trim()).filter(Boolean);
+  } else if (listingData.imageUrl || listingData.image_url) {
+    pictureUrls = [String(listingData.imageUrl || listingData.image_url).trim()];
+  }
+  if (pictureUrls.length === 0) {
+    pictureUrls = ['https://i.ebayimg.com/images/g/fe4AAeSwSO1q8G1~/s-l1600.webp'];
+  }
+
+  // Description handling - CDATA with safe closing tag escaping
+  const rawHtml = listingData.descriptionHtml || listingData.htmlBody || listingData.description || `<p>${xmlEscape(title)}</p>`;
+  const cleanCdataHtml = String(rawHtml).replace(/\]\]>/g, ']]&gt;');
+
+  // Shipping & Policies
+  const parsedShippingCost = Number(listingData.buyerShippingCost);
+  const isFreeShipping = Boolean(
+    listingData.isFreeShipping ||
+    (Number.isFinite(parsedShippingCost) && parsedShippingCost <= 0)
+  );
+  const shippingCost = isFreeShipping
+    ? '0.00'
+    : (Number.isFinite(parsedShippingCost) && parsedShippingCost > 0 ? parsedShippingCost : 4.95).toFixed(2);
+  const postalCode = listingData.postalCode || '95125';
+  const quantity = Math.max(1, parseInt(listingData.quantity, 10) || 1);
+
   const isSandbox = isEbaySandbox(env);
   const tradingEndpoint = isSandbox
     ? 'https://api.sandbox.ebay.com/ws/api.dll'
@@ -1268,14 +1595,59 @@ export async function createEbayListing(env, accessToken, listingData = {}) {
     .map(url => `<PictureURL>${xmlEscape(url)}</PictureURL>`)
     .join('\n      ');
 
-  const specificsXml = specificsList.length > 0 ? `
-    <ItemSpecifics>
-      ${specificsList.map(s => `<NameValueList><Name>${xmlEscape(s.name)}</Name><Value>${xmlEscape(s.value)}</Value></NameValueList>`).join('\n      ')}
-    </ItemSpecifics>` : '';
-
+  const specificsXml = buildEbayItemSpecificsXml(listingData, cleanSku);
   const skuXml = cleanSku ? `<SKU>${xmlEscape(cleanSku)}</SKU>` : '';
 
-  const addXml = `<?xml version="1.0" encoding="utf-8"?>
+  // Detect seller Business Policies via Account API before building XML
+  const sellerProfiles = await resolveSellerBusinessProfiles(env, accessToken, {
+    isFreeShipping,
+    buyerShippingCost: Number(shippingCost)
+  });
+
+  const buildAddXml = ({ useProfiles = Boolean(sellerProfiles), shippingService = 'ShippingMethodStandard' } = {}) => {
+    const policySectionXml = useProfiles && sellerProfiles
+      ? `${sellerProfiles.shipping.isCalculated ? `
+    <ShippingPackageDetails>
+      <MeasurementUnit>English</MeasurementUnit>
+      <WeightMajor unit="lbs">1</WeightMajor>
+      <WeightMinor unit="oz">0</WeightMinor>
+      <PackageDepth>2</PackageDepth>
+      <PackageLength>12</PackageLength>
+      <PackageWidth>10</PackageWidth>
+      <ShippingPackage>PackageThickEnvelope</ShippingPackage>
+    </ShippingPackageDetails>` : ''}
+    <SellerProfiles>
+      <SellerShippingProfile>
+        <ShippingProfileID>${xmlEscape(sellerProfiles.shipping.id)}</ShippingProfileID>
+        <ShippingProfileName>${xmlEscape(sellerProfiles.shipping.name)}</ShippingProfileName>
+      </SellerShippingProfile>
+      <SellerReturnProfile>
+        <ReturnProfileID>${xmlEscape(sellerProfiles.returnPolicy.id)}</ReturnProfileID>
+        <ReturnProfileName>${xmlEscape(sellerProfiles.returnPolicy.name)}</ReturnProfileName>
+      </SellerReturnProfile>
+      <SellerPaymentProfile>
+        <PaymentProfileID>${xmlEscape(sellerProfiles.payment.id)}</PaymentProfileID>
+        <PaymentProfileName>${xmlEscape(sellerProfiles.payment.name)}</PaymentProfileName>
+      </SellerPaymentProfile>
+    </SellerProfiles>`
+      : `
+    <DispatchTimeMax>1</DispatchTimeMax>
+    <ReturnPolicy>
+      <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
+      <RefundOption>MoneyBack</RefundOption>
+      <ReturnsWithinOption>Days_30</ReturnsWithinOption>
+      <ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>
+    </ReturnPolicy>
+    <ShippingDetails>
+      <ShippingType>Flat</ShippingType>
+      <ShippingServiceOptions>
+        <ShippingServicePriority>1</ShippingServicePriority>
+        <ShippingService>${xmlEscape(shippingService)}</ShippingService>
+        <ShippingServiceCost currencyID="USD">${shippingCost}</ShippingServiceCost>${isFreeShipping ? '\n        <FreeShipping>true</FreeShipping>' : ''}
+      </ShippingServiceOptions>
+    </ShippingDetails>`;
+
+    return `<?xml version="1.0" encoding="utf-8"?>
 <AddFixedPriceItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
     <eBayAuthToken>${xmlEscape(accessToken)}</eBayAuthToken>
@@ -1293,53 +1665,61 @@ export async function createEbayListing(env, accessToken, listingData = {}) {
     <ConditionID>${conditionId}</ConditionID>
     <Country>US</Country>
     <Currency>USD</Currency>
-    <DispatchTimeMax>1</DispatchTimeMax>
     <ListingDuration>GTC</ListingDuration>
     <ListingType>FixedPriceItem</ListingType>
-    <PaymentMethods>PayPal</PaymentMethods>
     <Quantity>${quantity}</Quantity>
     ${skuXml}
     <PictureDetails>
       ${picturesXml}
     </PictureDetails>
-    <PostalCode>${xmlEscape(postalCode)}</PostalCode>
-    <ReturnPolicy>
-      <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
-      <RefundOption>MoneyBack</RefundOption>
-      <ReturnsWithinOption>Days_30</ReturnsWithinOption>
-      <ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption>
-    </ReturnPolicy>
-    <ShippingDetails>
-      <ShippingType>Flat</ShippingType>
-      <ShippingServiceOptions>
-        <ShippingServicePriority>1</ShippingServicePriority>
-        <ShippingService>USPSGroundAdvantage</ShippingService>
-        <ShippingServiceCost currencyID="USD">${shippingCost}</ShippingServiceCost>
-        <FreeShipping>${isFreeShipping ? 'true' : 'false'}</FreeShipping>
-      </ShippingServiceOptions>
-    </ShippingDetails>${specificsXml}
+    <PostalCode>${xmlEscape(postalCode)}</PostalCode>${policySectionXml}${specificsXml}
   </Item>
 </AddFixedPriceItemRequest>`;
+  };
 
-  const res = await fetchWithTimeout(tradingEndpoint, {
-    method: 'POST',
-    headers: {
-      'X-EBAY-API-SITEID': '0',
-      'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
-      'X-EBAY-API-CALL-NAME': 'AddFixedPriceItem',
-      'X-EBAY-API-IAF-TOKEN': accessToken,
-      'Content-Type': 'text/xml'
-    },
-    body: addXml
-  }, 20000);
+  const postAddRequest = async (xmlBody) => {
+    const res = await fetchWithTimeout(tradingEndpoint, {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-SITEID': '0',
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+        'X-EBAY-API-CALL-NAME': 'AddFixedPriceItem',
+        'X-EBAY-API-IAF-TOKEN': accessToken,
+        'Content-Type': 'text/xml'
+      },
+      body: xmlBody
+    }, 20000);
+    return res.text();
+  };
 
-  const text = await res.text();
-  const ack = extractXmlTag(text, 'Ack') || 'Failure';
-  const itemId = extractXmlTag(text, 'ItemID');
+  let text = await postAddRequest(buildAddXml({ useProfiles: Boolean(sellerProfiles), shippingService: 'ShippingMethodStandard' }));
+  let ack = extractXmlTag(text, 'Ack') || 'Failure';
+  let itemId = extractXmlTag(text, 'ItemID');
+
+  // Automatic fallback if Error 37 occurs on inline ShippingDetails / ShippingService
+  if (ack !== 'Success' && ack !== 'Warning' && !sellerProfiles) {
+    const firstErr = extractTradingApiError(text, '');
+    if (firstErr.errCode === '37' || /ShippingDetails|ShippingService/i.test(firstErr.errMsg || '')) {
+      const discoveredService = await discoverTradingFlatShippingService(tradingEndpoint, accessToken);
+      if (discoveredService && discoveredService !== 'ShippingMethodStandard') {
+        text = await postAddRequest(buildAddXml({ useProfiles: false, shippingService: discoveredService }));
+        ack = extractXmlTag(text, 'Ack') || 'Failure';
+        itemId = extractXmlTag(text, 'ItemID');
+      }
+    }
+  } else if (ack !== 'Success' && ack !== 'Warning' && sellerProfiles) {
+    const firstErr = extractTradingApiError(text, '');
+    if (/SellerProfiles|not opted into business policies/i.test(firstErr.errMsg || '')) {
+      text = await postAddRequest(buildAddXml({ useProfiles: false, shippingService: 'ShippingMethodStandard' }));
+      ack = extractXmlTag(text, 'Ack') || 'Failure';
+      itemId = extractXmlTag(text, 'ItemID');
+    }
+  }
 
   if ((ack === 'Success' || ack === 'Warning') && itemId) {
     return {
       success: true,
+      action: 'created',
       listing_id: itemId,
       ebay_url: `https://www.ebay.com/itm/${itemId}`,
       price: formattedPrice,
@@ -1348,11 +1728,10 @@ export async function createEbayListing(env, accessToken, listingData = {}) {
     };
   }
 
-  const errMsg = extractXmlTag(text, 'LongMessage') ||
-                 extractXmlTag(text, 'ShortMessage') ||
-                 'eBay returned an unknown error creating listing';
-  const errCode = extractXmlTag(text, 'ErrorCode');
-  throw new Error(`[eBay ${errCode || 'Error'}] ${errMsg}`);
+  const { errCode, errMsg } = extractTradingApiError(text, 'eBay returned an unknown error creating listing');
+  const err = new Error(`[eBay ${errCode || 'Error'}] ${errMsg}`);
+  err.ebayErrorCode = errCode;
+  throw err;
 }
 
 /**

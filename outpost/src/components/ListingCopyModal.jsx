@@ -650,6 +650,7 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated, onIt
       if (res?.success) {
         setPublishResult({
           success: true,
+          action: res.action || 'created',
           listing_id: res.listing_id,
           ebay_url: res.ebay_url,
           warning: res.warning
@@ -1521,7 +1522,7 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated, onIt
                       )}
                       <span>
                         {publishResult.success
-                          ? `Successfully created eBay listing #${publishResult.listing_id}!${publishResult.warning ? ` (${publishResult.warning})` : ''}`
+                          ? `Successfully ${publishResult.action === 'revised' ? 'updated' : 'created'} eBay listing #${publishResult.listing_id}!${publishResult.warning ? ` (${publishResult.warning})` : ''}`
                           : (publishResult.error || 'Failed to create listing on eBay')}
                       </span>
                     </div>

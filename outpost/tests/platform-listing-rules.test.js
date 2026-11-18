@@ -329,6 +329,44 @@ test('Title builder eliminates Signed+Autographed duplication, strips redundant 
   });
   assert.equal(/\bInscribed\b/i.test(acunaRaw), false);
   assert.equal(acunaRaw, 'Ronald Acuna Jr. Signed Braves Custom Jersey XL "El Abusador" JSA COA ⚾');
+
+  // Case 6: Strict <= 80 Title Compression Fallback: Atlanta Braves compresses to Braves when exceeding 80
+  const acunaAtlanta = buildPlatformTitle('ebay', {
+    item_name: 'Ronald Acuna Jr. Signed Atlanta Braves Custom Stitched Jersey XL JSA Cert Inscribed El Abusador',
+    athlete_person: 'Ronald Acuna Jr.',
+    team_or_band: 'Atlanta Braves',
+    sport_genre: 'Baseball',
+    product_type: 'Custom Stitched Jersey',
+    authenticator: 'JSA',
+    inscription: 'El Abusador',
+    size: 'XL',
+    is_wearable: true,
+    is_custom_jersey: true
+  });
+  assert.equal(computeUtf16Length(acunaAtlanta) <= 80, true, `Must fit within 80 chars: "${acunaAtlanta}" (${computeUtf16Length(acunaAtlanta)})`);
+  assert.ok(acunaAtlanta.endsWith('⚾'), 'Must preserve trailing category emoji');
+  assert.ok(acunaAtlanta.includes('"El Abusador"'), 'Must never split or drop inscription when team compression fits');
+  assert.equal(/\bAtlanta\b/i.test(acunaAtlanta), false, 'Must compress Atlanta Braves to Braves');
+  assert.ok(/\bBraves\b/.test(acunaAtlanta), 'Must retain primary mascot Braves');
+
+  // Case 7: Strict <= 80 Title Compression Fallback: Auth token compresses (Beckett BAS -> BAS)
+  const acunaBas = buildPlatformTitle('ebay', {
+    item_name: 'Ronald Acuna Jr. Signed Braves Custom Stitched Jersey XL Beckett BAS Inscribed NL MVP 2023',
+    athlete_person: 'Ronald Acuna Jr.',
+    team_or_band: 'Braves',
+    sport_genre: 'Baseball',
+    product_type: 'Custom Stitched Jersey',
+    authenticator: 'Beckett BAS',
+    inscription: 'NL MVP 2023',
+    size: 'XL',
+    is_wearable: true,
+    is_custom_jersey: true
+  });
+  assert.equal(computeUtf16Length(acunaBas) <= 80, true, `Must fit within 80 chars: "${acunaBas}" (${computeUtf16Length(acunaBas)})`);
+  assert.ok(acunaBas.endsWith('⚾'), 'Must preserve trailing category emoji');
+  assert.ok(acunaBas.includes('"NL MVP 2023"'), 'Must preserve inscription');
+  assert.equal(/\bBeckett\b/i.test(acunaBas), false, 'Must compress Beckett BAS to BAS');
+  assert.ok(/\bBAS\b/.test(acunaBas), 'Must retain compressed BAS token');
 });
 
 test('eBay HTML template and Schema.org summary adapt dynamically across electronics, tools, vintage glass, apparel, and memorabilia', () => {

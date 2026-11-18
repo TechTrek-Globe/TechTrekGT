@@ -65,7 +65,7 @@ export function EditTabFinancials({
         updateField('platform', 'eBay');
         setCreateListingMsg({
           type: 'success',
-          text: `Listing #${res.listing_id} created live on eBay!`
+          text: `Listing #${res.listing_id} ${res.action === 'revised' ? 'updated' : 'created'} live on eBay!`
         });
       } else {
         setCreateListingMsg({

@@ -28,7 +28,7 @@ export const ALLOWED_UPPERCASE_ACRONYMS = new Set([
   'JSA', 'PSA', 'DNA', 'BAS', 'COA', 'LOA', 'HOF', 'MVP', 'OML', 'ONL',
   'MLB', 'NFL', 'NBA', 'NHL', 'NCAA', 'UGA', 'SWAU', 'CD', 'LP', 'EP',
   'DVD', 'TV', 'VIP', 'OEM', 'USA', 'NASA', 'BGS', 'UDA', 'BAM', 'F1',
-  'WWE', 'UFC', 'MMA', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL',
+  'WWE', 'UFC', 'MMA', 'NL', 'AL', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL',
   'II', 'III', 'IV', 'JR', 'SR', 'QT', 'UV', 'ACOA', 'SGC', 'CGC'
 ]);
 
@@ -566,12 +566,21 @@ export function cleanTitleFragment(text, options = {}) {
 }
 
 /**
- * Normalizes unauthorized ALL-CAPS words on eBay while preserving approved acronyms.
+ * Normalizes unauthorized ALL-CAPS words on eBay while preserving approved acronyms
+ * and masking verbatim quoted inscriptions.
  */
 export function normalizeUnauthorizedAllCaps(text) {
-  return String(text || '')
+  const quoted = [];
+  const masked = String(text || '').replace(/"[^"]*"/g, (m) => {
+    const idx = quoted.length;
+    quoted.push(m);
+    return `__NO_CAPS_MASK_${idx}__`;
+  });
+
+  const converted = masked
     .split(' ')
     .map(token => {
+      if (token.includes('__NO_CAPS_MASK_')) return token;
       const bare = token.replace(/[^A-Za-z0-9]/g, '');
       if (!bare || bare.length < 2) return token;
       if (bare === bare.toUpperCase() && /[A-Z]{2,}/.test(bare)) {
@@ -587,6 +596,8 @@ export function normalizeUnauthorizedAllCaps(text) {
       return token;
     })
     .join(' ');
+
+  return converted.replace(/__NO_CAPS_MASK_(\d+)__/gi, (_, i) => quoted[Number(i)] || '');
 }
 
 /**
@@ -1728,7 +1739,7 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
       provider: authEval.authenticator,
       certNumber,
       type: options.authType || itemData.auth_type || (signer ? `Witnessed (${signer})` : 'Witnessed'),
-      verificationUrl: certUrl
+      verificationUrl: null
     } : null,
     includedItems: options.includedInSale ? [options.includedInSale] : (itemData.included_items ? [itemData.included_items] : []),
     aiGeneratedMiddleSection: options.aiGeneratedMiddleSection || itemData.aiGeneratedMiddleSection || ''

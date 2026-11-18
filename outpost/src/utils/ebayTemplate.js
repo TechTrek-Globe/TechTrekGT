@@ -257,15 +257,27 @@ function normalizeAiMiddleForBlock2(rawAiHtml, { hasAuthenticationBlock = false 
   // 4. Normalize light-on-dark inline text colors to #111111 for the white card
   html = html.replace(/color\s*:\s*(?:#fff(?:fff)?|#e0e0e0|#f1c15b|rgb\(\s*241\s*,\s*193\s*,\s*91\s*\)|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))/gi, 'color: #111111');
 
-  // 5. Ensure at least the clean white card heading is present if AI omitted an <h3>
-  const hasSpecHeading = /<h3\b[^>]*>[\s\S]*?Item Details &amp; Specifications[\s\S]*?<\/h3>/i.test(html);
-  const headingHtml = hasSpecHeading
-    ? ''
-    : '<h3 style="color: #111111; margin: 0 0 10px 0; padding-bottom: 6px; border-bottom: 2px solid #b37a16;">Item Details &amp; Specifications</h3>\n    ';
+  // 5. Strip any leading or inner Item Details / Specifications headings (Block 2 renders the styled heading)
+  html = html.replace(/<h[23]\b[^>]*>[\s\S]*?(?:Item\s+Details|Specifications)[\s\S]*?<\/h[23]>\s*/gi, '');
+
+  // 6. Strip duplicate custom jersey / collector disclosures from Block 2 (disclosure belongs strictly in Block 4)
+  html = html.replace(/<p\b[^>]*>\s*(?:<strong>)?\s*(?:(?:Collectible\s+)?Custom\s+Jersey\s+Disclosure|Collector\s+Disclosure):?[\s\S]*?<\/p>\s*/gi, '');
+  html = html.replace(/<div\b[^>]*>\s*(?:<strong>)?\s*(?:(?:Collectible\s+)?Custom\s+Jersey\s+Disclosure|Collector\s+Disclosure):?[\s\S]*?<\/div>\s*/gi, '');
+  html = html.replace(/<li\b[^>]*>\s*(?:<strong>)?\s*(?:(?:Collectible\s+)?Custom\s+Jersey\s+Disclosure|Collector\s+Disclosure):?[\s\S]*?<\/li>\s*/gi, '');
+
+  // 7. Fix grammar and format-neutral phrasing in lead paragraphs
+  html = html.replace(/\b(?:This|In\s+this)\s+auction\s+features\s+an?\s+custom\b/gi, 'This listing features a custom');
+  html = html.replace(/\bThis\s+auction\s+features\s+an\b/gi, 'This listing features a');
+  html = html.replace(/\bThis\s+auction\s+features\b/gi, 'This listing features');
+  html = html.replace(/\bIn\s+this\s+auction\b/gi, 'In this listing');
+  html = html.replace(/\bin\s+this\s+auction\b/gi, 'in this listing');
+  html = html.replace(/\ban\s+custom\b/gi, 'a custom');
+  html = html.replace(/\bthis\s+auction\b/gi, 'this listing');
 
   return `  <!-- Block 2: Clean White Specifications Card -->
   <div style="background-color: #ffffff; border: 1px solid #dddddd; color: #111111; padding: 18px; margin-bottom: 15px; border-radius: 6px;">
-    ${headingHtml}${html.trim()}
+    <h3 style="color: #111111; margin: 0 0 10px 0; padding-bottom: 6px; border-bottom: 2px solid #b37a16;">Item Details &amp; Specifications</h3>
+    ${html.trim()}
   </div>`;
 }
 
@@ -528,9 +540,7 @@ export const generateEbayListingHtml = (item = {}) => {
       <li>Authenticator: ${escapeHtml(authentication.provider)}</li>
       ${authentication.certNumber && authentication.certNumber !== 'N/A' ? `<li>Certification Number: ${escapeHtml(authentication.certNumber)}</li>` : ''}
       <li>Details: ${escapeHtml(authentication.type)}</li>
-      ${authentication.verificationUrl
-        ? `<li>Verification: <a href="${escapeHtml(authentication.verificationUrl)}" target="_blank" rel="noopener noreferrer" style="color: #f1c15b; text-decoration: underline;">Verify Online Database</a></li>`
-        : `<li>Verification: Enter the certification number in the ${escapeHtml(authentication.provider)} online verification database.</li>`}
+      <li>Verification: Verify ${authentication.certNumber && authentication.certNumber !== 'N/A' ? `serial number ${escapeHtml(authentication.certNumber)} directly ` : ''}in the ${escapeHtml(authentication.provider)} online certification database.</li>
     </ul>
   </div>`;
   } else if (features.length > 0) {

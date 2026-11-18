@@ -1,5 +1,5 @@
 import { requireAuth, withAuth, ok, err } from '../../utils/guard.js';
-import { getEbayUserToken, createEbayListing } from './tokenHelper.js';
+import { getEbayUserToken, createEbayListing, reviseEbayListing } from './tokenHelper.js';
 import { generateAiListingDetails } from '../ai/generate-ebay-details.js';
 import { generateEbayListingHtml } from '../../../src/utils/ebayTemplate.js';
 import { generateEbayCopy } from '../../../src/utils/listingCopyGenerator.js';
@@ -136,32 +136,55 @@ export async function onRequestPost(context) {
       ? Number(body.shipping_cost)
       : (item.buyer_shipping_cost != null ? item.buyer_shipping_cost : 0);
 
-    // 9. Call eBay Trading API (AddFixedPriceItem)
-    let listingResult;
+    // 9. Revise existing active listing when ebay_listing_id is present (fallback to AddFixedPriceItem if ended)
+    const listingPayload = {
+      title: listingTitle,
+      descriptionHtml,
+      price: listingPrice,
+      sku: item.sku,
+      condition: item.condition,
+      category: item.category,
+      categoryId: body.category_id || item.category_id || attrs.category_id,
+      imageUrl: item.image_url || attrs.ebay_image_url || attrs.image_url,
+      pictureUrls: attrs.image_urls || attrs.picture_urls,
+      brand: item.brand || attrs.brand,
+      productType: item.category || attrs.product_type,
+      sport: item.sport_genre || attrs.sport,
+      athlete: item.athlete_person || attrs.athlete,
+      authenticator: item.authenticator || attrs.authenticator,
+      certNumber: item.cert_number || attrs.cert_number,
+      isFreeShipping,
+      buyerShippingCost,
+      specs: attrs.specs
+    };
+
+    const existingEbayId = item.ebay_listing_id ? String(item.ebay_listing_id).trim() : '';
+    const forceNew = body.force_new === true;
+
+    let listingResult = null;
     try {
-      listingResult = await createEbayListing(env, accessToken, {
-        title: listingTitle,
-        descriptionHtml,
-        price: listingPrice,
-        sku: item.sku,
-        condition: item.condition,
-        category: item.category,
-        categoryId: item.category_id || attrs.category_id,
-        imageUrl: item.image_url || attrs.ebay_image_url || attrs.image_url,
-        pictureUrls: attrs.image_urls || attrs.picture_urls,
-        brand: item.brand || attrs.brand,
-        productType: item.category || attrs.product_type,
-        sport: item.sport_genre || attrs.sport,
-        athlete: item.athlete_person || attrs.athlete,
-        authenticator: item.authenticator || attrs.authenticator,
-        certNumber: item.cert_number || attrs.cert_number,
-        isFreeShipping,
-        buyerShippingCost,
-        specs: attrs.specs
-      });
+      if (existingEbayId && !forceNew) {
+        try {
+          listingResult = await reviseEbayListing(env, accessToken, existingEbayId, listingPayload);
+        } catch (revErr) {
+          const code = String(revErr?.ebayErrorCode || '');
+          const msg = String(revErr?.message || '');
+          const isEndedOrMissing =
+            ['291', '17', '21916734', '21919028'].includes(code) ||
+            /has ended|listing has ended|cannot be revised|does not exist|invalid item id|cannot find|closed/i.test(msg);
+          if (!isEndedOrMissing) {
+            throw revErr;
+          }
+          console.warn(`[create-listing] Existing listing #${existingEbayId} ended/unavailable; publishing fresh listing:`, msg);
+          listingResult = await createEbayListing(env, accessToken, listingPayload);
+          listingResult.action = 'republished';
+        }
+      } else {
+        listingResult = await createEbayListing(env, accessToken, listingPayload);
+      }
     } catch (ebayErr) {
-      console.error('[create-listing] eBay API creation failed:', ebayErr);
-      return err(ebayErr.message || 'Failed to create listing on eBay.', 502);
+      console.error('[create-listing] eBay API creation/revision failed:', ebayErr);
+      return err(ebayErr.message || 'Failed to publish listing on eBay.', 502);
     }
 
     const newEbayId = listingResult.listing_id;
@@ -242,10 +265,11 @@ export async function onRequestPost(context) {
 
     return ok({
       success: true,
+      action: listingResult.action || 'created',
       listing_id: newEbayId,
       ebay_url: ebayUrl,
-      price: listingResult.price,
-      title: listingResult.title,
+      price: listingResult.price || listingPrice.toFixed(2),
+      title: listingResult.title || listingTitle,
       item: updatedItem
     });
   });

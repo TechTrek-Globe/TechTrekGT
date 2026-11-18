@@ -241,7 +241,7 @@ export function generateEbayCopy(item = {}, options = {}) {
       provider: authenticator,
       certNumber,
       type: authType || (athlete ? `Witnessed (${athlete})` : 'Witnessed'),
-      verificationUrl: certUrl
+      verificationUrl: null
     } : null,
     includedItems: options.includedInSale ? [options.includedInSale] : [],
     aiGeneratedMiddleSection: options.aiGeneratedMiddleSection || item.aiGeneratedMiddleSection || ''

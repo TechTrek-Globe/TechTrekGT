@@ -199,6 +199,8 @@ export async function generateAiListingDetails(env, itemData = {}) {
     '   - Heading MUST be: <h3 style="color: #111111; margin: 0 0 10px 0; padding-bottom: 6px; border-bottom: 2px solid #b37a16;">Item Details &amp; Specifications</h3>',
     '   - Bullet list MUST use: <ul style="margin: 0; padding-left: 20px; color: #111111; line-height: 1.7;"><li><strong>Label:</strong> Value</li></ul> (omit empty or N/A rows).',
     '   - If adding a brief condition/feature paragraph inside the white card, use: <p style="margin: 0 0 10px 0; color: #111111;">...</p>',
+    '   - Lead paragraph phrasing: If adding a lead paragraph, use format-neutral, grammatically correct phrasing: "This listing features a custom..." (NEVER use "auction", and NEVER use "an custom" - always use "a custom" and "this listing").',
+    '   - Disclosure Placement: NEVER include any "Custom Jersey Disclosure" or "Collector Disclosure" paragraph in Block 2 (disclosures are handled automatically in Block 4 What\'s Included & Collector Notes). Keep Block 2 strictly focused on Item Details & Specifications.',
     '2. Custom Jersey Anti-Spoofing Rule: NEVER claim "official [Team] jersey", "authentic jersey", or mention Nike, Adidas, Mitchell & Ness, Reebok, Fanatics, NFL, MLB, NBA, NHL, or NCAA unless the item is explicitly marked as an official licensed retail/on-field brand. Describe custom jerseys strictly as custom stitched collectible display jerseys.',
     '3. Strict Punctuation Rule: NEVER use em dashes or en dashes anywhere. Use standard hyphens (-), colons (:), or parentheses () exclusively.',
     '4. Output ONLY the raw HTML code for the single Block 2 <div> element. Do NOT output markdown code fences (no ```html), do not output outer page wrappers or commentary.',
@@ -233,6 +235,21 @@ export async function generateAiListingDetails(env, itemData = {}) {
   if (flags.isCustomJersey) {
     sanitizedHtml = scrubCustomJerseyClaims(sanitizedHtml);
   }
+
+  // Normalize grammar and format-neutral phrasing
+  sanitizedHtml = sanitizedHtml
+    .replace(/\b(?:This|In\s+this)\s+auction\s+features\s+an?\s+custom\b/gi, 'This listing features a custom')
+    .replace(/\bThis\s+auction\s+features\s+an\b/gi, 'This listing features a')
+    .replace(/\bThis\s+auction\s+features\b/gi, 'This listing features')
+    .replace(/\bIn\s+this\s+auction\b/gi, 'In this listing')
+    .replace(/\bin\s+this\s+auction\b/gi, 'in this listing')
+    .replace(/\ban\s+custom\b/gi, 'a custom')
+    .replace(/\bthis\s+auction\b/gi, 'this listing');
+
+  // Strip duplicate custom jersey disclosure from Block 2
+  sanitizedHtml = sanitizedHtml
+    .replace(/<p\b[^>]*>\s*(?:<strong>)?\s*(?:(?:Collectible\s+)?Custom\s+Jersey\s+Disclosure|Collector\s+Disclosure):?[\s\S]*?<\/p>\s*/gi, '')
+    .replace(/<div\b[^>]*>\s*(?:<strong>)?\s*(?:(?:Collectible\s+)?Custom\s+Jersey\s+Disclosure|Collector\s+Disclosure):?[\s\S]*?<\/div>\s*/gi, '');
 
   return {
     success: true,

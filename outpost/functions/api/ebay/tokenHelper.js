@@ -1190,8 +1190,22 @@ function buildEbayItemSpecificsXml(listingData = {}, cleanSku = '') {
   if (listingData.productType) specificsList.push({ name: 'Type', value: listingData.productType });
   if (listingData.sport) specificsList.push({ name: 'Sport', value: listingData.sport });
   if (listingData.athlete) specificsList.push({ name: 'Player/Athlete', value: listingData.athlete });
-  if (listingData.authenticator) specificsList.push({ name: 'Professional Grader', value: listingData.authenticator });
+  if (listingData.team) specificsList.push({ name: 'Team', value: listingData.team });
+  if (listingData.size) specificsList.push({ name: 'Size', value: listingData.size });
+  if (listingData.authenticator) {
+    specificsList.push({ name: 'Autograph Authentication', value: listingData.authenticator });
+    specificsList.push({ name: 'Professional Grader', value: listingData.authenticator });
+  }
+  if (listingData.authType) specificsList.push({ name: 'Autograph Format', value: listingData.authType });
   if (listingData.certNumber) specificsList.push({ name: 'Certification Number', value: String(listingData.certNumber) });
+  if (listingData.framingStatus && listingData.framingStatus !== 'Unframed') {
+    specificsList.push({ name: 'Framed', value: /^framed/i.test(listingData.framingStatus) ? 'Yes' : listingData.framingStatus });
+  }
+  if (listingData.color) specificsList.push({ name: 'Color', value: listingData.color });
+  if (listingData.inkColor) specificsList.push({ name: 'Ink Color', value: listingData.inkColor });
+  if (listingData.cardYear) specificsList.push({ name: 'Season', value: String(listingData.cardYear) });
+  if (listingData.cardNumber) specificsList.push({ name: 'Card Number', value: String(listingData.cardNumber) });
+  if (listingData.cardGrade) specificsList.push({ name: 'Grade', value: String(listingData.cardGrade) });
 
   if (Array.isArray(listingData.specifics)) {
     for (const spec of listingData.specifics) {

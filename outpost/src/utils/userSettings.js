@@ -1,3 +1,5 @@
+import { MEMORABILIA_CATEGORIES } from './itemCategories.js';
+
 /**
  * User Settings Management for TechTrek Outpost
  * Manages column visibility, column widths, and category ordering.
@@ -17,22 +19,19 @@ export const DEFAULT_COLUMNS = [
   { key: 'category',             label: 'Category',         defaultVisible: false, minWidth: 100, defaultWidth: 120 },
   { key: 'authenticator',        label: 'Authenticator',    defaultVisible: false, minWidth: 100, defaultWidth: 120 },
   { key: 'cert_number',          label: 'Cert #',           defaultVisible: false, minWidth: 90,  defaultWidth: 110 },
+  { key: 'color',                label: 'Color',            defaultVisible: false, minWidth: 85,  defaultWidth: 105 },
+  { key: 'item_condition',       label: 'Condition',        defaultVisible: false, minWidth: 95,  defaultWidth: 115 },
+  { key: 'prep_status',          label: 'Prep Status',      defaultVisible: false, minWidth: 105, defaultWidth: 125 },
+  { key: 'framing_status',       label: 'Framing / Case',   defaultVisible: false, minWidth: 105, defaultWidth: 125 },
+  { key: 'storage_location',     label: 'Storage Bin',      defaultVisible: false, minWidth: 90,  defaultWidth: 110 },
+  { key: 'source_vendor',        label: 'Source Vendor',    defaultVisible: false, minWidth: 105, defaultWidth: 130 },
   { key: 'platform',             label: 'Platform',         defaultVisible: false, minWidth: 90,  defaultWidth: 110 },
   { key: 'quantity',             label: 'Qty',              defaultVisible: false, minWidth: 60,  defaultWidth: 80 },
   { key: 'invoice_ref',          label: 'Invoice Ref',      defaultVisible: false, minWidth: 80,  defaultWidth: 100 },
 ];
 
 export const DEFAULT_CATEGORIES = [
-  'Jersey',
-  'Photo',
-  'Card',
-  'Baseball',
-  'Bat',
-  'Football',
-  'Helmet',
-  'Glove',
-  'Poster',
-  'Puck',
+  ...MEMORABILIA_CATEGORIES,
   'Other'
 ];
 

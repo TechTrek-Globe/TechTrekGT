@@ -27,6 +27,7 @@ export async function onRequestGet(context) {
     const category       = url.searchParams.get('category') || '';
     const listingFormat  = url.searchParams.get('listing_format') || '';
     const listingStatus  = url.searchParams.get('listing_status') || '';
+    const prepStatus     = url.searchParams.get('prep_status') || '';
     const invoice_id     = url.searchParams.get('invoice_id') || '';
     const q              = url.searchParams.get('q') || '';
     const sortByParam    = url.searchParams.get('sort_by') || 'created_at';
@@ -68,6 +69,11 @@ export async function onRequestGet(context) {
       'listing_status': 'i.listing_status',
       'floor_price': 'i.floor_price',
       'buy_it_now_price': 'i.buy_it_now_price',
+      'item_condition': 'i.item_condition',
+      'prep_status': 'i.prep_status',
+      'framing_status': 'i.framing_status',
+      'storage_location': 'i.storage_location',
+      'source_vendor': 'i.source_vendor',
       'net_profit': 'COALESCE(s.net_profit, (COALESCE(i.current_list_price, i.suggested_list_price, 0) - i.true_total_cost))',
       'margin': 'COALESCE(i.target_margin_pct, 0)',
       'days_in_inventory': 'COALESCE(i.days_on_market, 0)'
@@ -124,11 +130,15 @@ export async function onRequestGet(context) {
       conditions.push('i.listing_status = ?');
       bindings.push(listingStatus);
     }
+    if (prepStatus && prepStatus !== 'All') {
+      conditions.push('i.prep_status = ?');
+      bindings.push(prepStatus);
+    }
     if (invoice_id) { conditions.push('i.invoice_id = ?'); bindings.push(invoice_id); }
     if (q) {
-      conditions.push('(i.item_name LIKE ? OR i.athlete_person LIKE ? OR i.category LIKE ? OR i.cert_number LIKE ? OR i.authenticator LIKE ? OR i.sku LIKE ?)');
+      conditions.push('(i.item_name LIKE ? OR i.athlete_person LIKE ? OR i.category LIKE ? OR i.item_subtype LIKE ? OR i.cert_number LIKE ? OR i.authenticator LIKE ? OR i.sku LIKE ? OR i.storage_location LIKE ? OR i.source_vendor LIKE ?)');
       const like = `%${q}%`;
-      bindings.push(like, like, like, like, like, like);
+      bindings.push(like, like, like, like, like, like, like, like, like);
     }
 
     const whereClause = conditions.join(' AND ');
@@ -148,14 +158,18 @@ export async function onRequestGet(context) {
       statusConditions.push('i.listing_status = ?');
       statusBindings.push(listingStatus);
     }
+    if (prepStatus && prepStatus !== 'All') {
+      statusConditions.push('i.prep_status = ?');
+      statusBindings.push(prepStatus);
+    }
     if (invoice_id) {
       statusConditions.push('i.invoice_id = ?');
       statusBindings.push(invoice_id);
     }
     if (q) {
-      statusConditions.push('(i.item_name LIKE ? OR i.athlete_person LIKE ? OR i.category LIKE ? OR i.cert_number LIKE ? OR i.authenticator LIKE ? OR i.sku LIKE ?)');
+      statusConditions.push('(i.item_name LIKE ? OR i.athlete_person LIKE ? OR i.category LIKE ? OR i.item_subtype LIKE ? OR i.cert_number LIKE ? OR i.authenticator LIKE ? OR i.sku LIKE ? OR i.storage_location LIKE ? OR i.source_vendor LIKE ?)');
       const like = `%${q}%`;
-      statusBindings.push(like, like, like, like, like, like);
+      statusBindings.push(like, like, like, like, like, like, like, like, like);
     }
 
     const statusCountsSql = 'SELECT i.status, COUNT(*) AS count FROM auction_items i WHERE ' + statusConditions.join(' AND ') + ' GROUP BY i.status';
@@ -163,37 +177,10 @@ export async function onRequestGet(context) {
     const rowsSql = 'SELECT '
       + 'i.*, '
       + 'inv.invoice_ref, '
-      + 'inv.discount AS inv_discount, '
-      + 'inv.shipping AS inv_shipping, '
-      + 'inv.tax AS inv_tax, '
-      + 'c.id AS comp_id, '
-      + 'c.comp_1, '
-      + 'c.comp_2, '
-      + 'c.comp_3, '
-      + 'c.manual_avg, '
-      + 'c.live_avg, '
-      + 'c.active_comp_1, '
-      + 'c.active_comp_2, '
-      + 'c.active_comp_3, '
-      + 'c.active_avg, '
-      + 'c.sold_count, '
-      + 'c.ebay_search_url AS comp_ebay_search_url, '
-      + 'c.recommended_list_price, '
-      + 'c.updated_at AS comp_updated_at, '
-      + 's.id AS sale_id, '
-      + 's.gross_sale_price, '
-      + 's.buyer_shipping_paid, '
-      + 's.actual_shipping_cost, '
-      + 's.platform_fees_amt, '
-      + 's.promoted_listing_fee, '
-      + 's.net_proceeds, '
-      + 's.net_profit, '
-      + 's.buyer_handle, '
-      + 's.ebay_order_id, '
-      + 's.fee_reconciled_at, '
-      + 'r.final_value_fee AS recon_final_value_fee, '
-      + 'r.promoted_listing_fee AS recon_promoted_listing_fee, '
-      + 'r.shipping_label_cost AS recon_shipping_label_cost '
+      + "json_object('inv_discount', inv.discount, 'inv_shipping', inv.shipping, 'inv_tax', inv.tax) AS _inv_json, "
+      + "json_object('comp_id', c.id, 'comp_1', c.comp_1, 'comp_2', c.comp_2, 'comp_3', c.comp_3, 'manual_avg', c.manual_avg, 'live_avg', c.live_avg, 'active_comp_1', c.active_comp_1, 'active_comp_2', c.active_comp_2, 'active_comp_3', c.active_comp_3, 'active_avg', c.active_avg, 'sold_count', c.sold_count, 'comp_ebay_search_url', c.ebay_search_url, 'recommended_list_price', c.recommended_list_price, 'comp_updated_at', c.updated_at) AS _comp_json, "
+      + "json_object('sale_id', s.id, 'gross_sale_price', s.gross_sale_price, 'buyer_shipping_paid', s.buyer_shipping_paid, 'actual_shipping_cost', s.actual_shipping_cost, 'platform_fees_amt', s.platform_fees_amt, 'promoted_listing_fee', s.promoted_listing_fee, 'net_proceeds', s.net_proceeds, 'net_profit', s.net_profit, 'buyer_handle', s.buyer_handle, 'ebay_order_id', s.ebay_order_id, 'fee_reconciled_at', s.fee_reconciled_at) AS _sale_json, "
+      + "json_object('recon_final_value_fee', r.final_value_fee, 'recon_promoted_listing_fee', r.promoted_listing_fee, 'recon_shipping_label_cost', r.shipping_label_cost) AS _recon_json "
       + 'FROM auction_items i '
       + 'LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id '
       + 'LEFT JOIN auction_comps c ON i.id = c.item_id AND c.user_id = i.user_id '
@@ -286,7 +273,26 @@ export async function onRequestGet(context) {
       rows = await env.DB.prepare(rowsSql).bind(...bindings, limit, offset).all();
     }
 
-    const enrichedItems = (rows.results || []).map(row => {
+    const parseJoinedJson = (raw) => {
+      if (!raw) return {};
+      if (typeof raw === 'object') return raw;
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (_) {
+        return {};
+      }
+    };
+
+    const enrichedItems = (rows.results || []).map(rawRow => {
+      const { _inv_json, _comp_json, _sale_json, _recon_json, ...baseRow } = rawRow;
+      const row = {
+        ...baseRow,
+        ...parseJoinedJson(_inv_json),
+        ...parseJoinedJson(_comp_json),
+        ...parseJoinedJson(_sale_json),
+        ...parseJoinedJson(_recon_json)
+      };
       const isAmazon = typeof row.invoice_ref === 'string' && row.invoice_ref.startsWith('AMAZON-');
       const userNote = parseUserNote(row.notes);
       const searchUrl = buildEbaySearchUrl(row.item_name, row.athlete_person, row.authenticator);
@@ -370,6 +376,16 @@ export async function onRequestGet(context) {
         features: row.features || parsedAttrs.features || null,
         specs: row.specs || parsedAttrs.specs || null,
         included_in_sale: row.included_in_sale || parsedAttrs.included_in_sale || null,
+        item_subtype: row.item_subtype || null,
+        color: parsedAttrs.color || parsedAttrs.colorway || null,
+        item_condition: row.item_condition || parsedAttrs.condition || null,
+        condition: row.item_condition || parsedAttrs.condition || null,
+        condition_notes: row.condition_notes || null,
+        auth_type: row.auth_type || parsedAttrs.auth_type || null,
+        prep_status: row.prep_status || 'Ready',
+        framing_status: row.framing_status || null,
+        source_vendor: row.source_vendor || null,
+        storage_location: row.storage_location || null,
         ebay_search_url: searchUrl,
         image_url: normalizeHttps(imageUrl),
         user_note: userNote,

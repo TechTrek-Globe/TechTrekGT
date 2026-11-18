@@ -8,6 +8,7 @@ import {
   DEFAULT_TARGET_MARGIN_PCT
 } from '../../functions/utils/constants.js';
 import { cleanEbaySearchQuery, buildStructuredCompQuery } from '../utils/ebaySearch';
+import { ALL_ITEM_CATEGORIES } from '../utils/itemCategories';
 
 // Subcomponents
 import { EditModalHeader } from './edit/EditModalHeader';
@@ -32,22 +33,27 @@ const PLATFORM_FEE_PRESETS = {
   'Private Sale': { fee_pct: 0.0,  flat_fee: 0.00 },
 };
 
-const STANDARD_CATEGORIES = [
-  'Electronics', 'Toys & Games', 'Books', 'Home & Kitchen', 'Sports', 'Health',
-  'Clothing', 'Tools', 'Office', 'Pet Supplies', 'Beauty', 'Automotive',
-  'Jersey', 'Photo', 'Card', 'Baseball', 'Bat', 'Football', 'Mask', 'Drum Stick',
-  'Helmet', 'Glove', 'Poster', 'Puck', 'Other'
-];
+const STANDARD_CATEGORIES = ALL_ITEM_CATEGORIES;
 
 const EMPTY_FORM = {
   item_name: '',
   sku: '',
   category: '',
+  item_subtype: '',
   sport_genre: '',
   athlete_person: '',
   quantity: 1,
   best_listing_window: '',
   notes: '',
+  // Condition, Prep, Framing & Sourcing (Migration 0014)
+  item_condition: '',
+  condition_notes: '',
+  auth_type: '',
+  prep_status: 'Ready',
+  framing_status: '',
+  source_vendor: '',
+  source_lot_ref: '',
+  storage_location: '',
   // Costs
   unit_price: '',
   true_total_cost: '',
@@ -80,6 +86,8 @@ const EMPTY_FORM = {
   ebay_listing_id: '',
   // Memorabilia, Sizing & Platform Guardrails
   brand: '',
+  model: '',
+  included_in_sale: '',
   team_or_band: '',
   inscription: '',
   size: '',
@@ -87,6 +95,30 @@ const EMPTY_FORM = {
   is_custom_jersey: false,
   is_pickguard_guitar: false,
   target_net: '',
+  // Category-specific memorabilia & product attributes
+  color: '',
+  ink_color: '',
+  signed_surface: '',
+  signature_location: '',
+  dimensions: '',
+  frame_dimensions: '',
+  jersey_style: '',
+  colorway: '',
+  jersey_number: '',
+  equipment_model: '',
+  case_included: false,
+  guitar_type: '',
+  instrument_finish: '',
+  media_format: '',
+  album_title: '',
+  media_included: true,
+  photo_finish: '',
+  card_year: '',
+  card_set: '',
+  card_number: '',
+  parallel_serial: '',
+  card_grade: '',
+  auto_grade: '',
   // VineScout / Amazon Vine Link
   is_vinescout: false,
   asin: '',
@@ -233,11 +265,22 @@ export function EditItemModal({
         item_name: item.item_name || '',
         sku: item.sku || '',
         category: item.category || '',
+        item_subtype: item.item_subtype || '',
         sport_genre: item.sport_genre || parsedAttrs.sport_genre || '',
         athlete_person: item.athlete_person || parsedAttrs.athlete_person || '',
         quantity: item.quantity != null ? item.quantity : 1,
         best_listing_window: item.best_listing_window || '',
         notes: item.notes || '',
+
+        // Condition, Prep, Framing & Sourcing
+        item_condition: item.item_condition || item.condition || parsedAttrs.condition || '',
+        condition_notes: item.condition_notes || '',
+        auth_type: item.auth_type || parsedAttrs.auth_type || '',
+        prep_status: item.prep_status || 'Ready',
+        framing_status: item.framing_status || '',
+        source_vendor: item.source_vendor || '',
+        source_lot_ref: item.source_lot_ref || parsedAttrs.source_lot_ref || '',
+        storage_location: item.storage_location || '',
 
         unit_price: item.unit_price != null ? Number(item.unit_price).toFixed(2) : '',
         true_total_cost: item.true_total_cost != null ? Number(item.true_total_cost).toFixed(2) : '',
@@ -283,6 +326,8 @@ export function EditItemModal({
 
         // Memorabilia, Sizing & Platform Guardrails
         brand: item.brand || parsedAttrs.brand || '',
+        model: item.model || parsedAttrs.model || '',
+        included_in_sale: item.included_in_sale || parsedAttrs.included_in_sale || '',
         team_or_band: item.team_or_band || parsedAttrs.team_or_band || '',
         inscription: item.inscription || parsedAttrs.inscription || '',
         size: item.size || parsedAttrs.size || '',
@@ -290,6 +335,31 @@ export function EditItemModal({
         is_custom_jersey: Boolean(item.is_custom_jersey ?? parsedAttrs.is_custom_jersey ?? detectedCustomJersey),
         is_pickguard_guitar: Boolean(item.is_pickguard_guitar ?? parsedAttrs.is_pickguard_guitar ?? detectedPickguard),
         target_net: item.target_net != null ? String(item.target_net) : (parsedAttrs.target_net != null ? String(parsedAttrs.target_net) : ''),
+
+        // Category-specific memorabilia & product attributes
+        color: item.color || parsedAttrs.color || '',
+        ink_color: item.ink_color || parsedAttrs.ink_color || '',
+        signed_surface: item.signed_surface || parsedAttrs.signed_surface || '',
+        signature_location: item.signature_location || parsedAttrs.signature_location || '',
+        dimensions: item.dimensions || parsedAttrs.dimensions || '',
+        frame_dimensions: item.frame_dimensions || parsedAttrs.frame_dimensions || '',
+        jersey_style: item.jersey_style || parsedAttrs.jersey_style || (detectedCustomJersey ? 'Custom Stitched' : ''),
+        colorway: item.colorway || parsedAttrs.colorway || '',
+        jersey_number: item.jersey_number || parsedAttrs.jersey_number || '',
+        equipment_model: item.equipment_model || parsedAttrs.equipment_model || '',
+        case_included: Boolean(item.case_included ?? parsedAttrs.case_included ?? false),
+        guitar_type: item.guitar_type || parsedAttrs.guitar_type || (detectedPickguard ? 'Display Acoustic (38")' : ''),
+        instrument_finish: item.instrument_finish || parsedAttrs.instrument_finish || '',
+        media_format: item.media_format || parsedAttrs.media_format || '',
+        album_title: item.album_title || parsedAttrs.album_title || '',
+        media_included: (item.media_included ?? parsedAttrs.media_included) !== undefined ? Boolean(item.media_included ?? parsedAttrs.media_included) : true,
+        photo_finish: item.photo_finish || parsedAttrs.photo_finish || '',
+        card_year: item.card_year || parsedAttrs.card_year || '',
+        card_set: item.card_set || parsedAttrs.card_set || '',
+        card_number: item.card_number || parsedAttrs.card_number || '',
+        parallel_serial: item.parallel_serial || parsedAttrs.parallel_serial || '',
+        card_grade: item.card_grade || parsedAttrs.card_grade || '',
+        auto_grade: item.auto_grade || parsedAttrs.auto_grade || '',
 
         // VineScout / Amazon Vine
         is_vinescout: Boolean(item.is_vinescout || item.is_amazon || (item.invoice_ref && item.invoice_ref.startsWith('AMAZON-')) || item.asin),
@@ -716,12 +786,20 @@ export function EditItemModal({
   const handleFetchLiveComps = async (customQuery = null) => {
     setCompsDraft(prev => ({ ...prev, fetchingLive: true, fetchMsg: null }));
     try {
-      const q = (customQuery && customQuery.trim()) || buildStructuredCompQuery(
-        form.item_name || item.item_name,
-        form.athlete_person || item.athlete_person,
-        form.category || item.category,
-        form.authenticator || item.authenticator
-      );
+      const q = (customQuery && customQuery.trim()) || buildStructuredCompQuery({
+        ...item,
+        item_name: form.item_name || item.item_name,
+        athlete_person: form.athlete_person || item.athlete_person,
+        category: form.category || item.category,
+        item_subtype: form.item_subtype || item.item_subtype,
+        authenticator: form.authenticator || item.authenticator,
+        inscription: form.inscription || item.inscription,
+        framing_status: form.framing_status || item.framing_status,
+        dimensions: form.dimensions || item.dimensions,
+        card_year: form.card_year || item.card_year,
+        card_set: form.card_set || item.card_set,
+        card_grade: form.card_grade || item.card_grade
+      });
       const res = await fetchLiveComps(q, item.id);
       if (res && res.success && res.count > 0) {
         setCompsDraft(prev => ({
@@ -808,11 +886,22 @@ export function EditItemModal({
         item_name: form.item_name.trim(),
         sku: form.sku?.trim() || null,
         category: form.category || null,
+        item_subtype: form.item_subtype?.trim() || null,
         sport_genre: form.sport_genre?.trim() || null,
         athlete_person: form.athlete_person?.trim() || null,
         quantity: parseInt(form.quantity, 10) || 1,
         best_listing_window: form.best_listing_window?.trim() || null,
         notes: form.notes?.trim() || null,
+
+        // Condition, Prep, Framing & Sourcing
+        item_condition: form.item_condition?.trim() || null,
+        condition_notes: form.condition_notes?.trim() || null,
+        auth_type: form.auth_type?.trim() || null,
+        prep_status: form.prep_status?.trim() || 'Ready',
+        framing_status: form.framing_status?.trim() || null,
+        source_vendor: form.source_vendor?.trim() || null,
+        source_lot_ref: form.source_lot_ref?.trim() || null,
+        storage_location: form.storage_location?.trim() || null,
 
         unit_price: form.unit_price !== '' ? round2(form.unit_price) : 0,
         true_total_cost: form.true_total_cost !== '' && form.true_total_cost != null ? round2(form.true_total_cost) : undefined,
@@ -848,6 +937,8 @@ export function EditItemModal({
 
         // Platform Guardrails & Memorabilia metadata
         brand: form.brand?.trim() || null,
+        model: form.model?.trim() || null,
+        included_in_sale: form.included_in_sale?.trim() || null,
         team_or_band: form.team_or_band?.trim() || null,
         inscription: form.inscription?.trim() || null,
         size: form.size?.trim() || null,
@@ -855,6 +946,31 @@ export function EditItemModal({
         is_custom_jersey: Boolean(form.is_custom_jersey),
         is_pickguard_guitar: Boolean(form.is_pickguard_guitar),
         target_net: (form.target_net !== '' && form.target_net != null) ? parseFloat(form.target_net) : null,
+
+        // Category-specific memorabilia & product attributes
+        color: form.color?.trim() || null,
+        ink_color: form.ink_color?.trim() || null,
+        signed_surface: form.signed_surface?.trim() || null,
+        signature_location: form.signature_location?.trim() || null,
+        dimensions: form.dimensions?.trim() || null,
+        frame_dimensions: form.frame_dimensions?.trim() || null,
+        jersey_style: form.jersey_style?.trim() || null,
+        colorway: form.colorway?.trim() || null,
+        jersey_number: form.jersey_number?.trim() || null,
+        equipment_model: form.equipment_model?.trim() || null,
+        case_included: Boolean(form.case_included),
+        guitar_type: form.guitar_type?.trim() || null,
+        instrument_finish: form.instrument_finish?.trim() || null,
+        media_format: form.media_format?.trim() || null,
+        album_title: form.album_title?.trim() || null,
+        media_included: Boolean(form.media_included),
+        photo_finish: form.photo_finish?.trim() || null,
+        card_year: form.card_year?.trim() || null,
+        card_set: form.card_set?.trim() || null,
+        card_number: form.card_number?.trim() || null,
+        parallel_serial: form.parallel_serial?.trim() || null,
+        card_grade: form.card_grade?.trim() || null,
+        auto_grade: form.auto_grade?.trim() || null,
 
         // VineScout / Amazon Vine fields
         is_vinescout: Boolean(form.is_vinescout),
@@ -992,6 +1108,7 @@ export function EditItemModal({
               updateField={updateField}
               allCategories={allCategories}
               item={item}
+              onSwitchTab={setActiveTab}
             />
           )}
 

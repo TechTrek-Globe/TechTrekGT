@@ -17,6 +17,12 @@ export const DEFAULT_COLUMNS = [
   { key: 'category', label: 'Category', minWidth: 100 },
   { key: 'authenticator', label: 'Authenticator', minWidth: 100 },
   { key: 'cert_number', label: 'Cert #', minWidth: 90 },
+  { key: 'color', label: 'Color', minWidth: 85 },
+  { key: 'item_condition', label: 'Condition', minWidth: 95 },
+  { key: 'prep_status', label: 'Prep Status', minWidth: 105 },
+  { key: 'framing_status', label: 'Framing / Case', minWidth: 105 },
+  { key: 'storage_location', label: 'Storage Bin', minWidth: 90 },
+  { key: 'source_vendor', label: 'Source Vendor', minWidth: 105 },
   { key: 'platform', label: 'Platform', minWidth: 90 },
   { key: 'quantity', label: 'Qty', minWidth: 60 },
   { key: 'invoice_ref', label: 'Invoice Ref', minWidth: 80 }

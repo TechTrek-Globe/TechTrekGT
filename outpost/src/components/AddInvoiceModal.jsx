@@ -11,16 +11,18 @@ import {
 } from '../../functions/utils/constants.js';
 import { computeItemProration, computePricingFloors } from '../utils/formulaPreview';
 import { CatalogSearchDropdown } from './inventory/CatalogSearchDropdown';
+import { ALL_ITEM_CATEGORIES, ITEM_CONDITIONS, PREP_STATUSES, SOURCE_VENDORS } from '../utils/itemCategories';
+import { AUTHENTICATORS as CANONICAL_AUTHENTICATORS } from '../utils/certLookup';
 
-const CATEGORIES = ['Jersey', 'Photo', 'Card', 'Baseball', 'Bat', 'Football',
-  'Mask', 'Drum Stick', 'Helmet', 'Glove', 'Poster', 'Puck', 'Other'];
-const AUTHENTICATORS = ['JSA', 'Beckett', 'PSA', 'ACOA', 'Schwartz', 'SGC', 'Unlabeled', 'Other'];
+const CATEGORIES = ALL_ITEM_CATEGORIES;
+const AUTHENTICATORS = [...CANONICAL_AUTHENTICATORS.map(a => a.id), 'Unlabeled'];
 const STATUSES = ['Available', 'Listed', 'Kept for Self', 'Returned'];
 
 const emptyItem = () => ({
   _key: crypto.randomUUID(),
   item_name: '', category: 'Jersey', sport_genre: '', athlete_person: '',
   authenticator: 'JSA', cert_number: '', unit_price: '',
+  item_condition: '', prep_status: 'Ready',
   platform: 'eBay', boost_pct: 0, est_shipping_cost: 6.5,
   target_margin_pct: DEFAULT_TARGET_MARGIN_PCT, status: 'Available',
   notes: '', best_listing_window: '',
@@ -40,6 +42,7 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
   // Invoice header fields
   const [invoiceRef,    setInvoiceRef]    = useState('');
   const [description,   setDescription]  = useState('');
+  const [sourceVendor,  setSourceVendor] = useState('');
   const [dateAcquired,  setDateAcquired]  = useState('');
   const [discount,      setDiscount]      = useState('');
   const [shipping,      setShipping]      = useState('');
@@ -53,7 +56,7 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
 
   const reset = () => {
     setStep(1); setError('');
-    setInvoiceRef(''); setDescription(''); setDateAcquired('');
+    setInvoiceRef(''); setDescription(''); setSourceVendor(''); setDateAcquired('');
     setDiscount(''); setShipping(''); setTax('');
     setItems([emptyItem()]);
   };
@@ -132,6 +135,7 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
       await createInvoice({
         invoice_ref:   invoiceRef.trim(),
         description:   description.trim() || undefined,
+        source_vendor: sourceVendor || undefined,
         date_acquired: dateAcquired || undefined,
         discount:      parseFloat(discount) || 0,
         shipping:      parseFloat(shipping) || 0,
@@ -145,6 +149,9 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
             athlete_person:    it.athlete_person || undefined,
             authenticator:     it.authenticator || undefined,
             cert_number:       it.cert_number || undefined,
+            item_condition:    it.item_condition || undefined,
+            prep_status:       it.prep_status || 'Ready',
+            source_vendor:     sourceVendor || undefined,
             unit_price:        parseFloat(it.unit_price),
             platform:          it.platform,
             platform_fee_pct:  plat.fee_pct,
@@ -229,9 +236,16 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
                 <label className="block text-xs font-semibold text-slate-400 mb-1.5">Date Acquired</label>
                 <input id="inv-date" type="date" className="input-field text-sm" value={dateAcquired} onChange={e => setDateAcquired(e.target.value)} />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Source Vendor / Auction House</label>
+                <select id="inv-source" className="input-field text-sm" value={sourceVendor} onChange={e => setSourceVendor(e.target.value)}>
+                  <option value="">-- Select Source (optional) --</option>
+                  {SOURCE_VENDORS.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2 sm:col-span-1">
                 <label className="block text-xs font-semibold text-slate-400 mb-1.5">Description (optional)</label>
-                <input id="inv-desc" type="text" className="input-field text-sm" placeholder="Lot description, source..." value={description} onChange={e => setDescription(e.target.value)} />
+                <input id="inv-desc" type="text" className="input-field text-sm" placeholder="Lot description, batch note..." value={description} onChange={e => setDescription(e.target.value)} />
               </div>
             </div>
 
@@ -379,8 +393,23 @@ export function AddInvoiceModal({ open, isOpen, platforms = [], onClose, onCreat
                       </select>
                     </div>
 
+                    {/* Condition */}
+                    <div className="col-span-12 sm:col-span-4">
+                      <select id={`item-cond-${idx}`} className="input-field text-sm" value={it.item_condition} onChange={e => updateItem(it._key, 'item_condition', e.target.value)}>
+                        <option value="">Condition (optional)</option>
+                        {ITEM_CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Prep Status */}
+                    <div className="col-span-12 sm:col-span-4">
+                      <select id={`item-prep-${idx}`} className="input-field text-sm" value={it.prep_status} onChange={e => updateItem(it._key, 'prep_status', e.target.value)}>
+                        {PREP_STATUSES.map(p => <option key={p} value={p}>Prep: {p}</option>)}
+                      </select>
+                    </div>
+
                     {/* Notes */}
-                    <div className="col-span-12 sm:col-span-8">
+                    <div className="col-span-12">
                       <input id={`item-notes-${idx}`} type="text" className="input-field text-sm" placeholder="Notes / Best listing window" value={it.notes} onChange={e => updateItem(it._key, 'notes', e.target.value)} />
                     </div>
                   </div>

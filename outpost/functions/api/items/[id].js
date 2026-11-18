@@ -41,7 +41,32 @@ export const CLIENT_SETTABLE_ATTR_KEYS = Object.freeze([
   'specs',
   'model',
   'included_in_sale',
-  'ai_middle_section'
+  'ai_middle_section',
+  // Product-specific memorabilia & prep attributes
+  'color',
+  'ink_color',
+  'signed_surface',
+  'signature_location',
+  'dimensions',
+  'frame_dimensions',
+  'source_lot_ref',
+  'jersey_style',
+  'colorway',
+  'jersey_number',
+  'equipment_model',
+  'case_included',
+  'guitar_type',
+  'instrument_finish',
+  'media_format',
+  'album_title',
+  'media_included',
+  'photo_finish',
+  'card_year',
+  'card_set',
+  'card_number',
+  'parallel_serial',
+  'card_grade',
+  'auto_grade'
 ]);
 
 export async function onRequestGet(context) {
@@ -53,33 +78,39 @@ export async function onRequestGet(context) {
     const id = getItemId(new URL(request.url));
     if (!id) return err('Item ID required', 400);
 
-    const item = await env.DB.prepare(`
+    const rawItem = await env.DB.prepare(`
       SELECT
         i.*,
         inv.invoice_ref,
-        inv.discount AS inv_discount,
-        inv.shipping AS inv_shipping,
-        inv.tax      AS inv_tax,
-        c.comp_1,
-        c.comp_2,
-        c.comp_3,
-        c.manual_avg,
-        c.live_avg,
-        c.active_comp_1,
-        c.active_comp_2,
-        c.active_comp_3,
-        c.active_avg,
-        c.sold_count,
-        c.ebay_search_url AS comp_ebay_search_url,
-        c.recommended_list_price,
-        c.updated_at      AS comp_updated_at
+        json_object('inv_discount', inv.discount, 'inv_shipping', inv.shipping, 'inv_tax', inv.tax) AS _inv_json,
+        json_object(
+          'comp_1', c.comp_1, 'comp_2', c.comp_2, 'comp_3', c.comp_3,
+          'manual_avg', c.manual_avg, 'live_avg', c.live_avg,
+          'active_comp_1', c.active_comp_1, 'active_comp_2', c.active_comp_2, 'active_comp_3', c.active_comp_3,
+          'active_avg', c.active_avg, 'sold_count', c.sold_count,
+          'comp_ebay_search_url', c.ebay_search_url,
+          'recommended_list_price', c.recommended_list_price,
+          'comp_updated_at', c.updated_at
+        ) AS _comp_json
       FROM auction_items i
       LEFT JOIN auction_invoices inv ON inv.id = i.invoice_id
       LEFT JOIN auction_comps c ON i.id = c.item_id AND c.user_id = i.user_id
       WHERE i.id = ? AND i.user_id = ?
     `).bind(id, payload.userId).first();
 
-    if (!item) return err('Item not found', 404);
+    if (!rawItem) return err('Item not found', 404);
+
+    const parseJsonObj = (raw) => {
+      if (!raw) return {};
+      if (typeof raw === 'object') return raw;
+      try { const p = JSON.parse(raw); return p && typeof p === 'object' ? p : {}; } catch (_) { return {}; }
+    };
+    const { _inv_json, _comp_json, ...baseItem } = rawItem;
+    const item = {
+      ...baseItem,
+      ...parseJsonObj(_inv_json),
+      ...parseJsonObj(_comp_json)
+    };
 
     let unpackedItem = { ...item };
     if (item.attributes) {
@@ -101,7 +132,13 @@ export async function onRequestGet(context) {
             condition_subheader: unpackedItem.condition_subheader || parsed.condition_subheader || null,
             features: unpackedItem.features || parsed.features || null,
             specs: unpackedItem.specs || parsed.specs || null,
-            included_in_sale: unpackedItem.included_in_sale || parsed.included_in_sale || null
+            included_in_sale: unpackedItem.included_in_sale || parsed.included_in_sale || null,
+            item_condition: unpackedItem.item_condition || parsed.condition || null,
+            condition: unpackedItem.item_condition || parsed.condition || null,
+            color: unpackedItem.color || parsed.color || parsed.colorway || null,
+            auth_type: unpackedItem.auth_type || parsed.auth_type || null,
+            cert_verified: Boolean(unpackedItem.cert_verified || parsed.cert_verified),
+            cert_verified_at: unpackedItem.cert_verified_at || parsed.cert_verified_at || null
           };
         }
       } catch (_) {}
@@ -248,7 +285,18 @@ export async function onRequestPut(context) {
       // silently zeroed three unrelated price columns.
       floor_price:                body.floor_price          !== undefined ? round2Nullable(body.floor_price)          : round2Nullable(item.floor_price),
       buy_it_now_price:           body.buy_it_now_price     !== undefined ? round2Nullable(body.buy_it_now_price)     : round2Nullable(item.buy_it_now_price),
-      buyer_shipping_cost:        body.buyer_shipping_cost  !== undefined ? round2Nullable(body.buyer_shipping_cost)  : round2Nullable(item.buyer_shipping_cost)
+      buyer_shipping_cost:        body.buyer_shipping_cost  !== undefined ? round2Nullable(body.buyer_shipping_cost)  : round2Nullable(item.buyer_shipping_cost),
+      // Migration 0014: Product-specific item details, condition, auth tier & prep fields
+      item_subtype:               body.item_subtype         !== undefined ? (body.item_subtype ? String(body.item_subtype).trim() : null) : item.item_subtype,
+      item_condition:             (body.item_condition !== undefined || body.condition !== undefined)
+        ? ((body.item_condition ?? body.condition) ? String(body.item_condition ?? body.condition).trim() : null)
+        : item.item_condition,
+      condition_notes:            body.condition_notes      !== undefined ? (body.condition_notes ? String(body.condition_notes).trim() : null) : item.condition_notes,
+      auth_type:                  body.auth_type            !== undefined ? (body.auth_type ? String(body.auth_type).trim() : null) : item.auth_type,
+      prep_status:                body.prep_status          !== undefined ? (body.prep_status ? String(body.prep_status).trim() : 'Ready') : (item.prep_status || 'Ready'),
+      framing_status:             body.framing_status       !== undefined ? (body.framing_status ? String(body.framing_status).trim() : null) : item.framing_status,
+      source_vendor:              body.source_vendor        !== undefined ? (body.source_vendor ? String(body.source_vendor).trim() : null) : item.source_vendor,
+      storage_location:           body.storage_location     !== undefined ? (body.storage_location ? String(body.storage_location).trim() : null) : item.storage_location
     };
 
     // Guard against unique constraint collision on ebay_listing_id
@@ -428,6 +476,27 @@ export async function onRequestPut(context) {
     if (body.ai_middle_section !== undefined) {
       nextAttrs.ai_middle_section = body.ai_middle_section ? String(body.ai_middle_section).trim() : null;
     }
+    if (body.model !== undefined) {
+      nextAttrs.model = body.model ? String(body.model).trim() : null;
+    }
+    // Product-specific memorabilia & prep attribute shortcuts
+    const textAttrShortcuts = [
+      'color', 'ink_color', 'signed_surface', 'signature_location', 'dimensions', 'frame_dimensions',
+      'source_lot_ref', 'jersey_style', 'colorway', 'jersey_number', 'equipment_model',
+      'guitar_type', 'instrument_finish', 'media_format', 'album_title', 'photo_finish',
+      'card_year', 'card_set', 'card_number', 'parallel_serial', 'card_grade', 'auto_grade'
+    ];
+    for (const attrKey of textAttrShortcuts) {
+      if (body[attrKey] !== undefined) {
+        nextAttrs[attrKey] = body[attrKey] ? String(body[attrKey]).trim() : null;
+      }
+    }
+    if (body.case_included !== undefined) {
+      nextAttrs.case_included = Boolean(body.case_included);
+    }
+    if (body.media_included !== undefined) {
+      nextAttrs.media_included = Boolean(body.media_included);
+    }
     if (body.attributes !== undefined) {
       if (!body.attributes || typeof body.attributes !== 'object' || Array.isArray(body.attributes)) {
         return err('Invalid attributes object', 400);
@@ -487,6 +556,9 @@ export async function onRequestPut(context) {
           quantity = ?, purchase_date = ?, floor_price = ?, buy_it_now_price = ?,
           buyer_shipping_cost = ?, attributes = ?,
           asin = ?, order_id = ?, image_url = ?, is_vinescout = ?, etv = ?, tax_cost = ?,
+          cert_verified = ?, cert_verified_at = ?,
+          item_subtype = ?, item_condition = ?, condition_notes = ?, auth_type = ?,
+          prep_status = ?, framing_status = ?, source_vendor = ?, storage_location = ?,
           reprice_locked = COALESCE(?, reprice_locked),
           updated_at = datetime('now')
         WHERE id = ? AND user_id = ?
@@ -511,6 +583,16 @@ export async function onRequestPut(context) {
         (nextAttrs.is_vinescout || nextAttrs.source === 'amazon_vinescout' || nextAttrs.vine_program === true) ? 1 : 0,
         nextAttrs.etv != null ? Number(nextAttrs.etv) : null,
         nextAttrs.tax_cost != null ? Number(nextAttrs.tax_cost) : null,
+        nextAttrs.cert_verified ? 1 : 0,
+        nextAttrs.cert_verified ? (nextAttrs.cert_verified_at || item.cert_verified_at || new Date().toISOString()) : null,
+        updated.item_subtype,
+        updated.item_condition,
+        updated.condition_notes,
+        updated.auth_type,
+        updated.prep_status,
+        updated.framing_status,
+        updated.source_vendor,
+        updated.storage_location,
         body.reprice_locked !== undefined ? (body.reprice_locked ? 1 : 0) : null,
         id, payload.userId
       ).run();

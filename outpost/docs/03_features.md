@@ -959,4 +959,21 @@ Dynamic 5-platform listing rules registry, generator, AI optimizer, and pre-publ
 3. **Amber Tactical Listing Studio UI (`src/components/ListingCopyModal.jsx`)**:
    - Replaces static tabs with the 5-platform selector (`eBay`, `Facebook`, `Mercari`, `Whatnot`, `Reverb`) displaying live UTF-16 `XX/80` counters and validation dots, memorabilia/wearable size/variant guard controls, `AI Optimize` + `Copy JSON` actions (`finally {}` loading reset, non-blocking error banner), 4-photo upload sequence, pricing breakdown (`tabular-nums`), and live Pre-Publish Validation Gate checks.
 
+## Product-Specific Item Detail, Prep, Framing & Auth Tier Engine [ACTION ID: INV-006 / ITEM-001]
+
+Restructured Outpost's Item Detail schema, intake/edit modals, grid/card displays, and downstream listing/comps pipelines into a lean, category-aware architecture tailored to sports and music memorabilia alongside retail goods:
+
+1. **Promoted D1 Operational & Valuation Columns (`migrations/0014_item_detail_fields.sql`, `auction-schema.sql`)**:
+   - Added 8 high-signal columns to `auction_items`: `item_subtype`, `item_condition`, `condition_notes` (buyer-facing disclosure separate from private `notes`), `auth_type` (`Witnessed`, `Basic Cert`, `Full LOA`, `Graded Slab`, `Team / League Holo`, `Uncertified`), `prep_status` (`Ready`, `Needs Auth`, `At Authenticator`, `Needs Framing`, `At Framer`, `Needs Case/Clean`), `framing_status`, `source_vendor`, and `storage_location`, plus partial index `idx_auction_items_prep_status`.
+   - Fixed `PUT /api/items/:id` fast-path persistence so `cert_verified` and `cert_verified_at` D1 columns stay synchronized with `attributes` JSON.
+   - Expanded `CLIENT_SETTABLE_ATTR_KEYS` in `functions/api/items/[id].js` with allowlisted category-specific keys while strictly preserving `MED-6` mass-assignment exclusions.
+2. **Canonical Category Registry & Conditional UI (`src/utils/itemCategories.js`, `src/components/edit/EditTabDetails.jsx`, `EditItemModal.jsx`)**:
+   - Eliminated duplicate Athlete/Sport, Authenticator/Cert, and 135-line VineScout cards from `EditTabDetails.jsx` (replacing VineScout duplication with a compact tab-switch pill).
+   - Dynamically renders only the 2-6 relevant fields per resolved category group (`jersey_apparel`, `sports_gear`, `music_instrument`, `music_media`, `photo_print`, `trading_card`, `general`), auto-syncing `is_wearable`, `is_custom_jersey`, and `is_pickguard_guitar` guardrails and collapsing memorabilia/auth fields on general retail items.
+   - Aligned `src/utils/certLookup.js` with approved COA issuers (`SWAU`, `B.A.M.`, `Schwartz`, `MLB/NFL/NBA Authenticated`) and unified `AddInvoiceModal.jsx` with optional `Source Vendor`, `Condition`, and `Prep Status` intake controls.
+3. **Header, Grid, Card, Comps & eBay Publishing Integration**:
+   - `EditModalHeader.jsx`, `PricingCard.jsx`, `InventoryDataGrid.jsx`, and `InventoryGridRow.jsx` surface `prep_status`, `framing_status`, `item_condition`, `color`, `auth_type`, `storage_location`, and `source_vendor` (optional default-hidden inline-editable table columns).
+   - Wired `color`, `item_condition`, `condition_notes`, `auth_type`, `framing_status`, `ink_color`, `signature_location`, `dimensions`, and trading card fields into `ebayTemplate.js`, `platformListingRules.js`, `ebaySearch.js`, `ListingCopyModal.jsx`, `functions/api/ai/generate-ebay-details.js`, `functions/api/ebay/create-listing.js`, and `functions/api/ebay/tokenHelper.js` (eBay `ConditionID` and `ItemSpecifics` XML including `Color`).
+
+
 

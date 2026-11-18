@@ -81,15 +81,24 @@ export async function onRequestPost(context) {
     // If description not provided, generate via Gemini AI + HTML template
     if (!descriptionHtml) {
       let aiMiddleSection = '';
+      const effectiveCondition = item.item_condition || item.condition || attrs.condition || '';
       if (useAi) {
         try {
           const aiRes = await generateAiListingDetails(env, {
             title: body.title || item.item_name,
             brand: item.brand || attrs.brand || '',
             productType: item.category || attrs.product_type || '',
-            condition: item.condition || '',
-            conditionHeader: item.condition?.toLowerCase().includes('new') ? 'BRAND NEW IN ORIGINAL UNOPENED BOX' : '',
-            notes: item.notes || '',
+            itemSubtype: item.item_subtype || '',
+            color: attrs.color || attrs.colorway || '',
+            condition: effectiveCondition,
+            conditionHeader: effectiveCondition.toLowerCase().includes('new') ? 'BRAND NEW IN ORIGINAL UNOPENED BOX' : '',
+            conditionSubheader: item.condition_notes || attrs.condition_subheader || '',
+            authType: item.auth_type || '',
+            framingStatus: item.framing_status || '',
+            frameDimensions: attrs.frame_dimensions || '',
+            inkColor: attrs.ink_color || '',
+            dimensions: attrs.dimensions || '',
+            notes: item.condition_notes || item.notes || '',
             specs: attrs.specs || '',
             features: attrs.features || ''
           });
@@ -142,17 +151,26 @@ export async function onRequestPost(context) {
       descriptionHtml,
       price: listingPrice,
       sku: item.sku,
-      condition: item.condition,
+      condition: item.item_condition || item.condition || attrs.condition,
       category: item.category,
       categoryId: body.category_id || item.category_id || attrs.category_id,
       imageUrl: item.image_url || attrs.ebay_image_url || attrs.image_url,
       pictureUrls: attrs.image_urls || attrs.picture_urls,
-      brand: item.brand || attrs.brand,
-      productType: item.category || attrs.product_type,
+      brand: (attrs.is_custom_jersey || attrs.is_pickguard_guitar) ? 'Unbranded' : (item.brand || attrs.brand),
+      productType: item.item_subtype || item.category || attrs.product_type,
       sport: item.sport_genre || attrs.sport,
       athlete: item.athlete_person || attrs.athlete,
+      team: attrs.team_or_band || '',
+      size: attrs.is_wearable ? (attrs.size || '') : '',
       authenticator: item.authenticator || attrs.authenticator,
+      authType: item.auth_type || '',
       certNumber: item.cert_number || attrs.cert_number,
+      framingStatus: item.framing_status || '',
+      color: attrs.color || attrs.colorway || attrs.instrument_finish || '',
+      inkColor: attrs.ink_color || '',
+      cardYear: attrs.card_year || '',
+      cardNumber: attrs.card_number || '',
+      cardGrade: attrs.card_grade || '',
       isFreeShipping,
       buyerShippingCost,
       specs: attrs.specs

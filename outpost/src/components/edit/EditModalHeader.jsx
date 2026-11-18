@@ -103,7 +103,41 @@ export function EditModalHeader({ form, item, isDirty, autoSaving, autoSavedTime
             {form.category && (
               <>
                 <span className="text-slate-600">•</span>
-                <span className="text-slate-300 font-medium">{form.category}</span>
+                <span className="text-slate-300 font-medium">
+                  {form.category}{form.item_subtype ? ` (${form.item_subtype})` : ''}
+                </span>
+              </>
+            )}
+            {form.item_condition && (
+              <>
+                <span className="text-slate-600">•</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-200 border border-slate-700">
+                  {form.item_condition}
+                </span>
+              </>
+            )}
+            {form.prep_status && form.prep_status !== 'Ready' && (
+              <>
+                <span className="text-slate-600">•</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/35">
+                  Prep: {form.prep_status}
+                </span>
+              </>
+            )}
+            {form.framing_status && form.framing_status !== 'Unframed' && (
+              <>
+                <span className="text-slate-600">•</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/25">
+                  {form.framing_status}
+                </span>
+              </>
+            )}
+            {form.storage_location && (
+              <>
+                <span className="text-slate-600">•</span>
+                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700/80">
+                  Bin: {form.storage_location}
+                </span>
               </>
             )}
             <span className="text-slate-600">•</span>

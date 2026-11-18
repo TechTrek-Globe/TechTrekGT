@@ -349,12 +349,13 @@ export const generateEbayListingHtml = (item = {}) => {
   const rawDescription = (item.description || item.notes || item.additional_description || parsedAttrs.description || '').trim();
   const description = stripInternalTrackingNotes(rawDescription);
 
-  const condition = (item.condition || parsedAttrs.condition || '').trim();
+  const condition = (item.item_condition || item.condition || parsedAttrs.condition || '').trim();
   const conditionHeader = (item.conditionHeader || parsedAttrs.condition_header || '').trim();
-  const conditionSubheader = (item.conditionSubheader || parsedAttrs.condition_subheader || '').trim();
+  const conditionSubheader = (item.conditionSubheader || item.condition_notes || parsedAttrs.condition_subheader || '').trim();
   const rawConditionDetails = (
     item.conditionDetails ||
     item.condition_details ||
+    item.condition_notes ||
     (conditionHeader && conditionSubheader ? `${conditionHeader}: ${conditionSubheader}` : '') ||
     (condition ? `${condition}. Please review all photos carefully for the exact condition, quality, and details.` : '') ||
     parsedAttrs.conditionDetails ||
@@ -370,8 +371,24 @@ export const generateEbayListingHtml = (item = {}) => {
   const athlete = (item.athlete || item.athlete_person || item.signer || parsedAttrs.athlete_person || '').trim();
   const teamOrBand = (item.teamOrBand || item.team_or_band || item.team || parsedAttrs.team_or_band || '').trim();
   const inscription = (item.inscription || parsedAttrs.inscription || '').trim();
-  const size = (item.size || item.wearableSize || item.dimensions || parsedAttrs.size || '').trim();
-  const material = (item.material || item.finish || parsedAttrs.material || parsedAttrs.finish || '').trim();
+  const size = (item.size || item.wearableSize || item.dimensions || parsedAttrs.size || parsedAttrs.dimensions || '').trim();
+  const material = (item.material || item.finish || item.instrument_finish || item.photo_finish || parsedAttrs.material || parsedAttrs.finish || parsedAttrs.instrument_finish || parsedAttrs.photo_finish || '').trim();
+  const itemSubtype = (item.item_subtype || parsedAttrs.item_subtype || '').trim();
+  const color = (item.color || parsedAttrs.color || '').trim();
+  const framingStatus = (item.framing_status || parsedAttrs.framing_status || '').trim();
+  const frameDimensions = (item.frame_dimensions || parsedAttrs.frame_dimensions || '').trim();
+  const inkColor = (item.ink_color || parsedAttrs.ink_color || '').trim();
+  const signatureLocation = (item.signature_location || item.signed_surface || parsedAttrs.signature_location || parsedAttrs.signed_surface || '').trim();
+  const colorway = (item.colorway || parsedAttrs.colorway || '').trim();
+  const equipmentModel = (item.equipment_model || parsedAttrs.equipment_model || '').trim();
+  const albumTitle = (item.album_title || parsedAttrs.album_title || '').trim();
+  const mediaFormat = (item.media_format || parsedAttrs.media_format || '').trim();
+  const cardYear = (item.card_year || parsedAttrs.card_year || '').trim();
+  const cardSet = (item.card_set || parsedAttrs.card_set || '').trim();
+  const cardNumber = (item.card_number || parsedAttrs.card_number || '').trim();
+  const parallelSerial = (item.parallel_serial || parsedAttrs.parallel_serial || '').trim();
+  const cardGrade = (item.card_grade || parsedAttrs.card_grade || '').trim();
+  const autoGrade = (item.auto_grade || parsedAttrs.auto_grade || '').trim();
 
   const combinedText = `${title} ${productType} ${category} ${description}`.toLowerCase();
   const isCustomJersey = Boolean(
@@ -512,12 +529,23 @@ export const generateEbayListingHtml = (item = {}) => {
   }
   if (model) addSpec('Model', model);
   if (productType || (category && category !== 'General')) {
-    addSpec('Item Type', productType || category);
+    addSpec('Item Type', itemSubtype ? `${productType || category} (${itemSubtype})` : (productType || category));
   }
-  if (size && (isWearable || !isAutographed)) {
+  if (equipmentModel) addSpec('Equipment Model', equipmentModel);
+  if (albumTitle) addSpec('Album / Release', mediaFormat ? `${albumTitle} (${mediaFormat})` : albumTitle);
+  if (cardYear || cardSet) addSpec('Card Set', [cardYear, cardSet, cardNumber, parallelSerial].filter(Boolean).join(' '));
+  if (cardGrade) addSpec('Grade', autoGrade ? `${cardGrade} / ${autoGrade}` : cardGrade);
+  if (size && (isWearable || !isAutographed || categoryBucket === 'sports' || /\b(photo|poster)\b/i.test(`${category} ${productType}`))) {
     addSpec(isWearable ? 'Size' : 'Size / Dimensions', size);
   }
+  if (color) addSpec('Color', color);
+  if (colorway && colorway.toLowerCase() !== color.toLowerCase()) addSpec('Colorway', colorway);
   if (material) addSpec('Material / Finish', material);
+  if (inkColor) addSpec('Ink Color', inkColor);
+  if (signatureLocation) addSpec('Signature Placement', signatureLocation);
+  if (framingStatus && framingStatus !== 'Unframed') {
+    addSpec('Display / Framing', frameDimensions ? `${framingStatus} (${frameDimensions})` : framingStatus);
+  }
   if (inscription) addSpec('Inscription', `"${inscription}"`);
   addSpec('Condition', conditionHeader && conditionSubheader ? `${conditionHeader} - ${conditionSubheader}` : (condition || 'Pre-Owned / See Photos'));
   for (const s of parsedSpecs) {

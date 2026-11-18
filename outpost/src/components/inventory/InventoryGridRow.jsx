@@ -8,6 +8,7 @@ import { cleanItemDescription, cleanAthleteName } from '../../utils/spreadsheetP
 import { LISTING_FORMATS } from '../../utils/constants';
 import { fmtCurrency } from '../../utils/formulaPreview';
 import { getCertVerificationUrl } from '../../utils/certLookup';
+import { ITEM_CONDITIONS, PREP_STATUSES, FRAMING_STATUSES, SOURCE_VENDORS } from '../../utils/itemCategories';
 import { daysBetween } from '../../../functions/utils/auction.js';
 
 function ItemThumbnailCell({ item, onShowTooltip, onHideTooltip, onClick }) {
@@ -263,6 +264,16 @@ export function InventoryGridRow({
             onUpdated={onUpdateItem}
             onMarkSold={onMarkSold}
           />
+          {item.prep_status && item.prep_status !== 'Ready' && (
+            <div className="mt-1">
+              <span
+                className="inline-block px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 tracking-wide"
+                title={`Prep Workflow: ${item.prep_status}`}
+              >
+                {item.prep_status}
+              </span>
+            </div>
+          )}
           {isListed && daysListed > 0 && (
             <div className="flex items-center gap-1 mt-1">
               <span
@@ -577,6 +588,129 @@ export function InventoryGridRow({
               </div>
             );
           })()}
+        </td>
+      )}
+
+      {/* 14a. Color */}
+      {columnVisibility.color !== false && (
+        <td
+          style={{
+            width: `${columnWidths.color || 105}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'color')?.minWidth || 85}px`,
+            maxWidth: `${columnWidths.color || 105}px`
+          }}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
+        >
+          <InlineEditCell
+            value={item.color}
+            itemId={item.id}
+            field="color"
+            placeholder="-- Color --"
+            onUpdated={onUpdateItem}
+          />
+        </td>
+      )}
+
+      {/* 14b. Condition */}
+      {columnVisibility.item_condition !== false && (
+        <td
+          style={{
+            width: `${columnWidths.item_condition || 115}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'item_condition')?.minWidth || 95}px`,
+            maxWidth: `${columnWidths.item_condition || 115}px`
+          }}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
+        >
+          <InlineSelectCell
+            value={item.item_condition}
+            itemId={item.id}
+            field="item_condition"
+            options={ITEM_CONDITIONS}
+            placeholder="-- Cond --"
+            onUpdated={onUpdateItem}
+          />
+        </td>
+      )}
+
+      {/* 14c. Prep Status */}
+      {columnVisibility.prep_status !== false && (
+        <td
+          style={{
+            width: `${columnWidths.prep_status || 125}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'prep_status')?.minWidth || 105}px`,
+            maxWidth: `${columnWidths.prep_status || 125}px`
+          }}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
+        >
+          <InlineSelectCell
+            value={item.prep_status || 'Ready'}
+            itemId={item.id}
+            field="prep_status"
+            options={PREP_STATUSES}
+            onUpdated={onUpdateItem}
+          />
+        </td>
+      )}
+
+      {/* 14d. Framing / Display */}
+      {columnVisibility.framing_status !== false && (
+        <td
+          style={{
+            width: `${columnWidths.framing_status || 125}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'framing_status')?.minWidth || 105}px`,
+            maxWidth: `${columnWidths.framing_status || 125}px`
+          }}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
+        >
+          <InlineSelectCell
+            value={item.framing_status}
+            itemId={item.id}
+            field="framing_status"
+            options={FRAMING_STATUSES}
+            placeholder="-- Display --"
+            onUpdated={onUpdateItem}
+          />
+        </td>
+      )}
+
+      {/* 14e. Storage Bin */}
+      {columnVisibility.storage_location !== false && (
+        <td
+          style={{
+            width: `${columnWidths.storage_location || 110}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'storage_location')?.minWidth || 90}px`,
+            maxWidth: `${columnWidths.storage_location || 110}px`
+          }}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs font-mono"
+        >
+          <InlineEditCell
+            value={item.storage_location}
+            itemId={item.id}
+            field="storage_location"
+            placeholder="-- Bin --"
+            onUpdated={onUpdateItem}
+          />
+        </td>
+      )}
+
+      {/* 14f. Source Vendor */}
+      {columnVisibility.source_vendor !== false && (
+        <td
+          style={{
+            width: `${columnWidths.source_vendor || 130}px`,
+            minWidth: `${DEFAULT_COLUMNS.find(c => c.key === 'source_vendor')?.minWidth || 105}px`,
+            maxWidth: `${columnWidths.source_vendor || 130}px`
+          }}
+          className="px-3 py-1.5 whitespace-nowrap overflow-hidden text-xs"
+        >
+          <InlineSelectCell
+            value={item.source_vendor}
+            itemId={item.id}
+            field="source_vendor"
+            options={SOURCE_VENDORS}
+            placeholder="-- Source --"
+            onUpdated={onUpdateItem}
+          />
         </td>
       )}
 

@@ -828,5 +828,22 @@ CREATE INDEX IF NOT EXISTS idx_auction_items_batch
   ON auction_items(user_id, import_batch_id)
   WHERE import_batch_id IS NOT NULL;
 
+-- ============================================================
+-- MIGRATION 0014: PRODUCT-SPECIFIC ITEM DETAIL, PREP, FRAMING,
+-- AUTH TIER & CONDITION FIELDS
+-- ============================================================
+ALTER TABLE auction_items ADD COLUMN item_subtype TEXT;
+ALTER TABLE auction_items ADD COLUMN item_condition TEXT;
+ALTER TABLE auction_items ADD COLUMN condition_notes TEXT;
+ALTER TABLE auction_items ADD COLUMN auth_type TEXT;
+ALTER TABLE auction_items ADD COLUMN prep_status TEXT NOT NULL DEFAULT 'Ready';
+ALTER TABLE auction_items ADD COLUMN framing_status TEXT;
+ALTER TABLE auction_items ADD COLUMN source_vendor TEXT;
+ALTER TABLE auction_items ADD COLUMN storage_location TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_auction_items_prep_status
+  ON auction_items(user_id, prep_status)
+  WHERE prep_status IS NOT NULL AND prep_status != 'Ready';
+
 
 

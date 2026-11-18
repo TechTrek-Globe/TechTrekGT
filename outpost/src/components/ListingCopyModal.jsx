@@ -130,13 +130,14 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated, onIt
     setBrand(item.brand || parsedAttrs.brand || '');
     setProductType(item.category && item.category !== 'General' ? item.category : (parsedAttrs.category || ''));
     setSubtitle(parsedAttrs.model || '');
-    setCondition(item.condition || parsedAttrs.condition || 'Brand New / Excellent');
-    setConditionHeader(parsedAttrs.condition_header || (item.condition?.toLowerCase().includes('new') ? 'BRAND NEW IN ORIGINAL UNOPENED BOX' : ''));
-    setConditionSubheader(parsedAttrs.condition_subheader || (item.condition?.toLowerCase().includes('new') ? 'Never installed or used' : ''));
+    const resolvedCond = item.item_condition || item.condition || parsedAttrs.condition || 'Brand New / Excellent';
+    setCondition(resolvedCond);
+    setConditionHeader(parsedAttrs.condition_header || (resolvedCond.toLowerCase().includes('new') ? 'BRAND NEW IN ORIGINAL UNOPENED BOX' : ''));
+    setConditionSubheader(item.condition_notes || parsedAttrs.condition_subheader || (resolvedCond.toLowerCase().includes('new') ? 'Never installed or used' : ''));
     setFeatures(Array.isArray(parsedAttrs.features) ? parsedAttrs.features.join('\n') : (parsedAttrs.features || ''));
     setSpecs(typeof parsedAttrs.specs === 'object' && parsedAttrs.specs ? Object.entries(parsedAttrs.specs).map(([k, v]) => `${k}: ${v}`).join('\n') : (parsedAttrs.specs || ''));
     setCompatibility(parsedAttrs.compatibility || '');
-    setDescription(stripInternalTrackingNotes(item.notes || ''));
+    setDescription(stripInternalTrackingNotes(item.condition_notes || item.notes || ''));
     setIncludedInSale(parsedAttrs.included_in_sale || '');
     setAthlete(item.athlete_person || parsedAttrs.athlete_person || '');
     setTeamOrBand(item.team_or_band || parsedAttrs.team_or_band || '');
@@ -190,6 +191,8 @@ export function ListingCopyModal({ isOpen, onClose, item, onListingCreated, onIt
         is_pickguard_guitar: Boolean(isPickguardSignedGuitar),
         target_net: (targetNet !== '' && targetNet != null && !isNaN(Number(targetNet))) ? parseFloat(targetNet) : null,
         asin: asinInput?.trim() || null,
+        item_condition: condition?.trim() || null,
+        condition_notes: conditionSubheader?.trim() || null,
         condition_header: conditionHeader?.trim() || null,
         condition_subheader: conditionSubheader?.trim() || null,
         features: features?.trim() || null,

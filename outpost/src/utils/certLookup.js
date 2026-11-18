@@ -4,16 +4,22 @@
  */
 
 export const AUTHENTICATORS = [
-  { id: 'PSA', name: 'PSA (Professional Sports Authenticator)', badgeColor: 'bg-red-500/10 text-red-400 border-red-500/30' },
+  { id: 'PSA', name: 'PSA / DNA (Professional Sports Authenticator)', badgeColor: 'bg-red-500/10 text-red-400 border-red-500/30' },
   { id: 'Beckett', name: 'Beckett (BGS / BAS)', badgeColor: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
   { id: 'JSA', name: 'JSA (James Spence Authentication)', badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+  { id: 'Fanatics', name: 'Fanatics Authentic', badgeColor: 'bg-rose-500/10 text-rose-400 border-rose-500/30' },
+  { id: 'SWAU', name: 'SWAU (Star Wars Autograph Universe)', badgeColor: 'bg-violet-500/10 text-violet-400 border-violet-500/30' },
+  { id: 'B.A.M.', name: 'B.A.M. (Beckett / Music Autograph)', badgeColor: 'bg-sky-500/10 text-sky-400 border-sky-500/30' },
+  { id: 'Upper Deck', name: 'Upper Deck (UDA)', badgeColor: 'bg-orange-500/10 text-orange-400 border-orange-500/30' },
+  { id: 'Steiner', name: 'Steiner Sports', badgeColor: 'bg-slate-500/10 text-slate-300 border-slate-500/30' },
+  { id: 'Schwartz', name: 'Schwartz Sports Memorabilia', badgeColor: 'bg-teal-500/10 text-teal-400 border-teal-500/30' },
+  { id: 'MLB Authenticated', name: 'MLB Authenticated (Hologram)', badgeColor: 'bg-blue-600/10 text-blue-300 border-blue-500/30' },
+  { id: 'NFL Authenticated', name: 'NFL Authenticated', badgeColor: 'bg-indigo-600/10 text-indigo-300 border-indigo-500/30' },
+  { id: 'NBA Authenticated', name: 'NBA Authenticated', badgeColor: 'bg-amber-600/10 text-amber-300 border-amber-500/30' },
   { id: 'ACOA', name: 'ACOA (AutographCOA)', badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
   { id: 'SGC', name: 'SGC (Sportscard Guaranty)', badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/30' },
   { id: 'CGC', name: 'CGC (Certified Guaranty Company)', badgeColor: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' },
-  { id: 'Fanatics', name: 'Fanatics Authentic', badgeColor: 'bg-rose-500/10 text-rose-400 border-rose-500/30' },
-  { id: 'Upper Deck', name: 'Upper Deck (UDA)', badgeColor: 'bg-orange-500/10 text-orange-400 border-orange-500/30' },
   { id: 'Tristar', name: 'Tristar Productions', badgeColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' },
-  { id: 'Steiner', name: 'Steiner Sports', badgeColor: 'bg-slate-500/10 text-slate-300 border-slate-500/30' },
   { id: 'Other', name: 'Other / Custom', badgeColor: 'bg-slate-800 text-slate-400 border-slate-700' }
 ];
 
@@ -74,6 +80,21 @@ export function getCertVerificationUrl(authenticator, certNumber) {
   // Upper Deck
   if (auth.includes('upper deck') || auth.includes('uda')) {
     return `https://www.upperdeck.com/Customer-Care/Memorabilia-Authentication.aspx`;
+  }
+
+  // SWAU
+  if (auth.includes('swau')) {
+    return `https://swau.com/pages/verify-your-item`;
+  }
+
+  // MLB Authenticated
+  if (auth.includes('mlb')) {
+    return `https://www.mlb.com/official-information/authentication`;
+  }
+
+  // Schwartz Sports
+  if (auth.includes('schwartz')) {
+    return `https://www.schwartzsportsmemorabilia.com/pages/verify-authenticity`;
   }
 
   return null;

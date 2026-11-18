@@ -23,10 +23,16 @@ export function buildStructuredCompQuery(itemOrName, athlete, category, authenti
   const person = String(itemObj.athlete_person || athlete || '').trim();
   const cat = String(itemObj.category || category || '').trim();
   const auth = String(itemObj.authenticator || authenticator || '').trim();
+  const subtype = String(itemObj.item_subtype || '').trim();
+  const dimensions = String(itemObj.dimensions || '').trim();
+  const framingStatus = String(itemObj.framing_status || '').trim();
+  const cardYear = String(itemObj.card_year || '').trim();
+  const cardSet = String(itemObj.card_set || '').trim();
+  const cardGrade = String(itemObj.card_grade || '').trim();
 
-  // 1. Extract quoted inscriptions e.g. "El Abusador", "The Kid", "Iron Mike"
+  // 1. Extract explicit or quoted inscriptions e.g. "El Abusador", "The Kid", "Iron Mike"
   const quoteMatch = rawTitle.match(/["“']([^"”']{2,30})["”']/);
-  const inscription = quoteMatch ? quoteMatch[1].trim() : '';
+  const inscription = String(itemObj.inscription || (quoteMatch ? quoteMatch[1] : '')).trim();
 
   // 2. Identify Item Type / Category
   let type = '';
@@ -59,12 +65,18 @@ export function buildStructuredCompQuery(itemOrName, athlete, category, authenti
 
   // Assemble tokens
   const tokens = [];
+  if (cardYear) tokens.push(cardYear);
+  if (cardSet) tokens.push(cardSet);
   if (person) tokens.push(person);
   if (isSigned && !tokens.some(t => /signed|auto/i.test(t))) tokens.push('Signed');
   if (team && !tokens.some(t => t.toLowerCase() === team.toLowerCase())) tokens.push(team);
   if (brand && !tokens.some(t => t.toLowerCase() === brand.toLowerCase())) tokens.push(brand);
+  if (framingStatus && /^framed/i.test(framingStatus) && !tokens.some(t => /framed/i.test(t))) tokens.push('Framed');
+  if (dimensions && /photo|poster/i.test(`${cat} ${type}`) && !tokens.some(t => t.toLowerCase() === dimensions.toLowerCase())) tokens.push(dimensions);
   if (type && !tokens.some(t => t.toLowerCase() === type.toLowerCase())) tokens.push(type);
+  else if (subtype && !tokens.some(t => t.toLowerCase() === subtype.toLowerCase())) tokens.push(subtype);
   if (inscription && !tokens.some(t => t.toLowerCase().includes(inscription.toLowerCase()))) tokens.push(inscription);
+  if (cardGrade && !tokens.some(t => t.toLowerCase() === cardGrade.toLowerCase())) tokens.push(cardGrade);
   if (cleanAuth && !tokens.some(t => t.toLowerCase() === cleanAuth.toLowerCase())) tokens.push(cleanAuth);
 
   // If structured tokens give high context (e.g. >= 2 items), use them!

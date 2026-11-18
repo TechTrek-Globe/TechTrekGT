@@ -168,7 +168,9 @@ export async function onRequestPost(context) {
             status, platform, platform_fee_pct, platform_flat_fee,
             est_shipping_cost, boost_pct, min_sell_price, suggested_list_price,
             current_list_price, target_margin_pct,
-            date_acquired, date_listed, notes, best_listing_window, sku
+            date_acquired, date_listed, notes, best_listing_window, sku,
+            item_subtype, item_condition, condition_notes, auth_type,
+            prep_status, framing_status, source_vendor, storage_location
           ) VALUES (
             ?,?,?,?,?,?,?,
             ?,?,?,?,
@@ -176,7 +178,9 @@ export async function onRequestPost(context) {
             ?,?,?,?,
             ?,?,?,?,
             ?,?,
-            ?,?,?,?,?
+            ?,?,?,?,?,
+            ?,?,?,?,
+            ?,?,?,?
           )
         `).bind(
           itemId, payload.userId, invoiceId,
@@ -192,7 +196,15 @@ export async function onRequestPost(context) {
           it.current_list_price || null, targetMarginPct,
           date_acquired || null, it.date_listed || null,
           it.notes || null, it.best_listing_window || null,
-          itemSku
+          itemSku,
+          it.item_subtype || null,
+          it.item_condition || it.condition || null,
+          it.condition_notes || null,
+          it.auth_type || null,
+          it.prep_status || 'Ready',
+          it.framing_status || null,
+          it.source_vendor || body.source_vendor || null,
+          it.storage_location || null
         )
       );
 

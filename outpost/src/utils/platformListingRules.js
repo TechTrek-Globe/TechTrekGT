@@ -1416,7 +1416,7 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
   const title = buildPlatformTitle(normPlatform, itemData, options);
   const titleUtf16Count = computeUtf16Length(title);
   const cleanNotes = scrubProtectedBrandsFromCopy(
-    stripInternalTrackingNotes(options.description || options.notes || itemData.description || itemData.notes || ''),
+    stripInternalTrackingNotes(options.conditionNotes || itemData.condition_notes || options.description || options.notes || itemData.description || itemData.notes || ''),
     flags
   );
   const certUrl = (authEval.isCertified && certNumber)
@@ -1445,8 +1445,8 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
     const reverbCategory = /\b(guitar)\b/i.test(`${title} ${options.productType || ''}`) && !flags.isPickguardSignedGuitar
       ? 'Acoustic Guitars > Dreadnought'
       : 'Accessories > Memorabilia & Collectibles > Autographs';
-    const condition = resolvePlatformCondition('reverb', options.condition || itemData.condition);
-    const finish = String(options.finish || itemData.finish || 'Natural / Gloss').trim();
+    const condition = resolvePlatformCondition('reverb', options.condition || itemData.item_condition || itemData.condition);
+    const finish = String(options.finish || itemData.instrument_finish || itemData.finish || 'Natural / Gloss').trim();
 
     const pickguardDisclosure = flags.isPickguardSignedGuitar
       ? 'Signed on a custom insert pickguard mounted to a brand-new, non-stage-played 38-inch display acoustic guitar.'
@@ -1500,7 +1500,7 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
   }
 
   if (normPlatform === 'whatnot') {
-    const condition = resolvePlatformCondition('whatnot', options.condition || itemData.condition);
+    const condition = resolvePlatformCondition('whatnot', options.condition || itemData.item_condition || itemData.condition);
     const isMusic = /\b(guitar|music|cd|vinyl|drum|band)\b/i.test(`${sportOrGenre} ${title}`);
     const whatnotCategory = isMusic
       ? 'Music & Entertainment > Autographs'
@@ -1539,7 +1539,7 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
   }
 
   if (normPlatform === 'mercari') {
-    const condition = resolvePlatformCondition('mercari', options.condition || itemData.condition);
+    const condition = resolvePlatformCondition('mercari', options.condition || itemData.item_condition || itemData.condition);
     const hashtags = buildPlatformTags('mercari', itemData, options);
     const hashtagLine = hashtags.join(' ');
     const authName = authEval.authenticator || 'JSA/Beckett/PSA/SWAU';
@@ -1592,7 +1592,7 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
   }
 
   if (normPlatform === 'facebook') {
-    const condition = resolvePlatformCondition('facebook', options.condition || itemData.condition);
+    const condition = resolvePlatformCondition('facebook', options.condition || itemData.item_condition || itemData.condition);
     const relistTitle = buildFacebookRelistTitle(itemData, options);
     const productTags = buildPlatformTags('facebook', itemData, options);
     const isSports = /\b(football|baseball|basketball|hockey|golf|soccer|tennis|boxing|mma|ufc|wrestling|racing|sports)\b/i.test(`${sportOrGenre} ${title}`);

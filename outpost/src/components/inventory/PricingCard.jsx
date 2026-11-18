@@ -192,7 +192,17 @@ export function PricingCard({
                     : 'bg-slate-800 text-slate-300'
                 }`} title={item.cert_verified ? `Verified Certificate: ${item.authenticator} ${item.cert_number || ''}` : undefined}>
                   {item.cert_verified && <ShieldCheck className="w-2.5 h-2.5 text-emerald-400 flex-shrink-0" />}
-                  <span>{item.authenticator} {item.cert_number}</span>
+                  <span>{item.authenticator}{item.auth_type ? ` (${item.auth_type})` : ''} {item.cert_number}</span>
+                </span>
+              )}
+              {item.prep_status && item.prep_status !== 'Ready' && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  {item.prep_status}
+                </span>
+              )}
+              {item.framing_status && item.framing_status !== 'Unframed' && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/25">
+                  {item.framing_status}
                 </span>
               )}
             </div>

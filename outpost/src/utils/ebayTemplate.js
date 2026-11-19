@@ -645,6 +645,7 @@ ${middleSectionHtml}
     <h3 style="color: #f1c15b; margin-top: 0;">${block4Heading}</h3>
     <ul style="margin: 0; padding-left: 20px; color: #e0e0e0; line-height: 1.7;">
       ${includedBullets.join('\n      ')}
+      <li>Smoke-Free Collection: Stored in a clean, smoke-free, climate-controlled collection.</li>
       <li>Packaging &amp; Shipping: ${escapeHtml(packagingMethod)}</li>
       ${conditionalDisclosure}
     </ul>

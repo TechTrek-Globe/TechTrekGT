@@ -1182,12 +1182,54 @@ function resolveEbayConditionId(explicitId, conditionText) {
 /**
  * Builds ItemSpecifics XML from core listing attributes and custom specifics pairs.
  */
+function resolveEbayObjectType(listingData = {}) {
+  const explicit = String(listingData.objectType || listingData.object_type || '').trim();
+  if (explicit) return explicit;
+
+  const text = `${listingData.productType || ''} ${listingData.title || ''} ${listingData.category || ''}`;
+  const patterns = [
+    [/\bjersey\b/i, 'Jersey'],
+    [/\b(?:guitar|pickguard)\b/i, 'Guitar'],
+    [/\bhelmet\b/i, 'Helmet'],
+    [/\b(?:photo|photograph|8x10|11x14|16x20)\b/i, 'Photo'],
+    [/\bfootball\b/i, 'Football'],
+    [/\bbasketball\b/i, 'Basketball'],
+    [/\bbaseball\b/i, 'Baseball'],
+    [/\bbat\b/i, 'Bat'],
+    [/\bpuck\b/i, 'Puck'],
+    [/\b(?:trading\s*card|card)\b/i, 'Trading Card'],
+    [/\b(?:poster|print|lithograph)\b/i, 'Poster'],
+    [/\b(?:vinyl|record|lp|album)\b/i, 'Record'],
+    [/\bcd\b/i, 'CD'],
+    [/\b(?:hat|cap)\b/i, 'Hat'],
+    [/\bglove\b/i, 'Glove'],
+    [/\bdrumhead\b/i, 'Drumhead'],
+    [/\bbook\b/i, 'Book'],
+    [/\bmagazine\b/i, 'Magazine'],
+    [/\b(?:funko|figure)\b/i, 'Figure']
+  ];
+  for (const [re, label] of patterns) {
+    if (re.test(text)) return label;
+  }
+
+  const pt = String(listingData.productType || '').trim();
+  if (pt && !/^(?:general|memorabilia|autographs?|collectibles?|other)$/i.test(pt)) {
+    return pt;
+  }
+  if (listingData.authenticator || /\b(?:signed|autograph|autographed)\b/i.test(text)) {
+    return 'Other';
+  }
+  return '';
+}
+
 function buildEbayItemSpecificsXml(listingData = {}, cleanSku = '') {
   const specificsList = [];
   const brandVal = listingData.brand || 'Unbranded';
   specificsList.push({ name: 'Brand', value: brandVal });
   if (cleanSku) specificsList.push({ name: 'MPN', value: cleanSku });
   if (listingData.productType) specificsList.push({ name: 'Type', value: listingData.productType });
+  const objectType = resolveEbayObjectType(listingData);
+  if (objectType) specificsList.push({ name: 'Object Type', value: objectType });
   if (listingData.sport) specificsList.push({ name: 'Sport', value: listingData.sport });
   if (listingData.athlete) specificsList.push({ name: 'Player/Athlete', value: listingData.athlete });
   if (listingData.team) specificsList.push({ name: 'Team', value: listingData.team });
@@ -1458,7 +1500,7 @@ export async function reviseEbayListing(env, accessToken, listingId, listingData
     ? 'https://api.sandbox.ebay.com/ws/api.dll'
     : 'https://api.ebay.com/ws/api.dll';
 
-  const buildReviseXml = (callName) => `<?xml version="1.0" encoding="utf-8"?>
+  const buildReviseXml = (callName, includeSpecifics = true) => `<?xml version="1.0" encoding="utf-8"?>
 <${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
     <eBayAuthToken>${xmlEscape(accessToken)}</eBayAuthToken>
@@ -1472,42 +1514,44 @@ export async function reviseEbayListing(env, accessToken, listingId, listingData
     ${priceXml}
     ${conditionXml}
     ${categoryXml}
-    ${skuXml}${specificsXml}
+    ${skuXml}${includeSpecifics ? specificsXml : ''}
   </Item>
 </${callName}Request>`;
 
-  let res = await fetchWithTimeout(tradingEndpoint, {
-    method: 'POST',
-    headers: {
-      'X-EBAY-API-SITEID': '0',
-      'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
-      'X-EBAY-API-CALL-NAME': 'ReviseFixedPriceItem',
-      'X-EBAY-API-IAF-TOKEN': accessToken,
-      'Content-Type': 'text/xml'
-    },
-    body: buildReviseXml('ReviseFixedPriceItem')
-  }, 20000);
+  const sendReviseCall = async (callName, includeSpecifics = true) => {
+    const r = await fetchWithTimeout(tradingEndpoint, {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-SITEID': '0',
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+        'X-EBAY-API-CALL-NAME': callName,
+        'X-EBAY-API-IAF-TOKEN': accessToken,
+        'Content-Type': 'text/xml'
+      },
+      body: buildReviseXml(callName, includeSpecifics)
+    }, 20000);
+    const bodyText = await r.text();
+    return { text: bodyText, ack: extractXmlTag(bodyText, 'Ack') || 'Failure' };
+  };
 
-  let text = await res.text();
-  let ack = extractXmlTag(text, 'Ack') || 'Failure';
+  let activeCallName = 'ReviseFixedPriceItem';
+  let { text, ack } = await sendReviseCall(activeCallName, true);
 
   // Fallback to ReviseItem if existing listing is an Auction-format item
   if (ack !== 'Success' && ack !== 'Warning') {
     const firstErr = extractTradingApiError(text, '');
     if (/auction|fixed\s*price|ReviseItem/i.test(firstErr.errMsg || '')) {
-      res = await fetchWithTimeout(tradingEndpoint, {
-        method: 'POST',
-        headers: {
-          'X-EBAY-API-SITEID': '0',
-          'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
-          'X-EBAY-API-CALL-NAME': 'ReviseItem',
-          'X-EBAY-API-IAF-TOKEN': accessToken,
-          'Content-Type': 'text/xml'
-        },
-        body: buildReviseXml('ReviseItem')
-      }, 20000);
-      text = await res.text();
-      ack = extractXmlTag(text, 'Ack') || 'Failure';
+      activeCallName = 'ReviseItem';
+      ({ text, ack } = await sendReviseCall(activeCallName, true));
+    }
+  }
+
+  // If a category-specific required ItemSpecific (e.g. 21919303) is still rejected,
+  // retry without <ItemSpecifics> so the existing live eBay specifics are preserved.
+  if (ack !== 'Success' && ack !== 'Warning' && specificsXml) {
+    const specErr = extractTradingApiError(text, '');
+    if (String(specErr.errCode) === '21919303') {
+      ({ text, ack } = await sendReviseCall(activeCallName, false));
     }
   }
 

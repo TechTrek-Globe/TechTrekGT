@@ -418,3 +418,17 @@ test('eBay HTML template and Schema.org summary adapt dynamically across electro
   assert.equal(/custom stitched display jersey|insert pickguard/i.test(glass.htmlBody), false);
 });
 
+test('All 5 platforms always include Smoke-Free Collection in generated listings', () => {
+  for (const platform of SUPPORTED_PLATFORMS) {
+    const { payload } = buildPlatformPayload(platform, BASE_PICKGUARD_GUITAR, {
+      notes: 'Clean display piece.'
+    });
+    const text = payload.description_plain_text || payload.description_html || '';
+    assert.ok(/Smoke-Free Collection/i.test(text), `${platform} payload must include Smoke-Free Collection`);
+  }
+
+  const ebayCopy = generateEbayCopy({ item_name: 'Sony WH-1000XM5 Headphones', brand: 'Sony', category: 'Electronics' });
+  assert.ok(/Smoke-Free Collection/i.test(ebayCopy.textBody), 'eBay plain text must include Smoke-Free Collection');
+  assert.ok(/Smoke-Free Collection/i.test(ebayCopy.htmlBody), 'eBay HTML must include Smoke-Free Collection');
+});
+

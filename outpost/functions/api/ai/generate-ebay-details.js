@@ -474,12 +474,32 @@ export async function generateAiPlatformListing(env, itemData = {}) {
     if (flags.isCustomJersey) {
       merged.description_html = scrubCustomJerseyClaims(merged.description_html);
     }
+    if (!/\bsmoke[\s-]?free\b/i.test(merged.description_html)) {
+      merged.description_html += '\n<p><strong>Care &amp; Storage:</strong> Smoke-Free Collection.</p>';
+    }
   }
 
   if (merged.description_plain_text) {
     merged.description_plain_text = sanitizeNoEmDash(stripInternalTrackingNotes(String(merged.description_plain_text).replace(/<[^>]+>/g, ' ')));
     if (flags.isCustomJersey) {
       merged.description_plain_text = scrubCustomJerseyClaims(merged.description_plain_text);
+    }
+    if (!/\bsmoke[\s-]?free\b/i.test(merged.description_plain_text)) {
+      const smokeNote = 'Smoke-Free Collection.';
+      if (normPlatform === 'mercari') {
+        const tagMatch = merged.description_plain_text.match(/\n\n(#\S+(?:\s+#\S+)*)$/);
+        if (tagMatch) {
+          const bodyPart = merged.description_plain_text.slice(0, tagMatch.index).trim();
+          const candidate = `${bodyPart}\n• Storage: ${smokeNote}${tagMatch[0]}`;
+          if (candidate.length <= 1000) {
+            merged.description_plain_text = candidate;
+          }
+        } else if ((merged.description_plain_text.length + smokeNote.length + 1) <= 1000) {
+          merged.description_plain_text = `${merged.description_plain_text}\n${smokeNote}`;
+        }
+      } else {
+        merged.description_plain_text = `${merged.description_plain_text}\n• Storage: ${smokeNote}`;
+      }
     }
     if (normPlatform === 'mercari' && merged.description_plain_text.length > 1000) {
       merged.description_plain_text = baseline.description_plain_text;

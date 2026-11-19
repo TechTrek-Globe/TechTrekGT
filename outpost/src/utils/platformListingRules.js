@@ -1471,6 +1471,7 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
         ? '<li><strong>Display vs. Stage-Played Disclosure:</strong> Note: The autograph is on the custom insert pickguard mounted to a brand-new, non-stage-played display instrument intended for wall or case display.</li>'
         : '',
       cleanNotes ? `<li><strong>Condition Notes:</strong> ${escapeHtml(cleanNotes)}</li>` : '',
+      '<li><strong>Care &amp; Storage:</strong> Smoke-Free Collection (stored in a clean, climate-controlled environment).</li>',
       '</ul>',
       `<p><strong>Packaging &amp; Insured Shipping:</strong> ${escapeHtml(logistics.box_dimensions_note)}. Ships insured within ${logistics.handling_days} business days.</p>`
     ].filter(Boolean).join('\n'));
@@ -1513,6 +1514,7 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
       `• Item Specs & Condition: ${condition}${size ? ` | Size ${size}` : ''}${cleanNotes ? ` | ${cleanNotes}` : '.'}`,
       flags.isCustomJersey ? '• Note: Custom stitched display jersey; not affiliated with or manufactured by any pro sports league or apparel brand.' : null,
       flags.isPickguardSignedGuitar ? '• Note: Autograph is on the custom pickguard mounted to a brand-new, non-stage-played display guitar.' : null,
+      '• Storage: Smoke-Free Collection.',
       `• Packaging Guarantee: ${logistics.packaging_method} (${logistics.estimated_packed_weight}).`
     ].filter(line => line !== null);
 
@@ -1556,6 +1558,7 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
       `• Item & Condition: ${condition}${size ? ` (Size ${size})` : ''}${cleanNotes ? ` - ${cleanNotes}` : ''}`,
       flags.isCustomJersey ? '• Note: Custom stitched display jersey. Not affiliated with or manufactured by any pro sports league or apparel brand.' : null,
       flags.isPickguardSignedGuitar ? '• Note: Hand-signed on the custom pickguard mounted to a brand-new, non-stage-played display guitar.' : null,
+      '• Storage: Smoke-Free Collection.',
       `• Shipping: ${logistics.packaging_method}. Reasonable offers welcome via Mercari Offer button.`,
       '',
       hashtagLine
@@ -1617,6 +1620,7 @@ export function buildPlatformPayload(platform, itemData = {}, options = {}) {
       `• Item & Condition: ${condition}${size ? `, Size ${size}` : ''}${cleanNotes ? `. ${cleanNotes}` : '.'}`,
       flags.isCustomJersey ? '• Note: Custom-made display jersey with sewn tackle-twill name and numbers. Not affiliated with or manufactured by any pro sports league or apparel brand.' : null,
       flags.isPickguardSignedGuitar ? '• Note: Hand-signed on the custom pickguard mounted to a brand-new, non-stage-played display acoustic guitar.' : null,
+      '• Storage: Smoke-Free Collection.',
       `• Pickup & Payment: ${pickupText}`,
       `• Shipping: Shipping available - packaged securely for transit (UV display cube / poly-bagged box / double-boxed).${logistics.over_500_checkout_note ? ` ${logistics.over_500_checkout_note}` : ''}`,
       'If this listing is active, it is still available. Message with questions or to arrange pickup/shipping.'
@@ -1965,6 +1969,7 @@ export function buildPlatformSystemPrompt(platform) {
   const baseHeader = [
     'Strict Punctuation Rule: NEVER use em dashes or en dashes anywhere. Use standard hyphens (-), colons (:), or parentheses () exclusively.',
     'Strict Privacy Rule: NEVER include internal warehouse, lot, item, order ID, or ASIN metadata.',
+    'Collection Rule: Always include "Smoke-Free Collection" in the listing description.',
     'Emoji Rule: End the title with 1 single literal category/subject emoji preceded by 1 space. NEVER use hype emojis (🔥, 🚨, ⭐, 🌟, 👀, ✅, 💯, 💥, ⚡, 💎, 👑, 🏆, 💰, ❗, ‼️).',
     'Wearable Size Rule: Include standalone size token (S, M, L, XL, 2XL, 3XL, 48, 52) ONLY when the item is wearable apparel/jersey. Omit completely for balls, guitars, pickguards, drumheads, helmets, CDs, and photos. Never write Size: or Sz.'
   ].join('\n');

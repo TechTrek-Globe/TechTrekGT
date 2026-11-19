@@ -154,6 +154,7 @@ export function generateEbayCopy(item = {}, options = {}) {
 
   textLines.push(
     'SHIPPING & HANDLING:',
+    `- Smoke-Free Collection: Stored in a clean, smoke-free collection.`,
     `- ${shippingPolicy}`,
     '- Packaged with extreme care for safe arrival.',
     '',
@@ -358,6 +359,7 @@ export function generateFacebookCopy(item = {}, options = {}) {
   bodyLines.push(
     '',
     'Local Pickup & Terms:',
+    '• Smoke-Free Collection',
     `• ${pickupLocation}`,
     `• ${paymentTerms}`,
     '• First come, first served. Serious inquiries only. No trades.',
@@ -398,6 +400,7 @@ export function generateWhatnotCopy(item = {}, options = {}) {
     item.category ? `📦 Category: ${item.category}` : null,
     (authenticator || cert) ? `🛡️ Auth: ${authenticator || 'Certified'} ${cert}`.trim() : null,
     customNotes || null,
+    '🏡 Smoke-Free Collection',
     `📦 Ships next-day securely packed!`
   ].filter(Boolean).join('\n');
 
@@ -449,6 +452,7 @@ export function generateMercariCopy(item = {}, options = {}) {
   if (authenticator || certNumber) descriptionLines.push(`Authentication: ${authenticator || 'Certified'} ${certNumber}`.trim());
   descriptionLines.push(
     'Condition: Excellent, exactly as pictured.',
+    'Smoke-Free Collection.',
     'Fast & secure shipping with tracking.',
     ''
   );

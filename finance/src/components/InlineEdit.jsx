@@ -181,16 +181,19 @@ export function InlineEdit({
     );
   }
 
+  const hasCustomJustify = /\bjustify-(start|end|center|between|around|evenly)\b/.test(className);
+  const isLeftAligned = /\bjustify-start\b/.test(className);
+
   return (
     <button
       type="button"
       onClick={open}
       aria-label={`Edit value, current value is ${formatted}`}
-      className={`group/ie flex items-center justify-end w-full hover:opacity-90 transition-opacity relative ${className}`}
+      className={`group/ie flex items-center ${hasCustomJustify ? '' : 'justify-end'} w-full hover:opacity-90 transition-opacity relative ${className}`}
       title="Click to edit"
     >
       <span className={dimmed ? 'text-slate-400 font-mono text-xs' : ''}>{formatted}</span>
-      <Pencil className="w-2.5 h-2.5 text-slate-600 opacity-0 group-hover/ie:opacity-100 group-hover/ie:text-blue-400 transition-all absolute left-0.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+      <Pencil className={`w-2.5 h-2.5 text-slate-600 opacity-0 group-hover/ie:opacity-100 group-hover/ie:text-blue-400 transition-all absolute ${isLeftAligned ? 'right-0.5' : 'left-0.5'} top-1/2 -translate-y-1/2 pointer-events-none`} />
     </button>
   );
 }

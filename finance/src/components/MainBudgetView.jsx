@@ -99,22 +99,22 @@ export function MainBudgetView({ onNavigateView }) {
                 {/* Sticky Header Row */}
                 <thead className="sticky top-0 z-30 bg-slate-950 text-slate-200 uppercase font-bold text-[10px] tracking-wider shadow-md">
                   <tr>
-                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-l-2 border-amber-400 rounded-l-lg text-slate-200">Bill Name</th>
-                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-right text-slate-200">Monthly Amount</th>
-                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-right text-slate-200">Bi-Weekly (Per Pay)</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-l-2 border-r border-amber-400 border-r-slate-800/80 rounded-l-lg text-left text-slate-200">Bill Name</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-r border-amber-400 border-r-slate-800/80 text-right text-slate-200">Monthly Amount</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-r border-amber-400 border-r-slate-800/80 text-right text-slate-200">Bi-Weekly (Per Pay)</th>
                     {accountPeople.map((/** @type {any} */ p) => (
-                      <th key={p.id} className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-right text-emerald-300">{p.name.split(' ')[0]} Portion</th>
+                      <th key={p.id} className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-r border-amber-400 border-r-slate-800/80 text-right text-emerald-300">{p.name.split(' ')[0]} Portion</th>
                     ))}
-                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-slate-200">Due Day</th>
-                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-slate-200">Payment Notes</th>
-                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-amber-400 text-slate-200">Bank Match Names</th>
-                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-r-2 border-amber-400 rounded-r-lg text-slate-200">Notes</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-r border-amber-400 border-r-slate-800/80 text-center text-slate-200">Due Day</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-r border-amber-400 border-r-slate-800/80 text-left text-slate-200">Payment Notes</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-r border-amber-400 border-r-slate-800/80 text-left text-slate-200">Bank Match Names</th>
+                    <th className="p-3.5 sticky top-0 z-30 bg-slate-950 border-t-2 border-b-2 border-r-2 border-amber-400 rounded-r-lg text-left text-slate-200">Notes</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-slate-800/80">
                   {accountBills.length === 0 ? (
                     <tr>
-                      <td colSpan={7 + accountPeople.length} className="p-8 text-center text-slate-500 italic">
+                      <td colSpan={7 + accountPeople.length} className="p-8 text-center text-slate-500 italic border-b border-slate-800/80">
                         No active bills assigned to this account.
                       </td>
                     </tr>
@@ -127,13 +127,13 @@ export function MainBudgetView({ onNavigateView }) {
                         <tr key={bill.id} className="hover:bg-slate-900/40 transition-colors group/row">
 
                           {/* Bill Name - inline editable */}
-                          <td className="p-3.5 font-semibold">
-                            <div className="flex items-center gap-2 flex-wrap">
+                          <td className="p-3.5 text-left font-semibold border-b border-r border-slate-800/80">
+                            <div className="flex items-center justify-start gap-2 flex-wrap">
                               <InlineEdit
                                 value={bill.name}
                                 type="text"
                                 onCommit={(/** @type {string} */ v) => updateBill(bill.id, { name: v })}
-                                className="text-slate-200 font-semibold text-xs"
+                                className="text-slate-200 font-semibold text-xs justify-start text-left !w-auto pr-4"
                               />
                               {(!bill.splits || Object.keys(bill.splits).length === 0 || Object.values(bill.splits).every(v => !parseFloat(v))) && (
                                 <span className="text-[9px] bg-amber-950/80 text-amber-300 border border-amber-800/60 px-1.5 py-0.2 rounded font-sans font-semibold">
@@ -144,7 +144,7 @@ export function MainBudgetView({ onNavigateView }) {
                           </td>
 
                           {/* Monthly Amount - inline editable (writes to bill.amount) */}
-                          <td className="p-3.5 text-right">
+                          <td className="p-3.5 text-right border-b border-r border-slate-800/80">
                             <InlineEdit
                               value={bill.amount}
                               type="currency"
@@ -154,7 +154,7 @@ export function MainBudgetView({ onNavigateView }) {
                           </td>
 
                           {/* Bi-weekly - derived, read-only */}
-                          <td className="p-3.5 text-right font-mono text-blue-400 text-xs">
+                          <td className="p-3.5 text-right font-mono text-blue-400 text-xs border-b border-r border-slate-800/80">
                             ${biWeeklyCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
@@ -162,14 +162,14 @@ export function MainBudgetView({ onNavigateView }) {
                           {accountPeople.map((/** @type {any} */ p) => {
                             const portion = getBillPersonMonthlyPortion(bill, p.id);
                             return (
-                              <td key={p.id} className="p-3.5 text-right font-mono text-purple-300 text-xs">
+                              <td key={p.id} className="p-3.5 text-right font-mono text-purple-300 text-xs border-b border-r border-slate-800/80">
                                 ${portion.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             );
                           })}
 
                           {/* Due Day - inline editable */}
-                          <td className="p-3.5 text-center">
+                          <td className="p-3.5 text-center border-b border-r border-slate-800/80">
                             <div className="flex flex-col items-center gap-0.5">
                               <InlineEdit
                                 value={bill.dueDay}
@@ -189,35 +189,35 @@ export function MainBudgetView({ onNavigateView }) {
                           </td>
 
                           {/* Payment Notes - inline editable */}
-                          <td className="p-3.5 text-slate-300 text-xs">
+                          <td className="p-3.5 text-left text-slate-300 text-xs border-b border-r border-slate-800/80">
                             <InlineEdit
                               value={bill.paymentNotes || bill.paymentSource || ''}
                               type="text"
                               onCommit={(/** @type {string} */ v) => updateBill(bill.id, { paymentNotes: v, paymentSource: v })}
-                              className="text-slate-300 text-xs"
+                              className="text-slate-300 text-xs justify-start text-left pr-4"
                               displayFn={(/** @type {string} */ v) => v || '—'}
                             />
                           </td>
 
                           {/* Bank Match Names - inline editable */}
-                          <td className="p-3.5 text-slate-300 text-xs">
+                          <td className="p-3.5 text-left text-slate-300 text-xs border-b border-r border-slate-800/80">
                             <InlineEdit
                               value={bill.bankMatchNames || bill.matchingKey || ''}
                               type="text"
                               onCommit={(/** @type {string} */ v) => updateBill(bill.id, { matchingKey: v, bankMatchNames: v })}
-                              className="text-slate-300 text-xs"
+                              className="text-slate-300 text-xs justify-start text-left pr-4"
                               placeholder="e.g. GA POWER, COMCAST"
                               displayFn={(/** @type {string} */ v) => v ? <span className="px-1.5 py-0.5 rounded bg-blue-950/70 border border-blue-800/50 text-blue-300 font-mono text-[10px]">{v}</span> : <span className="text-slate-600 italic">-</span>}
                             />
                           </td>
 
                           {/* Notes */}
-                          <td className="p-3.5 text-slate-500 italic max-w-xs truncate text-xs">
+                          <td className="p-3.5 text-left text-slate-500 italic max-w-xs truncate text-xs border-b border-slate-800/80">
                             <InlineEdit
                               value={bill.notes || ''}
                               type="text"
                               onCommit={(/** @type {string} */ v) => updateBill(bill.id, { notes: v })}
-                              className="text-slate-500 italic max-w-xs truncate text-xs"
+                              className="text-slate-500 italic max-w-xs truncate text-xs justify-start text-left pr-4"
                               displayFn={(/** @type {string} */ v) => v || '—'}
                             />
                           </td>
@@ -226,18 +226,18 @@ export function MainBudgetView({ onNavigateView }) {
                     })
                   )}
                 </tbody>
-                <tfoot className="bg-slate-900 font-bold border-t-2 border-slate-700 text-slate-200 sticky bottom-0 z-10 shadow-lg">
+                <tfoot className="bg-slate-900 font-bold text-slate-200 sticky bottom-0 z-10 shadow-lg">
                   <tr>
-                    <td className="p-3.5 text-slate-400">Account Subtotal</td>
-                    <td className="p-3.5 text-right font-mono text-rose-400">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="p-3.5 text-right font-mono text-blue-400">${(accountTotal / 2).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="p-3.5 text-left text-slate-400 border-t-2 border-slate-700 border-r border-r-slate-800/80">Account Subtotal</td>
+                    <td className="p-3.5 text-right font-mono text-rose-400 border-t-2 border-slate-700 border-r border-r-slate-800/80">${accountTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="p-3.5 text-right font-mono text-blue-400 border-t-2 border-slate-700 border-r border-r-slate-800/80">${(accountTotal / 2).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     {accountPeople.map((/** @type {any} */ p) => {
                       const pTotal = accountBills.reduce((/** @type {number} */ s, /** @type {any} */ b) => s + getBillPersonMonthlyPortion(b, p.id), 0);
                       return (
-                        <td key={p.id} className="p-3.5 text-right font-mono text-purple-300">${pTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td key={p.id} className="p-3.5 text-right font-mono text-purple-300 border-t-2 border-slate-700 border-r border-r-slate-800/80">${pTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       );
                     })}
-                    <td colSpan={4} />
+                    <td colSpan={4} className="border-t-2 border-slate-700" />
                   </tr>
                 </tfoot>
               </table>

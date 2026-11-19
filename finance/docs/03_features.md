@@ -203,3 +203,7 @@ All serverless API routes execute in Cloudflare Workers ESM format (`src/worker.
     - Instant text/status filters (`all`, `deficit`, `locked`, `payday` pills + search filter for payee/bill/note/date).
     - `jumpToToday` shortcut via `Ctrl+J`, `Cmd+J`, or `T`.
     - Arrow key and `Tab` grid cell navigation across matrix cells (`data-matrix-cell="true"`).
+  - **Bills Table Alignment & Grid Separators (`MainBudgetView.jsx`, `InlineEdit.jsx`):**
+    - Standardized horizontal column alignment across `<thead>`, `<tbody>`, and `<tfoot>` (`Account Subtotal`): left-aligned text columns (`Bill Name`, `Payment Notes`, `Bank Match Names`, `Notes`), right-aligned numeric columns (`Monthly Amount`, `Bi-Weekly (Per Pay)`, earner portions), and centered `Due Day` column.
+    - Updated `InlineEdit.jsx` to respect custom `justify-*` classes (instead of unconditionally applying `justify-end`) and position the hover edit pencil icon on the opposite side for left-aligned fields.
+    - Added explicit cell-level horizontal (`border-b border-slate-800/80`) and vertical (`border-r border-slate-800/80`) grid separators compatible with `border-separate border-spacing-0` sticky-header tables, plus `border-t-2 border-slate-700` on `tfoot` cells.

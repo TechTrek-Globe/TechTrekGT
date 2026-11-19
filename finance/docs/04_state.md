@@ -319,6 +319,7 @@ For every existing user, their personal ledger ID is identical to their user ID 
 - **Modal Accessibility:** Modals (`SettingsModal.jsx`, `ShareLedgerModal.jsx`, `AuthModal.jsx`) implement `Escape` key close listeners and restore focus to trigger elements.
 - **Amortization Schedule Pagination:** Replaced the hard `.slice(0, 36)` cap with 60-period interactive pagination, period ranges, and previous/next controls.
 - **Ledger Windowing & Navigation:** `LedgerView.jsx` features active month windowing (+/- 4 months rendered with distant month placeholders and "Scroll into view" triggers), instant text and status filters, `Ctrl+J`/`Cmd+J`/`T` Jump to Today, and cell keyboard navigation.
+- **Bills Table Alignment & Grid Separators (`MainBudgetView.jsx`, `InlineEdit.jsx`):** `InlineEdit` honors explicit `justify-start` / `justify-center` overrides without CSS specificity collision against `justify-end`, and `MainBudgetView` enforces cell-level `border-b border-slate-800/80` and `border-r border-slate-800/80` grid dividers across `thead`, `tbody`, and `tfoot` (`border-t-2 border-slate-700`) under `border-separate border-spacing-0`.
 
 
 

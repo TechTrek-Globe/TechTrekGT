@@ -532,15 +532,15 @@ Reconciled the Break-Even Floor Price calculation across the table and pricing h
 
 ## Gemini AI Context-Aware eBay Listing Details Generator [ACTION ID: AI-001 / EBAY-010]
 
-Integrated Google Gemini API (`gemini-3.5-flash-lite` primary with `gemini-3.5-flash` fallback) into the Outpost eBay listing generation pipeline to dynamically produce context-aware, HTML-formatted Condition and Key Details cards based on actual item metadata, specs, and seller notes.
+Integrated Google Gemini API (`gemini-3.5-flash-lite` primary with `gemini-3.8-flash` and `gemini-2.5-flash` fallbacks) into the Outpost eBay listing generation pipeline to dynamically produce context-aware, HTML-formatted Condition and Key Details cards based on actual item metadata, specs, and seller notes.
 
 ### AI Listing Generator Capabilities
 
 1. **Serverless AI Generation Endpoint (`functions/api/ai/generate-ebay-details.js`)**:
    - Route: `POST /api/ai/generate-ebay-details` registered in `src/worker.js` with session authentication (`requireAuth` verifying HttpOnly `auth_token` and `users.token_version`).
    - Ingests item metadata payload (`title`, `brand`, `productType`, `condition`, `conditionHeader`, `conditionSubheader`, `notes`, `specs`, `features`).
-   - Queries Google Gemini API using `fetchWithTimeout` targeting the high-performance `gemini-3.5-flash-lite` model via `generateContent` (delivering sub-2-second generation latency) with resilient automatic fallback to `gemini-3.5-flash`.
-   - Dual Model Resilience: Calls `gemini-3.5-flash-lite` with a 10-second timeout, falling back gracefully to `gemini-3.5-flash` with a 15-second timeout if the primary request encounters an issue.
+   - Queries Google Gemini API using `fetchWithTimeout` targeting `gemini-3.5-flash-lite` via `generateContent`, with transient `429`/`503` exponential backoff retry and automatic fallback to `gemini-3.8-flash` and `gemini-2.5-flash` within a 14-second total budget.
+   - Status-Specific Error Surfacing: Distinguishes upstream `503` overload and `429` rate limits from `401`/`403` authentication failures (which return `502` to avoid clearing user sessions while accurately reporting `GEMINI_API_KEY` issues).
    - Strict Output Sanitization & Privacy Protection: Strips markdown code fences (` ```html `), enforces the platform zero em-dash rule, and filters out internal tracking notes (e.g., `Inventory tracked: Lot #...`, `Lot #... · Item #...`, order IDs, ASINs) so warehouse and invoice metadata is never leaked to buyers.
 2. **Dynamic Template Injection & Fallback Architecture (`src/utils/ebayTemplate.js`, `src/utils/listingCopyGenerator.js`)**:
    - `generateEbayListingHtml(item)` accepts optional `aiGeneratedMiddleSection`.
@@ -871,7 +871,7 @@ The 1-Click eBay Listing Creation Engine enables sellers to publish full fixed-p
    - Single-click action creates the live fixed-price listing on eBay, populating Title (SEO-optimized, max 80 chars), dark-theme HTML description with AI Condition and Key Details cards, Category ID (with eBay catalog category mapping allowed), Condition ID, Item Specifics (Brand, MPN/SKU, Type, Player/Athlete, Grader, Cert Number), and default shipping and return policies.
    - Pictures: Automatically sends existing primary image URL from `auction_items.image_url` or attributes; if no photo is yet uploaded in Outpost, attaches an eBay EPS-hosted placeholder so the listing is successfully created on eBay, allowing the seller to drag-and-drop live photos directly on eBay.
 2. **Gemini AI Description & Card Generation (`functions/api/ai/generate-ebay-details.js`)**:
-   - Exports `generateAiListingDetails(env, itemData)`: Invokes Google Gemini API (`gemini-3.5-flash-lite` with low-latency generation and automatic fallback to `gemini-3.5-flash`).
+   - Exports `generateAiListingDetails(env, itemData)`: Invokes Google Gemini API (`gemini-3.5-flash-lite` with transient backoff retry and automatic fallback to `gemini-3.8-flash` and `gemini-2.5-flash`).
    - Automatically sanitizes XSS vectors, strips internal tracking notes and warehouse lot codes via `stripInternalTrackingNotes`, and injects cards directly into Outpost's dark-theme HTML template.
 3. **eBay Trading API Integration (`createEbayListing` in `functions/api/ebay/tokenHelper.js`)**:
    - Constructs SOAP XML for `AddFixedPriceItem` with XML escaping, CDATA-wrapped HTML description, ConditionID mapping (`1000` New, `2750` Like New, `3000` Used, `1500` Open Box), and leaf category resolution.
@@ -953,7 +953,7 @@ Dynamic 5-platform listing rules registry, generator, AI optimizer, and pre-publ
    - Computes exact fee-adjusted pricing guidance per platform: Reverb (`ceil((net + 0.49) / 0.9181 * 1.12)`), Whatnot (`ceil((net + 0.30) / 0.891 * 1.12)`), Mercari (`ceil(net * 1.18)`), Facebook (`ceil(net * 1.15)`), eBay (`ceil((net + 0.40) / 0.864 * 1.12)`).
    - Resolves platform logistics: Facebook Tier 1 High-Value (`Local Police Precinct lot or QuikTrip (QT) Safe Place lot`) vs Tier 2 Lower-Risk (`Mason Mill Park`) meetups with `["Cash", "Apple Pay"]` only and `relist_title` (`<= 80` UTF-16); Mercari plain text `<= 1000` chars with zero URLs and `8-12` hashtags; Whatnot packed weight tiers and live-show scannable bullet notes; Reverb `3-day` handling, `< 48"` box disclosure, and double title + Block 1 pickguard disclosure; eBay restores full modular dark-card layout (`background-color:rgb(17,17,17); border:1px solid rgb(51,51,51);` with gold headings `rgb(241,193,91)`), store banner image (`fe4AAeSwSO1q8G1~`), delimiters (`ADD LISTING INFO HERE` / `END LISTING INFO HERE`), compact dark footer strip with `Browse All Listings` link, and dual `htmlBody` / `insertHtml` output for modal display and clipboard copy.
 2. **AI JSON Mode & Worker Wiring (`functions/api/ai/generate-ebay-details.js`, `src/worker.js`, `src/utils/auctionApi.js`)**:
-   - Preserves `gemini-3.5-flash-lite` (10s) + `gemini-3.5-flash` (15s) fallback via `x-goog-api-key` and routes `mode: 'platform_listing'` (`POST /api/ai/generate-ebay-details`) via `generateAiPlatformListing(env, itemData)`.
+   - Uses `gemini-3.5-flash-lite` (8s, 1 transient retry) + `gemini-3.8-flash` (10s) + `gemini-2.5-flash` (10s) fallback within a 14s budget via `x-goog-api-key`, surfaces status-specific 503/429/401-403 errors, and routes `mode: 'platform_listing'` (`POST /api/ai/generate-ebay-details`) via `generateAiPlatformListing(env, itemData)`.
    - Re-exports `PLATFORM_RULES_REGISTRY`, `getPlatformRules`, `buildPlatformPayload`, and `validatePlatformPayload` from `src/worker.js` while keeping the 85-route manifest intact.
    - Exposes `generateAiPlatformListingApi(payload)` in `src/utils/auctionApi.js` and `generateReverbCopy` / `generatePlatformListing` in `src/utils/listingCopyGenerator.js`.
 3. **Amber Tactical Listing Studio UI (`src/components/ListingCopyModal.jsx`)**:

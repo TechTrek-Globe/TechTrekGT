@@ -59,15 +59,80 @@ function extractTextFromGeminiResponse(data) {
   return '';
 }
 
+const GEMINI_MODELS = [
+  { id: 'gemini-3.5-flash-lite', timeoutMs: 8000 },
+  { id: 'gemini-3.8-flash', timeoutMs: 10000 },
+  { id: 'gemini-2.5-flash', timeoutMs: 10000 }
+];
+const TRANSIENT_GEMINI_STATUSES = new Set([429, 500, 502, 503, 504]);
+const TOTAL_GEMINI_BUDGET_MS = 14000;
+
+function buildGeminiUpstreamError(status, lastError) {
+  if (status === 401 || status === 403) {
+    return Object.assign(
+      new Error(`Gemini API authentication failed (${status}). Please check GEMINI_API_KEY configuration.`),
+      { statusCode: 502 }
+    );
+  }
+  if (status === 429) {
+    return Object.assign(
+      new Error('Gemini API rate limit exceeded (429). Please wait a moment and try again.'),
+      { statusCode: 429 }
+    );
+  }
+  if (status === 503) {
+    return Object.assign(
+      new Error('Gemini AI service is temporarily overloaded (503). Please try again in a few moments.'),
+      { statusCode: 503 }
+    );
+  }
+  if (status === 400 || status === 404) {
+    return Object.assign(
+      new Error(`Gemini API request rejected (${status}). Please verify model and request configuration.`),
+      { statusCode: 502 }
+    );
+  }
+  if (status && status >= 500) {
+    return Object.assign(
+      new Error(`Gemini AI service returned an upstream error (${status}). Please try again.`),
+      { statusCode: 502 }
+    );
+  }
+  if (lastError && (lastError.isTimeout || lastError.name === 'TimeoutError' || /timeout/i.test(lastError.message))) {
+    return Object.assign(
+      new Error('AI generation timed out after 15 seconds. Please try again.'),
+      { statusCode: 504, isTimeout: true }
+    );
+  }
+  if (lastError) {
+    return Object.assign(
+      new Error(lastError.message || 'Failed to communicate with AI generation service.'),
+      { statusCode: 500 }
+    );
+  }
+  return Object.assign(
+    new Error('Gemini API returned an empty response. Please try again.'),
+    { statusCode: 502 }
+  );
+}
+
 /**
- * Calls Google Gemini API using gemini-3.5-flash-lite (primary) with gemini-3.5-flash (fallback),
- * enforcing fetchWithTimeout (AUDIT-003 15s max) and header-only API key transmission.
+ * Calls Google Gemini API using gemini-3.5-flash-lite (primary) with gemini-3.8-flash and
+ * gemini-2.5-flash fallbacks, exponential backoff on transient 429/503 responses,
+ * fetchWithTimeout (AUDIT-003 15s max), and header-only API key transmission.
  */
 async function callGeminiWithFallback(apiKey, systemInstruction, userPrompt, responseMimeType = null) {
   let generatedText = '';
   const cleanApiKey = apiKey.trim();
+  const startedAt = Date.now();
+  let lastStatus = null;
+  let lastError = null;
+
+  const getRemainingBudgetMs = () => TOTAL_GEMINI_BUDGET_MS - (Date.now() - startedAt);
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   const callGenerateContent = async (model, timeoutMs = 15000) => {
+    const clampedTimeout = Math.max(1000, Math.min(15000, timeoutMs));
     const generateContentUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     const bodyPayload = {
       systemInstruction: {
@@ -90,47 +155,59 @@ async function callGeminiWithFallback(apiKey, systemInstruction, userPrompt, res
         'x-goog-api-key': cleanApiKey
       },
       body: JSON.stringify(bodyPayload)
-    }, timeoutMs);
+    }, clampedTimeout);
   };
 
-  try {
-    // Primary attempt: gemini-3.5-flash-lite for fast, low-latency generation
-    try {
-      const primaryRes = await callGenerateContent('gemini-3.5-flash-lite', 10000);
-      if (primaryRes.ok) {
-        const data = await primaryRes.json().catch(() => ({}));
-        generatedText = extractTextFromGeminiResponse(data);
-      } else {
-        const errBody = await primaryRes.text().catch(() => '');
-        console.warn(`[generate-ebay-details] Primary gemini-3.5-flash-lite returned ${primaryRes.status}: ${errBody.slice(0, 200)}. Falling back to gemini-3.5-flash.`);
-      }
-    } catch (primaryErr) {
-      console.warn(`[generate-ebay-details] Primary gemini-3.5-flash-lite exception: ${primaryErr.message}. Falling back to gemini-3.5-flash.`);
-    }
+  for (let mIdx = 0; mIdx < GEMINI_MODELS.length && !generatedText; mIdx++) {
+    const { id: modelId, timeoutMs } = GEMINI_MODELS[mIdx];
+    // Allow 1 backoff retry on the primary model for transient 429/503 spikes when budget permits
+    const maxAttempts = mIdx === 0 ? 2 : 1;
 
-    // Secondary attempt fallback: gemini-3.5-flash if primary attempt produced no text
-    if (!generatedText) {
-      const fallbackRes = await callGenerateContent('gemini-3.5-flash', 15000);
-      if (fallbackRes.ok) {
-        const fallbackData = await fallbackRes.json().catch(() => ({}));
-        generatedText = extractTextFromGeminiResponse(fallbackData);
-      } else {
-        const fallbackErr = await fallbackRes.text().catch(() => '');
-        console.error(`[generate-ebay-details] Fallback gemini-3.5-flash failed (${fallbackRes.status}):`, fallbackErr.slice(0, 300));
-        throw Object.assign(new Error(`Gemini API request failed (${fallbackRes.status}). Please check API key configuration.`), { statusCode: 502 });
+    for (let attempt = 0; attempt < maxAttempts && !generatedText; attempt++) {
+      const remaining = getRemainingBudgetMs();
+      if (remaining <= 1000) break;
+
+      if (attempt > 0 || mIdx > 0) {
+        const backoffMs = Math.min(800, 350 * Math.pow(2, attempt) + Math.floor(Math.random() * 150));
+        if (remaining - backoffMs > 1500) {
+          await sleep(backoffMs);
+        }
+      }
+
+      const callTimeout = Math.min(timeoutMs, Math.max(1000, getRemainingBudgetMs()));
+      try {
+        const res = await callGenerateContent(modelId, callTimeout);
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          generatedText = extractTextFromGeminiResponse(data);
+          if (generatedText) break;
+          console.warn(`[generate-ebay-details] ${modelId} returned 200 OK with empty text.`);
+          break;
+        }
+
+        lastStatus = res.status;
+        const errBody = await res.text().catch(() => '');
+        console.warn(`[generate-ebay-details] ${modelId} attempt ${attempt + 1} returned ${res.status}: ${errBody.slice(0, 200)}`);
+
+        // Auth or client request errors will not succeed on retry or alternate models
+        if (res.status === 401 || res.status === 403) {
+          throw buildGeminiUpstreamError(res.status, null);
+        }
+        if (!TRANSIENT_GEMINI_STATUSES.has(res.status)) {
+          break;
+        }
+      } catch (apiErr) {
+        if (apiErr.statusCode && apiErr.statusCode !== 504) {
+          throw apiErr;
+        }
+        lastError = apiErr;
+        console.warn(`[generate-ebay-details] ${modelId} attempt ${attempt + 1} exception: ${apiErr.message}`);
       }
     }
-  } catch (apiErr) {
-    if (apiErr.statusCode) throw apiErr;
-    if (apiErr.isTimeout || apiErr.name === 'TimeoutError' || /timeout/i.test(apiErr.message)) {
-      throw Object.assign(new Error('AI generation timed out after 15 seconds. Please try again.'), { statusCode: 504, isTimeout: true });
-    }
-    console.error('[generate-ebay-details] Network exception:', apiErr);
-    throw Object.assign(new Error(apiErr.message || 'Failed to communicate with AI generation service.'), { statusCode: 500 });
   }
 
   if (!generatedText || !generatedText.trim()) {
-    throw Object.assign(new Error('Gemini API returned an empty response. Please try again.'), { statusCode: 502 });
+    throw buildGeminiUpstreamError(lastStatus, lastError);
   }
 
   return generatedText;
@@ -138,7 +215,7 @@ async function callGeminiWithFallback(apiKey, systemInstruction, userPrompt, res
 
 /**
  * Generates context-aware eBay listing HTML cards (Condition and Key Details)
- * using the Google Gemini API (gemini-3.5-flash-lite with gemini-3.5-flash fallback).
+ * using the Google Gemini API (gemini-3.5-flash-lite with gemini-3.8-flash / gemini-2.5-flash fallbacks).
  *
  * @param {object} env - Cloudflare Worker env (GEMINI_API_KEY)
  * @param {object} itemData - Item details and notes

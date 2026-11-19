@@ -290,5 +290,76 @@ test('[AI-001] eBay Listing HTML Generator with AI Middle Section', async (t) =>
     assert.equal(disclosureMatches.length, 1, 'Must render collector disclosure strictly once in Block 4');
     assert.equal(/Collectible Custom Jersey Disclosure/i.test(copy.htmlBody), false, 'Must strip duplicate Collectible Custom Jersey Disclosure from Block 2');
   });
+
+  await t.test('generateEbayDetailsHandler retries 503 and falls back to gemini-3.8-flash', async () => {
+    const originalFetch = globalThis.fetch;
+    const calledUrls = [];
+    globalThis.fetch = async (url) => {
+      calledUrls.push(String(url));
+      if (String(url).includes('gemini-3.5-flash-lite')) {
+        return new Response('Service Unavailable', { status: 503 });
+      }
+      return new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '<div style="background-color:#ffffff;"><p>Recovered via 3.8 Flash</p></div>' }] } }]
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+
+    try {
+      const mockEnv = { JWT_SECRET: 'test-secret', GEMINI_API_KEY: 'test-key' };
+      const token = await createToken({ userId: 'usr-123', tv: 1 }, mockEnv.JWT_SECRET);
+      const req = new Request('http://localhost:3001/api/ai/generate-ebay-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: `auth_token=${token}` },
+        body: JSON.stringify({ title: 'Vintage Camera' })
+      });
+      const res = await generateEbayDetailsHandler({ request: req, env: mockEnv });
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.equal(data.success, true);
+      assert.ok(data.html.includes('Recovered via 3.8 Flash'));
+      assert.equal(calledUrls.filter(u => u.includes('gemini-3.5-flash-lite')).length, 2, 'Should retry primary once on 503');
+      assert.ok(calledUrls.some(u => u.includes('gemini-3.8-flash')), 'Should fall back to gemini-3.8-flash');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  await t.test('generateEbayDetailsHandler surfaces status-specific 503/429/401 errors accurately', async () => {
+    const originalFetch = globalThis.fetch;
+    const mockEnv = { JWT_SECRET: 'test-secret', GEMINI_API_KEY: 'test-key' };
+    const token = await createToken({ userId: 'usr-123', tv: 1 }, mockEnv.JWT_SECRET);
+
+    const makeReq = () => new Request('http://localhost:3001/api/ai/generate-ebay-details', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: `auth_token=${token}` },
+      body: JSON.stringify({ title: 'Vintage Camera' })
+    });
+
+    try {
+      // Persistent 503 -> 503 overloaded (not API key error)
+      globalThis.fetch = async () => new Response('Overloaded', { status: 503 });
+      const res503 = await generateEbayDetailsHandler({ request: makeReq(), env: mockEnv });
+      assert.equal(res503.status, 503);
+      const body503 = await res503.json();
+      assert.ok(body503.error.includes('503'));
+      assert.equal(/API key/i.test(body503.error), false, '503 error must not blame API key configuration');
+
+      // Persistent 429 -> 429 rate limit
+      globalThis.fetch = async () => new Response('Quota exceeded', { status: 429 });
+      const res429 = await generateEbayDetailsHandler({ request: makeReq(), env: mockEnv });
+      assert.equal(res429.status, 429);
+      const body429 = await res429.json();
+      assert.ok(/rate limit/i.test(body429.error));
+
+      // Upstream 403 -> 502 authentication failed (does not emit 401/403 logout)
+      globalThis.fetch = async () => new Response('Forbidden', { status: 403 });
+      const res403 = await generateEbayDetailsHandler({ request: makeReq(), env: mockEnv });
+      assert.equal(res403.status, 502);
+      const body403 = await res403.json();
+      assert.ok(body403.error.includes('GEMINI_API_KEY'));
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
 

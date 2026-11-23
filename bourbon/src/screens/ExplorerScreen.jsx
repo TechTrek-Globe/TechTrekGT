@@ -340,7 +340,7 @@ export default function ExplorerScreen() {
                 Whiskey Style
               </p>
               <div className="flex flex-wrap gap-1.5 text-xs">
-                {['all', 'Wheated', 'Rye', 'Single Barrel', 'Bottled in Bond', 'Barrel Proof', 'Small Batch'].map((t) => {
+                {['all', ...types].map((t) => {
                   const isSelected = filterType.toLowerCase() === t.toLowerCase()
                   return (
                     <button

@@ -271,7 +271,7 @@ export async function fetchBourbonData() {
 
   // Attempt local Worker proxy endpoint
   try {
-    const proxyResp = await fetch('/api/bourbon/data', { cache: 'no-cache' })
+    const proxyResp = await fetch(`${import.meta.env.BASE_URL}api/bourbon/data`, { cache: 'no-cache' })
     if (proxyResp.ok) {
       const text = await proxyResp.text()
       const rows = parseCsv(text)

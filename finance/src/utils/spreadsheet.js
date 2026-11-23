@@ -786,15 +786,28 @@ export function processSpreadsheetImport({
           }
           return acc;
         });
-      } else if (Object.keys(incomingRows).length > 0) {
+      } else {
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const hasIncomingRows = Object.keys(incomingRows).length > 0;
         nextAccounts = nextAccounts.map(acc => {
           if (acc.id === accIdForImport) {
-            const merged = { ...(acc.importedLedgerRows || {}), ...incomingRows };
+            const existingRows = (acc.importedLedgerRows && typeof acc.importedLedgerRows === 'object') ? acc.importedLedgerRows : {};
+            const hasFutureKeys = Object.keys(existingRows).some(dKey => dKey > todayStr);
+            if (!hasIncomingRows && !hasFutureKeys) return acc;
+
+            const sanitizedExisting = {};
+            for (const [dKey, rVal] of Object.entries(existingRows)) {
+              if (dKey <= todayStr) {
+                sanitizedExisting[dKey] = rVal;
+              }
+            }
+            const merged = hasIncomingRows ? { ...sanitizedExisting, ...incomingRows } : sanitizedExisting;
             metadataChanged = true;
             return {
               ...acc,
               importedLedgerRows: merged,
-              ledgerMode: 'import'
+              ledgerMode: hasIncomingRows ? 'import' : acc.ledgerMode
             };
           }
           return acc;

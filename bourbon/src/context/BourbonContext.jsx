@@ -176,12 +176,14 @@ export function BourbonProvider({ children }) {
   })
 
   // Aggregates for statistics and quick counts
-  const unicorns = state.data.filter((b) => b.isUnicorn || (b.valueRating && b.valueRating.includes('A+')))
+  const unicorns = state.data
+    .filter((b) => b.isUnicorn || (b.valueRating && b.valueRating.includes('A+')))
+    .sort((a, b) => (b.valueScore ?? -Infinity) - (a.valueScore ?? -Infinity))
   const strongValues = state.data.filter((b) => b.tier === 'strong' || (b.valueRating && b.valueRating.startsWith('A') && !b.valueRating.includes('A+')))
   const stealandGreat = state.data.filter((b) => b.isUnicorn || b.tier === 'strong')
 
   const distilleries = [...new Set(state.data.map((b) => b.distillery).filter(Boolean))].sort()
-  const types = ['Wheated Bourbon', 'Rye Whiskey', 'Single Barrel', 'Bottled in Bond', 'Barrel Proof', 'Small Batch']
+  const types = [...new Set(state.data.map((b) => b.type).filter(Boolean))].sort()
 
   const validScores = state.data.filter((b) => b.valueScore !== null)
   const avgValueScore = validScores.length

@@ -14,7 +14,7 @@ Application state is centralized in [bourbon/src/context/BourbonContext.jsx](fil
   - loading: Boolean indicating whether an active data fetch is in progress.
   - error: Error message string if data retrieval fails across all tiers.
   - lastUpdated: ISO timestamp or string reflecting the last successful catalog sync.
-  - dataSource: Origin indicator tracking whether active data stems from live, cache, or seed sources.
+  - dataSource: Origin indicator tracking whether active data stems from `'google-sheet'`, `'worker-proxy'`, `'seed-catalog'`, or `'loading'`.
   - searchQuery: Active text search query string.
   - activeTab: Current navigation screen (radar, explorer, search, sommelier).
   - sortBy: Current sort field (valueScore, sprigPrice, fairPrice, name, msrp).
@@ -43,7 +43,7 @@ Application state is centralized in [bourbon/src/context/BourbonContext.jsx](fil
 Holding the catalog in client memory enables instantaneous responsive interactions:
 
 - Zero Network Round-Trips: Filtering 100+ bottles by category or adjusting the maximum price slider does not issue network fetch requests.
-- Client-Side Memoization: Screen components utilize useMemo to compute filtered, sorted sub-arrays derived from state.data, guaranteeing 60fps rendering during continuous slider adjustments.
+- Client-Side Memoization & Aggregates: `BourbonContext` computes `unicorns` (sorted by `valueScore` descending), `strongValues`, `distilleries`, and `types` dynamically from `state.data`, while screen components compute filtered/sorted views synchronously in memory for 60fps rendering.
 - Detail Modal Cache: Clicking any bottle in the Explorer or Radar screens immediately mounts the bottle detail view with zero loading spinners, as the complete record already resides in memory.
 
 ## 4. Edge Proxy Caching (Cloudflare Cache API)

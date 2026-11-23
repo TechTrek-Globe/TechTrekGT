@@ -199,7 +199,7 @@ export default function BourbonCard({ bourbon, compact = false }) {
 
           {!compact && (
             <div className="grid grid-cols-3 gap-2 mt-2.5">
-              {sprigPrice !== null && (
+              {sprigPrice != null && (
                 <div className="stat-box py-1.5 px-2">
                   <p className="text-[8px] text-smoke-500 uppercase tracking-wide">Sprig Pour</p>
                   <p className="text-bourbon-300 font-semibold font-mono text-xs mt-0.5">
@@ -207,7 +207,7 @@ export default function BourbonCard({ bourbon, compact = false }) {
                   </p>
                 </div>
               )}
-              {fairPrice !== null && (
+              {fairPrice != null && (
                 <div className="stat-box py-1.5 px-2">
                   <p className="text-[8px] text-smoke-500 uppercase tracking-wide">Fair Bar (3.6x)</p>
                   <p className="text-smoke-300 font-semibold font-mono text-xs mt-0.5">
@@ -215,7 +215,7 @@ export default function BourbonCard({ bourbon, compact = false }) {
                   </p>
                 </div>
               )}
-              {msrp !== null && (
+              {msrp != null && (
                 <div className="stat-box py-1.5 px-2">
                   <p className="text-[8px] text-smoke-500 uppercase tracking-wide">Bottle (750ml)</p>
                   <p className="text-smoke-300 font-semibold font-mono text-xs mt-0.5">

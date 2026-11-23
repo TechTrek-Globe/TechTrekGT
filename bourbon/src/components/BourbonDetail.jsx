@@ -168,7 +168,7 @@ export default function BourbonDetail() {
 
             {/* Price Economics Grid (4 columns on desktop) */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mt-3">
-              {sprigPrice !== null && (
+              {sprigPrice != null && (
                 <div className="stat-box">
                   <p className="text-[9px] text-smoke-500 uppercase tracking-wide">Sprig Pour Price</p>
                   <p className="text-bourbon-300 font-bold font-mono text-xl sm:text-2xl mt-0.5">${sprigPrice.toFixed(2)}</p>
@@ -176,7 +176,7 @@ export default function BourbonDetail() {
                 </div>
               )}
 
-              {fairPrice !== null && (
+              {fairPrice != null && (
                 <div className="stat-box">
                   <p className="text-[9px] text-smoke-500 uppercase tracking-wide">Fair Bar Price (3.6x)</p>
                   <p className="text-smoke-200 font-bold font-mono text-xl sm:text-2xl mt-0.5">${fairPrice.toFixed(2)}</p>
@@ -184,7 +184,7 @@ export default function BourbonDetail() {
                 </div>
               )}
 
-              {rawCost !== null && (
+              {rawCost != null && (
                 <div className="stat-box">
                   <p className="text-[9px] text-smoke-500 uppercase tracking-wide">Raw 2oz Cost</p>
                   <p className="text-smoke-300 font-mono font-semibold text-sm sm:text-base mt-0.5">${rawCost.toFixed(2)}</p>
@@ -192,7 +192,7 @@ export default function BourbonDetail() {
                 </div>
               )}
 
-              {msrp !== null && (
+              {msrp != null && (
                 <div className="stat-box">
                   <p className="text-[9px] text-smoke-500 uppercase tracking-wide">Bottle MSRP (750ml)</p>
                   <p className="text-smoke-300 font-mono font-semibold text-sm sm:text-base mt-0.5">${msrp.toFixed(2)}</p>

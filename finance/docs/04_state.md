@@ -320,6 +320,7 @@ For every existing user, their personal ledger ID is identical to their user ID 
 - **Amortization Schedule Pagination:** Replaced the hard `.slice(0, 36)` cap with 60-period interactive pagination, period ranges, and previous/next controls.
 - **Ledger Windowing & Navigation:** `LedgerView.jsx` features active month windowing (+/- 4 months rendered with distant month placeholders and "Scroll into view" triggers), instant text and status filters, `Ctrl+J`/`Cmd+J`/`T` Jump to Today, and cell keyboard navigation.
 - **Bills Table Alignment & Grid Separators (`MainBudgetView.jsx`, `InlineEdit.jsx`):** `InlineEdit` honors explicit `justify-start` / `justify-center` overrides without CSS specificity collision against `justify-end`, and `MainBudgetView` enforces cell-level `border-b border-slate-800/80` and `border-r border-slate-800/80` grid dividers across `thead`, `tbody`, and `tfoot` (`border-t-2 border-slate-700`) under `border-separate border-spacing-0`.
+- **Recurring Bill `dueMonths` & Matrix Null/Lock Consistency:** `structuredBudgetStore.js` preserves `bill.dueMonths` across D1 save/restore round-trips (`finance_bills.due_months`), `LedgerView.jsx` ignores `null`/`''` bill matrix values consistently with `calculateRunningBalanceAsOf` (while treating numeric `0` as an explicit per-date suppression override), and `processSpreadsheetImport` (`spreadsheet.js`) prunes stale future `importedLedgerRows` (`> todayStr`) on merge imports to prevent unintended lock boundary advancement. Verified by `tests/fix-november-autoload-and-duemonths.test.js`.
 
 
 

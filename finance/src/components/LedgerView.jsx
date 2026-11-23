@@ -1078,7 +1078,7 @@ function DailySpreadsheetMatrix() {
           let amt = 0;
           const expectedBillAmt = round2(parseFloat(b.amount) || 0);
 
-          if (customBillVal !== undefined) {
+          if (customBillVal !== undefined && customBillVal !== null && customBillVal !== '') {
             // Tier 1: manual dailyMatrix override (drag-drop, inline edit, or actual transaction) wins outright
             hasDayBillOverride = true;
             amt = parseFloat(customBillVal) || 0;
@@ -2140,7 +2140,13 @@ function DailySpreadsheetMatrix() {
                                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                                   : 'text-slate-400'
                         }`}
-                        title={row.isStartRow ? "Account Starting Balance Row" : undefined}
+                        title={
+                          row.isStartRow
+                            ? "Account Starting Balance Row"
+                            : row.isHistoricalLock
+                              ? "Locked to imported data (scheduled projections suppressed)"
+                              : undefined
+                        }
                         >
                           {row.isToday ? 'NOW' : row.isStartRow ? 'START' : row.dayOfWeekName.substring(0, 3)}
                         </span>

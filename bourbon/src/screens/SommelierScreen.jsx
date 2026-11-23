@@ -33,6 +33,15 @@ const FLAVOR_PROFILES = [
     keywords: ['barrel proof', 'cask strength', 'full proof', 'uncut', 'hazmat', '120']
   },
   {
+    id: 'budget_8',
+    name: 'Under $8 Value Steals',
+    icon: '💸',
+    desc: 'Sub-$8 pours where the math beats retail hands down.',
+    maxPrice: 8,
+    minScore: 10,
+    keywords: []
+  },
+  {
     id: 'budget_alpha',
     name: 'Under $15 Value Steals',
     icon: '🎯',
@@ -66,7 +75,7 @@ export default function SommelierScreen() {
         return prof.keywords.some(k => text.includes(k))
       }
       return true
-    }).sort((a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0)).slice(0, 6)
+    }).sort((a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0))
   }, [selectedProfile, data])
 
   // Flight calculations
@@ -105,23 +114,27 @@ export default function SommelierScreen() {
 
     // Pattern matching against inventory
     if (query.includes('unicorn') || query.includes('rare') || query.includes('best value') || query.includes('math')) {
-      const topPours = [...unicorns].slice(0, 3)
+      const topPours = [...unicorns]
       if (topPours.length > 0) {
         recommendedPours = topPours
-        answerText = `By Brown Water Society mathematical protocols, our highest-alpha inventory allocation right now is ${topPours.map(p => `"${p.name}" (Sprig: $${p.sprigPrice?.toFixed(2) || '?'}, Value: +${p.valueScore}%)`).join(', ')}. Order one before the barrel runs dry.`
+        answerText = `By Brown Water Society mathematical protocols, our highest-alpha inventory allocation right now is ${topPours.slice(0, 3).map(p => `"${p.name}" (Sprig: $${p.sprigPrice?.toFixed(2) || '?'}, Value: +${p.valueScore}%)`).join(', ')}. Order one before the barrel runs dry.`
       } else {
-        const topScores = [...data].sort((a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0)).slice(0, 3)
+        const topScores = [...data].sort((a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0))
         recommendedPours = topScores
-        answerText = `Top mathematical value pours currently on the grid: ${topScores.map(p => `"${p.name}" (+${p.valueScore}%)`).join(', ')}.`
+        answerText = `Top mathematical value pours currently on the grid: ${topScores.slice(0, 3).map(p => `"${p.name}" (+${p.valueScore}%)`).join(', ')}.`
       }
-    } else if (query.includes('under') || query.includes('cheap') || query.includes('budget') || query.includes('$15') || query.includes('$10') || query.includes('$12')) {
-      const budget = data.filter(b => b.sprigPrice && b.sprigPrice <= 15).sort((a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0)).slice(0, 3)
+    } else if (query.includes('under') || query.includes('cheap') || query.includes('budget') || query.includes('$8') || query.includes('$15') || query.includes('$10') || query.includes('$12')) {
+      const priceMatch = query.match(/\$(\d+)/)
+      const cap = priceMatch ? parseInt(priceMatch[1], 10) : 15
+      const budget = data.filter(b => b.sprigPrice && b.sprigPrice <= cap).sort((a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0))
       recommendedPours = budget
-      answerText = `Looking for high-yield sips under $15? Sprig's grid reveals ${budget.map(b => `"${b.name}" at $${b.sprigPrice.toFixed(2)} (+${b.valueScore}% vs MSRP/oz)`).join(', ')}. Maximum satisfaction, zero wallet remorse.`
+      answerText = budget.length > 0
+        ? `Looking for high-yield sips under $${cap}? Sprig's grid reveals ${budget.slice(0, 3).map(b => `"${b.name}" at $${b.sprigPrice.toFixed(2)} (+${b.valueScore}% vs MSRP/oz)`).join(', ')}. Maximum satisfaction, zero wallet remorse.`
+        : `No pours under $${cap} were found on the current Sprig menu.`
     } else if (query.includes('strong') || query.includes('cask') || query.includes('proof') || query.includes('hazmat') || query.includes('hot')) {
-      const highProof = data.filter(b => b.proof && b.proof >= 110).sort((a, b) => b.proof - a.proof).slice(0, 3)
+      const highProof = data.filter(b => b.proof && b.proof >= 110).sort((a, b) => b.proof - a.proof)
       recommendedPours = highProof
-      answerText = `If you have the palate for heat and unadulterated cask strength, consult: ${highProof.map(b => `"${b.name}" at ${b.proof}° proof`).join(', ')}. Pour neat, let it breathe 5 minutes, and take a Kentucky chew.`
+      answerText = `If you have the palate for heat and unadulterated cask strength, consult: ${highProof.slice(0, 3).map(b => `"${b.name}" at ${b.proof}° proof`).join(', ')}. Pour neat, let it breathe 5 minutes, and take a Kentucky chew.`
     } else {
       // General search against name / distillery
       const matches = data.filter(b =>
@@ -129,13 +142,13 @@ export default function SommelierScreen() {
         b.distillery.toLowerCase().includes(query) ||
         b.type.toLowerCase().includes(query) ||
         b.notes.toLowerCase().includes(query)
-      ).slice(0, 3)
+      )
 
       if (matches.length > 0) {
         recommendedPours = matches
-        answerText = `Regarding "${sommelierPrompt}": On the Sprig grid, I recommend ${matches.map(m => `"${m.name}" ($${m.sprigPrice ? m.sprigPrice.toFixed(2) : '?'})`).join(', ')}. Each presents a distinct mathematical and sensory profile.`
+        answerText = `Regarding "${sommelierPrompt}": On the Sprig grid, I recommend ${matches.slice(0, 3).map(m => `"${m.name}" ($${m.sprigPrice ? m.sprigPrice.toFixed(2) : '?'})`).join(', ')}. Each presents a distinct mathematical and sensory profile.`
       } else {
-        const topAlpha = [...data].sort((a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0)).slice(0, 2)
+        const topAlpha = [...data].sort((a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0))
         recommendedPours = topAlpha
         answerText = `I don't see an exact hit for "${sommelierPrompt}", but the Brown Water Society data engine won't let you leave empty-handed. Try "${topAlpha[0]?.name}" ($${topAlpha[0]?.sprigPrice?.toFixed(2)}) for undisputed mathematical superiority.`
       }

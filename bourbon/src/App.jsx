@@ -86,7 +86,7 @@ function AppContent() {
           <div className="text-right hidden lg:block">
             <p className="text-[10px] text-smoke-500 uppercase tracking-wider font-mono">Sync Source</p>
             <p className="text-xs text-smoke-300 font-mono">
-              {dataSource === 'live' ? '🟢 Live Sheet' : dataSource === 'cache' ? '🟡 Edge Cache' : '⚪ Static Seed'}
+              {dataSource === 'google-sheet' ? '🟢 Live Sheet' : dataSource === 'worker-proxy' ? '🟡 Edge Cache' : '⚪ Static Seed'}
             </p>
           </div>
           <button

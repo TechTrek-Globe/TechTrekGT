@@ -21,7 +21,7 @@ function StatPill({ icon: Icon, label, value, color = 'bourbon' }) {
 }
 
 export default function RadarScreen() {
-  const { data, unicorns, avgValueScore, loading, lastUpdated, reload } = useBourbon()
+  const { data, unicorns, strongValues, avgValueScore, loading, lastUpdated, reload } = useBourbon()
 
   const topUnicorns = unicorns.slice(0, 5)
   const topValue = [...data]
@@ -92,7 +92,7 @@ export default function RadarScreen() {
           <StatPill
             icon={Sparkles}
             label="Strong Value Pours"
-            value={data.filter(b => b.tier === 'strong').length}
+            value={strongValues.length}
             color="smoke"
           />
         </div>

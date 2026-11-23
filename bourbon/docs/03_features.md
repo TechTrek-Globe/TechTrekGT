@@ -45,14 +45,14 @@ Bourbon Sommelier organizes exploration into four dedicated screen experiences:
 - Radar Screen ([bourbon/src/screens/RadarScreen.jsx](file:///e:/TechTrekGT/bourbon/src/screens/RadarScreen.jsx)): Highlights the top unicorn finds, high-value barrel-proof bottles, and limited allocations currently available at the bar.
 - Explorer Screen ([bourbon/src/screens/ExplorerScreen.jsx](file:///e:/TechTrekGT/bourbon/src/screens/ExplorerScreen.jsx)): The complete interactive catalog with multi-column sorting (value score, price, name, MSRP), classification filters, and pagination.
 - Search Screen ([bourbon/src/screens/SearchScreen.jsx](file:///e:/TechTrekGT/bourbon/src/screens/SearchScreen.jsx)): Real-time, instant fuzzy text search searching across bottle names, distilleries, mashbills, and tasting notes with instant keyboard response.
-- Sommelier Screen ([bourbon/src/screens/SommelierScreen.jsx](file:///e:/TechTrekGT/bourbon/src/screens/SommelierScreen.jsx)): An interactive guided recommendation engine that asks the patron for their price budget and flavor preference (sweet wheated, bold oak, spicy rye, or proof hound) and serves tailored pour suggestions.
+- Sommelier Screen ([bourbon/src/screens/SommelierScreen.jsx](file:///e:/TechTrekGT/bourbon/src/screens/SommelierScreen.jsx)): An interactive guided recommendation engine that asks the patron for their price budget (including Under $8 Value Steals and Under $15 Value Steals archetypes, plus dynamic `$N` budget Q&A matching) and flavor preference (sweet wheated, bold oak, spicy rye, or proof hound) and serves all matching pour suggestions from the full catalog without arbitrary truncation.
 
 ## 5. Attribute Filtering and Price Slider Controls
 
 Patrons can dynamically narrow the catalog to their exact requirements:
 
 - Dynamic Price Caps: Selectable price brackets (Under $15, $15 to $25, Over $25) or a precision numeric slider (maxPrice) to filter out bottles exceeding a target expenditure.
-- Type Filters: Toggle filters for Wheated, Rye, Barrel Proof, Single Barrel, and Bottled-in-Bond.
+- Type Filters: Toggle filters dynamically derived from the loaded catalog (`types` in `BourbonContext`, covering Wheated, Rye, Barrel Proof, Single Barrel, Bottled in Bond, Small Batch, Single Malt, Finished / Specialty, and Bourbon).
 - Distillery Filter: Dropdown selector filtering bottles by specific heritage distilleries.
 - Sorting Options: Instant sorting by valueScore, sprigPrice, fairPrice, bottle name, or MSRP in ascending or descending sequence.
 

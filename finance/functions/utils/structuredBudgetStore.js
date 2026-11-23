@@ -534,7 +534,7 @@ export function buildStructuredWriteStatements(db, ledgerId, payload, dataByteLe
       const amount = typeof b.amount === 'number' ? b.amount : 0;
       const period = typeof b.period === 'string' ? b.period : 'Monthly';
       const dueDay = Number(b.dueDay) || 1;
-      const dueMonths = JSON.stringify(b.months ?? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+      const dueMonths = JSON.stringify(b.dueMonths ?? b.months ?? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
       const paymentSource = typeof b.paymentSource === 'string' ? b.paymentSource : 'Auto Pay';
       const category = typeof b.category === 'string' ? b.category : 'Uncategorized';
       const splitsJson = JSON.stringify(b.splits ?? {});
@@ -941,7 +941,9 @@ export async function readStructuredBudget(db, ledgerId, fallbackJsonStr = null)
           setField('amount', Number(r.amount));
           setField('period', r.period);
           setField('dueDay', Number(r.due_day));
-          setField('months', parseJsonSafe(r.due_months, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]));
+          const parsedDueMonths = parseJsonSafe(r.due_months, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+          setField('dueMonths', parsedDueMonths);
+          setField('months', parsedDueMonths);
           setField('paymentSource', r.payment_source);
           setField('category', r.category);
           setField('splits', (splitsByBill[r.id] && Object.keys(splitsByBill[r.id]).length > 0)
